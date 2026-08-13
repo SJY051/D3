@@ -1,0 +1,4 @@
+interface:
+  display_name: "Judge0 Boundary"
+  short_description: "Integrate Judge0 behind D³ boundaries"
+  default_prompt: "Use $judge0-boundary to implement this D³ judge change with isolation, privacy, and contract evidence."

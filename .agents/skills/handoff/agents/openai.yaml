@@ -1,0 +1,6 @@
+interface:
+  display_name: "Handoff"
+  short_description: "Prepare a precise D³ work handoff"
+  default_prompt: "Use $handoff to prepare the current work for another teammate."
+policy:
+  allow_implicit_invocation: false

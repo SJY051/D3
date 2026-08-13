@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d3.local/contracts/websocket/battle-event.v1.schema.json",
+  "title": "Battle WebSocket Event v1",
+  "x-requirements": ["D3-BTL-002", "D3-BTL-004"],
+  "type": "object",
+  "required": ["type", "version", "matchId", "sequence", "serverTime", "payload"],
+  "properties": {
+    "type": {
+      "enum": ["MATCH_STATE", "TIMER_SYNC", "PLAYER_ACTIVITY", "CONNECTION_STATE", "ATTACK_WARNING", "ATTACK_APPLIED", "SUBMISSION_STATE", "MATCH_RESULT"]
+    },
+    "version": { "type": "integer", "const": 1 },
+    "matchId": { "type": "string", "format": "uuid" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "serverTime": { "type": "string", "format": "date-time" },
+    "payload": { "type": "object" }
+  },
+  "additionalProperties": false
+}

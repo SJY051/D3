@@ -1,0 +1,26 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: judge-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  datasource:
+    url: ${JUDGE_DB_URL:jdbc:postgresql://localhost:5432/d3_judge}
+    username: ${JUDGE_DB_USER:d3_judge}
+    password: ${JUDGE_DB_PASSWORD:local-only}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

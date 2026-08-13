@@ -1,0 +1,39 @@
+name: Feature
+description: 구현할 사용자 가치를 요구사항과 검증 증거에 연결합니다.
+title: "feat: "
+body:
+  - type: input
+    id: requirements
+    attributes:
+      label: Requirement IDs
+      description: "예: D3-BTL-003"
+      placeholder: D3-...
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Observable outcome
+      description: 사용자가 관찰할 수 있는 결과를 적어 주세요.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary area
+      options: [identity, battle, judge, community, web, platform, contracts, infrastructure]
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance evidence
+      description: 자동 테스트, 계약 검사, 스크린샷 또는 시연 절차를 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Non-goals and dependencies
+    validations:
+      required: true

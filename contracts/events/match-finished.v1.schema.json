@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d3.local/contracts/events/match-finished.v1.schema.json",
+  "title": "match.finished.v1",
+  "x-requirements": ["D3-BTL-002", "D3-BTL-003", "D3-BTL-005"],
+  "allOf": [
+    { "$ref": "./envelope.v1.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "match.finished" },
+        "data": {
+          "type": "object",
+          "required": ["matchId", "result", "ranked", "playerIds"],
+          "properties": {
+            "matchId": { "type": "string", "format": "uuid" },
+            "result": { "enum": ["PLAYER_ONE_WIN", "PLAYER_TWO_WIN", "DRAW", "VOIDED"] },
+            "ranked": { "type": "boolean" },
+            "playerIds": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "string", "format": "uuid" } }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "D3 Community API",
+    "version": "0.0.0-scaffold",
+    "description": "No operations are implemented in the scaffold."
+  },
+  "x-requirements": ["D3-COM-001", "D3-STAT-001"],
+  "paths": {}
+}
+

@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  color: #18181b;
+  background: #fafafa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+.scaffold-shell {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.scaffold-header,
+.scaffold-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  border-bottom: 1px solid #a1a1aa;
+  padding: 12px 0;
+}
+
+.scaffold-brand {
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.scaffold-nav a[aria-current="page"] {
+  font-weight: 800;
+  text-decoration-thickness: 3px;
+}
+
+.scaffold-page {
+  padding: 32px 0;
+}
+
+.scaffold-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.scaffold-grid section {
+  min-height: 160px;
+  border: 1px dashed #71717a;
+  padding: 16px;
+}

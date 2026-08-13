@@ -1,0 +1,26 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: community-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  datasource:
+    url: ${COMMUNITY_DB_URL:jdbc:postgresql://localhost:5432/d3_community}
+    username: ${COMMUNITY_DB_USER:d3_community}
+    password: ${COMMUNITY_DB_PASSWORD:local-only}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

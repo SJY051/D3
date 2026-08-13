@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify Change"
+  short_description: "Verify a D³ change against its contract"
+  default_prompt: "Use $verify-change to check this change and report evidence."

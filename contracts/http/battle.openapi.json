@@ -1,0 +1,11 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "D3 Battle API",
+    "version": "0.0.0-scaffold",
+    "description": "No operations are implemented in the scaffold."
+  },
+  "x-requirements": ["D3-BTL-001", "D3-BTL-002", "D3-BTL-003", "D3-BTL-004", "D3-BTL-005", "D3-SOLO-001", "D3-ADM-001"],
+  "paths": {}
+}
+

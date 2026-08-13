@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spring Service"
+  short_description: "Implement D³ Spring services safely"
+  default_prompt: "Use $spring-service to implement this D³ Spring service change within its requirement and data boundary."

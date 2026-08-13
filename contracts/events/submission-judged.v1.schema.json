@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d3.local/contracts/events/submission-judged.v1.schema.json",
+  "title": "submission.judged.v1",
+  "x-requirements": ["D3-JDG-001", "D3-BTL-003"],
+  "allOf": [
+    { "$ref": "./envelope.v1.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "submission.judged" },
+        "data": {
+          "type": "object",
+          "required": ["submissionId", "status", "language", "evidenceVersion"],
+          "properties": {
+            "submissionId": { "type": "string", "format": "uuid" },
+            "status": { "enum": ["ACCEPTED", "WRONG_ANSWER", "COMPILATION_ERROR", "RUNTIME_ERROR", "TIME_LIMIT", "MEMORY_LIMIT", "PLATFORM_FAILURE"] },
+            "language": { "enum": ["C", "CPP", "JAVA", "PYTHON3", "JAVASCRIPT", "TYPESCRIPT"] },
+            "evidenceVersion": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

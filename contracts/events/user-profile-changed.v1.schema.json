@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d3.local/contracts/events/user-profile-changed.v1.schema.json",
+  "title": "user-profile.changed.v1",
+  "x-requirements": ["D3-ID-001", "D3-STAT-001"],
+  "allOf": [
+    { "$ref": "./envelope.v1.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "user-profile.changed" },
+        "data": {
+          "type": "object",
+          "required": ["userId", "handle", "profileVersion"],
+          "properties": {
+            "userId": { "type": "string", "format": "uuid" },
+            "handle": { "type": "string", "minLength": 1 },
+            "profileVersion": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

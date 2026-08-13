@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d3.local/contracts/events/rating-changed.v1.schema.json",
+  "title": "rating.changed.v1",
+  "x-requirements": ["D3-BTL-005", "D3-STAT-001"],
+  "allOf": [
+    { "$ref": "./envelope.v1.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "rating.changed" },
+        "data": {
+          "type": "object",
+          "required": ["userId", "matchId", "ratingBefore", "ratingAfter", "seasonRpAfter", "tierAfter"],
+          "properties": {
+            "userId": { "type": "string", "format": "uuid" },
+            "matchId": { "type": "string", "format": "uuid" },
+            "ratingBefore": { "type": "integer" },
+            "ratingAfter": { "type": "integer" },
+            "seasonRpAfter": { "type": "integer", "minimum": 0 },
+            "tierAfter": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

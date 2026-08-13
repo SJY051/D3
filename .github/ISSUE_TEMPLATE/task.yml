@@ -1,0 +1,29 @@
+name: Task
+description: 문서, 조사, 구성 또는 품질 작업을 배정합니다.
+title: "chore: "
+body:
+  - type: input
+    id: requirements
+    attributes:
+      label: Requirement or artifact IDs
+      placeholder: D3-... or artifact path
+    validations:
+      required: true
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: Bounded deliverable
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+    validations:
+      required: true
+  - type: textarea
+    id: exclusions
+    attributes:
+      label: Explicit exclusions and blockers
+    validations:
+      required: true

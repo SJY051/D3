@@ -1,0 +1,18 @@
+{
+  "description": "Validate shared D3 agent guidance after file edits.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/scripts/verify-agent-config.mjs\"",
+            "timeout": 30,
+            "statusMessage": "Checking shared agent guidance"
+          }
+        ]
+      }
+    ]
+  }
+}

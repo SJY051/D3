@@ -1,0 +1,4 @@
+interface:
+  display_name: "Realtime Battle"
+  short_description: "Build authoritative D³ battle flows"
+  default_prompt: "Use $realtime-battle to implement this D³ match or WebSocket change from the authoritative battle contract."

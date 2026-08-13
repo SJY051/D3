@@ -1,0 +1,13 @@
+// D³ logical ERD scaffold — D3-DOC-001
+// Physical columns and relationships are intentionally absent until the owning
+// issue defines invariants and migration acceptance evidence.
+
+// identity_db candidates: users, auth_identities, refresh_sessions
+// battle_db candidates: problems, matches, match_players, ratings, seasons, outbox_events
+// judge_db candidates: submissions, judge_runs, evaluation_evidence, outbox_events
+// community_db candidates: posts, follows, comments, likes, profile_projections,
+//                          match_projections, inbox_events
+
+// Cross-database foreign keys are prohibited. Cross-boundary references use
+// stable IDs plus contract versions and are drawn as logical references only.
+

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Start Issue"
+  short_description: "Begin a scoped D³ issue safely"
+  default_prompt: "Use $start-issue to prepare work for the assigned issue."
+policy:
+  allow_implicit_invocation: false

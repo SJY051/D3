@@ -1,0 +1,13 @@
+pre-commit:
+  parallel: true
+  commands:
+    scaffold:
+      run: pnpm verify:scaffold
+    web-types:
+      glob: "apps/web/**/*.{ts,tsx,json,css,html}"
+      run: pnpm --filter @d3/web typecheck
+
+commit-msg:
+  commands:
+    conventional-title:
+      run: node scripts/check-commit-message.mjs {1}

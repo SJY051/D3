@@ -1,0 +1,28 @@
+{
+  "name": "d3",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24 <27",
+    "pnpm": ">=11 <12"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "lefthook": "2.1.10"
+  },
+  "scripts": {
+    "prepare": "lefthook install",
+    "hooks:install": "lefthook install",
+    "verify:structure": "node scripts/verify-structure.mjs",
+    "verify:contracts": "node scripts/verify-contracts.mjs",
+    "verify:agents": "node scripts/verify-agent-config.mjs",
+    "verify:scaffold": "pnpm verify:structure && pnpm verify:contracts && pnpm verify:agents",
+    "web:typecheck": "pnpm --filter @d3/web typecheck",
+    "web:test": "pnpm --filter @d3/web test",
+    "web:e2e": "pnpm --filter @d3/web test:e2e",
+    "web:build": "pnpm --filter @d3/web build",
+    "demo:preflight": "node scripts/demo-preflight.mjs"
+  }
+}
