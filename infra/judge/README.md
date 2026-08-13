@@ -62,7 +62,7 @@ Judge0 CE 1.13.1 runs its server and worker containers with Docker `privileged: 
 
 ## Runtime matrix
 
-This matrix comes from the authenticated `/languages` response and command `00f2045c-40aa-4ac6-a630-527d30acc2fa`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays.
+This matrix comes from the authenticated `/languages` response and command `cf367b91-3c16-4548-9f32-6c21234494de`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays and enforcing unique exact runtime mappings.
 
 | Product language | Judge0 ID | Observed runtime | Hello-world | Deterministic case |
 |---|---:|---|---|---|

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 readonly base_url="${JUDGE0_BASE_URL:-http://127.0.0.1:2358}"
+readonly poll_deadline_seconds="${D3_JUDGE_POLL_DEADLINE_SECONDS:-30}"
 : "${JUDGE0_AUTH_HEADER:?Set JUDGE0_AUTH_HEADER without printing it.}"
 : "${JUDGE0_AUTH_TOKEN:?Set JUDGE0_AUTH_TOKEN without printing it.}"
 : "${D3_JUDGE_C_ID:?Set the verified C language ID.}"
@@ -19,8 +20,14 @@ case "$base_url" in
     ;;
 esac
 
+if [[ ! "$poll_deadline_seconds" =~ ^[1-9][0-9]*$ ]] || (( poll_deadline_seconds > 30 )); then
+  echo "D3_JUDGE_POLL_DEADLINE_SECONDS must be an integer from 1 through 30." >&2
+  exit 2
+fi
+
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf -- "$tmp_dir"' EXIT
+available_languages=""
 
 auth_curl() {
   curl --fail --silent --show-error --max-time 15 \
@@ -28,13 +35,26 @@ auth_curl() {
     "$@"
 }
 
+auth_curl_with_timeout() {
+  local timeout_seconds="$1"
+  shift
+  curl --fail --silent --show-error --max-time "$timeout_seconds" \
+    --header "${JUDGE0_AUTH_HEADER}: ${JUDGE0_AUTH_TOKEN}" \
+    "$@"
+}
+
 wait_for_submission() {
   local token="$1"
-  local result status_id
+  local deadline remaining result status_id
 
-  for _ in {1..120}; do
-    result="$(auth_curl \
-      "${base_url}/submissions/${token}?base64_encoded=false&fields=token,language_id,status,time,memory")"
+  deadline=$((SECONDS + poll_deadline_seconds))
+  while (( SECONDS < deadline )); do
+    remaining=$((deadline - SECONDS))
+    if ! result="$(auth_curl_with_timeout "$remaining" \
+      "${base_url}/submissions/${token}?base64_encoded=false&fields=language_id,status,time,memory" 2>/dev/null)"; then
+      sleep 0.25
+      continue
+    fi
     status_id="$(jq -er '.status.id' <<<"$result")"
     if (( status_id > 2 )); then
       jq -c '{languageId: .language_id, status: .status.description, time, memory}' <<<"$result"
@@ -43,8 +63,23 @@ wait_for_submission() {
     sleep 0.25
   done
 
-  echo "Submission polling exceeded 30 seconds." >&2
+  echo "Submission polling reached the ${poll_deadline_seconds}-second deadline." >&2
   return 1
+}
+
+validate_language_mapping() {
+  local product_language="$1"
+  local language_id="$2"
+  local expected_name="$3"
+  local actual_name
+
+  actual_name="$(jq -er --argjson id "$language_id" \
+    '[.[] | select(.id == $id)] | if length == 1 then .[0].name else error("runtime ID is missing or duplicated") end' \
+    <<<"$available_languages")"
+  if [[ "$actual_name" != "$expected_name" ]]; then
+    echo "${product_language} runtime mismatch: expected '${expected_name}', got '${actual_name}'." >&2
+    return 1
+  fi
 }
 
 run_case() {
@@ -115,7 +150,19 @@ language_ids="$(jq -cn \
   --argjson javascript "$D3_JUDGE_JAVASCRIPT_ID" \
   --argjson typescript "$D3_JUDGE_TYPESCRIPT_ID" \
   '[$c, $cpp, $java, $python3, $javascript, $typescript]')"
-auth_curl "${base_url}/languages" | jq -c --argjson ids "$language_ids" \
+if [[ "$(jq 'unique | length' <<<"$language_ids")" != "6" ]]; then
+  echo "Each product language must use a unique Judge0 runtime ID." >&2
+  exit 1
+fi
+
+available_languages="$(auth_curl "${base_url}/languages")"
+validate_language_mapping "C" "$D3_JUDGE_C_ID" "C (GCC 9.2.0)"
+validate_language_mapping "C++" "$D3_JUDGE_CPP_ID" "C++ (GCC 9.2.0)"
+validate_language_mapping "Java" "$D3_JUDGE_JAVA_ID" "Java (OpenJDK 13.0.1)"
+validate_language_mapping "Python 3" "$D3_JUDGE_PYTHON3_ID" "Python (3.8.1)"
+validate_language_mapping "JavaScript" "$D3_JUDGE_JAVASCRIPT_ID" "JavaScript (Node.js 12.14.0)"
+validate_language_mapping "TypeScript" "$D3_JUDGE_TYPESCRIPT_ID" "TypeScript (3.7.4)"
+printf '%s' "$available_languages" | jq -c --argjson ids "$language_ids" \
   '[.[] | select(.id as $id | $ids | index($id)) | {id, name}]'
 
 network_payload="$(jq -cn --argjson languageId "$D3_JUDGE_PYTHON3_ID" \
