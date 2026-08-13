@@ -163,7 +163,11 @@ Table battle_db.match_player {
   reconnect_deadline_at timestamptz
   accepted_submission_id uuid [note: 'Logical judge contract reference; no cross-database FK']
   attempts int [not null, default: 0]
-  score numeric
+  score numeric [note: 'Committed total; null before result calculation']
+  speed_score_component numeric [note: 'Committed D3-BTL-003 speed component; null before result calculation']
+  efficiency_score_component numeric [note: 'Committed dynamic-efficiency component; null before result calculation']
+  submission_score_component numeric [note: 'Committed submission-discipline component; null before result calculation']
+  score_calculation_version text [note: 'Immutable formula and weight version used for the committed components']
   rating_before int
   rating_after int
   rp_before int

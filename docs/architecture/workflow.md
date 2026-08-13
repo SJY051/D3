@@ -57,7 +57,7 @@ sequenceDiagram
   K-->>BT: Idempotent judged event
   BT->>BT: Correlate event; lock only an accepted SUBMIT
   Note over BT,J: Outcome calculation waits for an approved safe scoring-evidence boundary
-  BT->>BT: Determine outcome after scoring evidence is available
+  BT->>BT: Commit outcome, named score components and calculation version
   BT-->>G: Per-player final outcome, score, rating and RP
   G-->>WA: Forward Player A result
   G-->>WB: Forward Player B result
