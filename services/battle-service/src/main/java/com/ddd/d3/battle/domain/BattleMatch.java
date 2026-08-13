@@ -3,6 +3,7 @@ package com.ddd.d3.battle.domain;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -186,8 +187,9 @@ public final class BattleMatch {
         Instant now = clock.instant();
         Optional<String> expiredPlayer = reconnectDeadlines.entrySet().stream()
                 .filter(entry -> !now.isBefore(entry.getValue()))
-                .map(Map.Entry::getKey)
-                .findFirst();
+                .min(Comparator.comparing(Map.Entry<String, Instant>::getValue)
+                        .thenComparing(Map.Entry::getKey))
+                .map(Map.Entry::getKey);
         if (expiredPlayer.isPresent()) {
             finish(new Result(
                     Outcome.WIN,
@@ -239,10 +241,7 @@ public final class BattleMatch {
             }
             throw new IllegalStateException("Player is not disconnected");
         }
-        Long completedGeneration = successfullyReconnectedGenerations.get(playerId);
-        if (connectionGeneration < activeGeneration
-                && completedGeneration != null
-                && connectionGeneration <= completedGeneration) {
+        if (connectionGeneration < activeGeneration) {
             return;
         }
         if (connectionGeneration != activeGeneration) {

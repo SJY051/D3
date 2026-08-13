@@ -186,6 +186,36 @@ class BattleMatchTest {
     }
 
     @Test
+    void d3Btl002UsesTheEarliestExpiredReconnectDeadline() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+        clock.advance(Duration.ofSeconds(5));
+        match.handle(new BattleMatch.Disconnect(PLAYER_TWO, 1));
+        clock.advance(Duration.ofSeconds(5));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 2));
+        clock.advance(Duration.ofSeconds(30));
+
+        match.handle(new BattleMatch.AdvanceTime());
+
+        assertEquals(PLAYER_ONE, match.result().orElseThrow().winnerId());
+    }
+
+    @Test
+    void d3Btl002IgnoresSkippedReconnectGenerationsOlderThanTheActiveCycle() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 3));
+
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 2));
+
+        assertTrue(match.isDisconnected(PLAYER_ONE));
+    }
+
+    @Test
     void d3Btl002RetainsReconnectIdempotencyAcrossCompletedGenerations() {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
