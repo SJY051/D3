@@ -213,6 +213,66 @@ run_case() {
     '{case: $caseLabel, result: "PASS", evidence: $actual}'
 }
 
+run_default_case() {
+  local label="$1"
+  local language_id="$2"
+  local source_code="$3"
+  local stdin_text="$4"
+  local expected_output="$5"
+  local expected_status_pattern="$6"
+  local expected_memory="${7:-}"
+  local expected_time_min="${8:-}"
+  local expected_time_max="${9:-}"
+  local payload token result status actual_memory
+
+  payload="$(jq -cn \
+    --arg sourceCode "$source_code" \
+    --arg stdin "$stdin_text" \
+    --arg expectedOutput "$expected_output" \
+    --argjson languageId "$language_id" \
+    '{
+      source_code: $sourceCode,
+      language_id: $languageId,
+      stdin: $stdin,
+      expected_output: $expectedOutput,
+      enable_network: false
+    }')"
+  token="$(auth_curl \
+    --header 'Content-Type: application/json' \
+    --request POST \
+    --data "$payload" \
+    "${base_url}/submissions?base64_encoded=false&wait=false" | jq -er '.token')"
+  result="$(wait_for_submission "$token")"
+  status="$(jq -er '.status' <<<"$result")"
+  if [[ ! "$status" =~ $expected_status_pattern ]]; then
+    jq -cn --arg caseLabel "$label" --arg expected "$expected_status_pattern" --argjson actual "$result" \
+      '{case: $caseLabel, result: "FAIL", expectedStatusPattern: $expected, actual: $actual}'
+    return 1
+  fi
+  if [[ -n "$expected_memory" ]]; then
+    actual_memory="$(jq -er '.memory' <<<"$result")"
+    if [[ "$actual_memory" != "$expected_memory" ]]; then
+      jq -cn --arg caseLabel "$label" --argjson expectedMemory "$expected_memory" --argjson actual "$result" \
+        '{case: $caseLabel, result: "FAIL", expectedMemoryKiB: $expectedMemory, actual: $actual}'
+      return 1
+    fi
+  fi
+  if [[ -n "$expected_time_min" || -n "$expected_time_max" ]]; then
+    if [[ -z "$expected_time_min" || -z "$expected_time_max" ]] ||
+      ! jq -e --argjson min "$expected_time_min" --argjson max "$expected_time_max" \
+        '.time != null and ((.time | tonumber) >= $min) and ((.time | tonumber) <= $max)' \
+        >/dev/null <<<"$result"; then
+      jq -cn --arg caseLabel "$label" \
+        --arg expectedMin "$expected_time_min" --arg expectedMax "$expected_time_max" \
+        --argjson actual "$result" \
+        '{case: $caseLabel, result: "FAIL", expectedTimeSeconds: {min: $expectedMin, max: $expectedMax}, actual: $actual}'
+      return 1
+    fi
+  fi
+  jq -cn --arg caseLabel "$label" --argjson actual "$result" \
+    '{case: $caseLabel, result: "PASS", evidence: $actual}'
+}
+
 unauthenticated_code="$(curl -q --noproxy '*' --silent --show-error --max-time 5 \
   --output "$tmp_dir/unauthenticated.json" --write-out '%{http_code}' \
   "${base_url}/version" || true)"
@@ -349,3 +409,19 @@ run_case "file-size-control" "$D3_JUDGE_PYTHON3_ID" \
 run_case "file-size-limit" "$D3_JUDGE_PYTHON3_ID" \
   $'with open("large.bin", "wb") as output:\n    output.write(b"x" * (256 * 1024))\nprint("OPEN")' \
   "" "" '^Runtime Error' 2 5 262144 "" "" "" 65536 60 64
+
+run_default_case "default-cpu-time" "$D3_JUDGE_PYTHON3_ID" 'while True: pass' \
+  "" "" '^Time Limit Exceeded$' "" 1.8 2.6
+run_default_case "default-wall-time" "$D3_JUDGE_PYTHON3_ID" \
+  $'import time\ntime.sleep(7)\nprint("OPEN")' "" "" '^Time Limit Exceeded$' "" 0 0.2
+run_default_case "default-memory" "$D3_JUDGE_PYTHON3_ID" \
+  'bytearray(300 * 1024 * 1024)' "" "" '^Runtime Error' 262144
+run_default_case "default-process-limit" "$D3_JUDGE_PYTHON3_ID" \
+  $'import os, time\nchildren = []\nblocked = False\ntry:\n    for _ in range(70):\n        pid = os.fork()\n        if pid == 0:\n            time.sleep(0.2)\n            os._exit(0)\n        children.append(pid)\nexcept OSError:\n    blocked = True\nfinally:\n    for pid in children:\n        try:\n            os.waitpid(pid, 0)\n        except ChildProcessError:\n            pass\nprint("BLOCKED" if blocked else "OPEN")' \
+  "" $'BLOCKED\n' '^Accepted$'
+run_default_case "default-stack-limit" "$D3_JUDGE_C_ID" \
+  $'#include <stdio.h>\n__attribute__((noinline)) void dive(int n) { volatile char pad[1024 * 1024]; pad[0] = (char)n; if (n > 0) dive(n - 1); if (pad[0] == 127) puts("never"); }\nint main(void) { dive(80); puts("OPEN"); return 0; }' \
+  "" "" '^Runtime Error'
+run_default_case "default-file-size" "$D3_JUDGE_PYTHON3_ID" \
+  $'with open("large.bin", "wb") as output:\n    output.write(b"x" * (2 * 1024 * 1024))\nprint("OPEN")' \
+  "" "" '^Runtime Error'
