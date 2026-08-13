@@ -62,7 +62,7 @@ Judge0 CE 1.13.1 runs its server and worker containers with Docker `privileged: 
 
 ## Runtime matrix
 
-This matrix comes from the authenticated `/languages` response and command `cf367b91-3c16-4548-9f32-6c21234494de`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays and enforcing unique exact runtime mappings.
+This matrix comes from the authenticated `/languages` response and command `fe0f31bd-70e6-4955-ba57-a9f7bcba1b95`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays, enforcing unique exact runtime mappings, bypassing hostile proxy variables, and asserting the 65,536 KiB memory boundary.
 
 | Product language | Judge0 ID | Observed runtime | Hello-world | Deterministic case |
 |---|---:|---|---|---|
@@ -83,7 +83,7 @@ The initially exposed generated values were rotated, the empty bootstrap databas
 
 ## Sanitized smoke
 
-Run [`smoke.sh`](smoke.sh) on the instance through SSM. It refuses non-loopback endpoints by default, reads credentials only from environment variables, emits no source, compiler output, hidden input, API credential, or submission token, and deletes its temporary response files.
+Run [`smoke.sh`](smoke.sh) on the instance through SSM. It refuses non-loopback endpoints, forces every loopback request to bypass environment proxies, reads credentials only from environment variables, emits no source, compiler output, hidden input, API credential, or submission token, and deletes its temporary response files.
 
 On the instance, obtain the authentication values without printing them, export the six IDs from the verified matrix, and run the script:
 
@@ -152,7 +152,7 @@ Do not delete the shared VPC, subnet, route table, internet gateway, account-lev
 | API auth and request/resource limits | PASS |
 | Submission network isolation | PASS: opt-in HTTP 422 and executed outbound socket blocked |
 | Six-language hello-world and deterministic sum | PASS: 12/12 cases |
-| Accepted, wrong answer, compilation, runtime, timeout, memory | PASS |
+| Accepted, wrong answer, compilation, runtime, timeout, memory | PASS: memory-pressure evidence asserted exactly 65,536 KiB |
 | Platform failure normalization | PASS in PR #20 fake-adapter test; live outage injection NOT RUN |
 | Runtime log privacy | PASS after overlay and secret rotation: 0 secret/source matches |
 | Reboot persistence | PASS: systemd active, cgroup v1, repository overlay hashes, authenticated Python execution, and zero secret log matches |
