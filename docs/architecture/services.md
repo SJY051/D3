@@ -19,7 +19,7 @@ Gateway authentication does not replace service authorization. Every domain serv
 
 ## Communication rules
 
-- Battle requests judge job acceptance synchronously through a versioned client boundary, then persists the returned stable submission ID with its match, player, attempt and `RUN`/`SUBMIT` mode before acknowledging acceptance.
+- Battle requests judge job acceptance synchronously through a versioned client boundary, then persists the returned stable submission ID with its match, player, attempt, `RUN`/`SUBMIT` mode and stable command ID before acknowledging acceptance. Distinct `RUN` commands receive distinct command IDs without incrementing the submission attempt; retries reuse the original ID.
 - Judge publishes `submission.judged.v1` after durable evaluation.
 - Battle publishes `match.finished.v1` and `rating.changed.v1` from an outbox after committing the result.
 - Identity publishes `user-profile.changed.v1` for consumer-owned projections.

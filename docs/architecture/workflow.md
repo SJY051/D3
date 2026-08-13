@@ -49,7 +49,7 @@ sequenceDiagram
   G->>BT: Match-scoped command
   BT->>J: Accept versioned judge job
   J-->>BT: Stable submission ID
-  BT->>BT: Persist submission-to-match, player and RUN/SUBMIT mode correlation
+  BT->>BT: Persist submission-to-match, player, mode and command id correlation
   J->>J0: Execute within pinned limits
   J0-->>J: Raw execution result
   J->>J: Normalize and persist evidence
@@ -105,7 +105,7 @@ stateDiagram-v2
 
 ## Contract activation gap
 
-The current Judge HTTP stub does not yet define the synchronous acceptance response. Before accepting a job to the client, Judge must return a stable submission ID and Battle must durably map it to the match, player, attempt and `RUN`/`SUBMIT` mode; otherwise a restart cannot correlate a later `submission.judged.v1` event or distinguish a public-example `ACCEPTED` result from an accepted hidden-test submission. That event also exposes only status, language and an opaque evidence version, while the Judge HTTP stub has no safe evidence read operation. D3-BTL-003 outcome calculation therefore remains blocked until an approved versioned event summary or Judge-owned read contract exposes the minimum hidden-test progress and dynamic runtime evidence without source or hidden cases.
+The current Judge HTTP stub does not yet define the synchronous acceptance response. Before accepting a job to the client, Judge must return a stable submission ID and Battle must durably map it to the match, player, attempt, `RUN`/`SUBMIT` mode and stable command ID; otherwise a restart cannot correlate a later `submission.judged.v1` event, deduplicate a retry, or distinguish a public-example `ACCEPTED` result from an accepted hidden-test submission. Each distinct `RUN` uses a new command ID without incrementing the submission attempt; a retry reuses its command ID. That event also exposes only status, language and an opaque evidence version, while the Judge HTTP stub has no safe evidence read operation. D3-BTL-003 outcome calculation therefore remains blocked until an approved versioned event summary or Judge-owned read contract exposes the minimum hidden-test progress and dynamic runtime evidence without source or hidden cases.
 
 The current `match.finished.v1` contains only match ID, result, ranked flag, and seat-ordered player IDs; its schema now defines index 0 as `PLAYER_ONE` and index 1 as `PLAYER_TWO`, so a basic winner projection is unambiguous. `rating.changed.v1` provides current rating/RP and an unconstrained tier string, but no independently defined division, leaderboard, language, or peak data; division display remains blocked until a compatible structured representation or new versioned boundary is approved. `user-profile.changed.v1` provides handle but not display name. None of those schemas carries the score composition, attempts, attack history, or execution summary represented by the target record model.
 

@@ -157,7 +157,7 @@ Table battle_db.match {
 Table battle_db.match_player {
   match_id uuid [not null]
   user_id uuid [not null, note: 'Logical identity contract reference; no cross-database FK']
-  seat smallint [not null]
+  seat smallint [not null, note: '1 is PLAYER_ONE and 2 is PLAYER_TWO']
   language_key text [not null]
   connection_state text [not null]
   reconnect_deadline_at timestamptz
@@ -171,7 +171,12 @@ Table battle_db.match_player {
 
   Indexes {
     (match_id, user_id) [pk]
+    (match_id, seat) [unique]
     (user_id, match_id)
+  }
+
+  checks {
+    `seat IN (1, 2)` [name: 'match_player_supported_seat']
   }
 }
 
@@ -180,6 +185,7 @@ Table battle_db.judge_job_reference {
   match_id uuid [not null]
   player_user_id uuid [not null, note: 'Logical identity contract reference']
   mode battle_judge_job_mode [not null, note: 'Copied from the accepted command so asynchronous ACCEPTED results retain RUN versus SUBMIT semantics']
+  command_id uuid [not null, unique, note: 'Stable command idempotency key; each distinct RUN receives a new value while retries reuse it']
   attempt_number int [not null]
   last_judge_status text [not null]
   evidence_version text
@@ -187,7 +193,7 @@ Table battle_db.judge_job_reference {
   last_result_at timestamptz
 
   Indexes {
-    (match_id, player_user_id, attempt_number) [unique]
+    (match_id, player_user_id, mode, attempt_number)
   }
 }
 
