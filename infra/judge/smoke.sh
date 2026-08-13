@@ -12,12 +12,10 @@ readonly base_url="${JUDGE0_BASE_URL:-http://127.0.0.1:2358}"
 : "${D3_JUDGE_TYPESCRIPT_ID:?Set the verified TypeScript language ID.}"
 
 case "$base_url" in
-  http://127.0.0.1:* | http://localhost:*) ;;
+  http://127.0.0.1:2358 | http://localhost:2358) ;;
   *)
-    if [[ "${D3_ALLOW_REMOTE_JUDGE0_SMOKE:-false}" != "true" ]]; then
-      echo "Refusing a non-loopback Judge0 smoke without D3_ALLOW_REMOTE_JUDGE0_SMOKE=true." >&2
-      exit 2
-    fi
+    echo "Refusing Judge0 smoke outside the approved loopback endpoints." >&2
+    exit 2
     ;;
 esac
 
