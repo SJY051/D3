@@ -253,12 +253,21 @@ run_case "time-limit" "$D3_JUDGE_PYTHON3_ID" 'while True: pass' "" "" '^Time Lim
 run_case "wall-time-limit" "$D3_JUDGE_PYTHON3_ID" \
   $'import time\ntime.sleep(3)\nprint("OPEN")' "" "" '^Time Limit Exceeded$' 10 1 262144 "" 0 0.2
 run_case "memory-pressure" "$D3_JUDGE_PYTHON3_ID" 'bytearray(300 * 1024 * 1024)' "" "" '^Runtime Error' 2 5 65536 65536
+run_case "process-control" "$D3_JUDGE_PYTHON3_ID" \
+  $'import os, time\nchildren = []\nblocked = False\ntry:\n    for _ in range(20):\n        pid = os.fork()\n        if pid == 0:\n            time.sleep(0.2)\n            os._exit(0)\n        children.append(pid)\nexcept OSError:\n    blocked = True\nfinally:\n    for pid in children:\n        try:\n            os.waitpid(pid, 0)\n        except ChildProcessError:\n            pass\nprint("BLOCKED" if blocked else "OPEN")' \
+  "" $'OPEN\n' '^Accepted$' 2 5 262144 "" "" "" 65536 60 1024
 run_case "process-limit" "$D3_JUDGE_PYTHON3_ID" \
   $'import os, time\nchildren = []\nblocked = False\ntry:\n    for _ in range(20):\n        pid = os.fork()\n        if pid == 0:\n            time.sleep(0.2)\n            os._exit(0)\n        children.append(pid)\nexcept OSError:\n    blocked = True\nfinally:\n    for pid in children:\n        try:\n            os.waitpid(pid, 0)\n        except ChildProcessError:\n            pass\nprint("BLOCKED" if blocked else "OPEN")' \
   "" $'BLOCKED\n' '^Accepted$' 2 5 262144 "" "" "" 65536 8 1024
+run_case "stack-control" "$D3_JUDGE_C_ID" \
+  $'#include <stdio.h>\n__attribute__((noinline)) void dive(int n) { volatile char pad[1024 * 1024]; pad[0] = (char)n; if (n > 0) dive(n - 1); if (pad[0] == 127) puts("never"); }\nint main(void) { dive(16); puts("OPEN"); return 0; }' \
+  "" $'OPEN\n' '^Accepted$' 2 5 262144 "" "" "" 65536 60 1024
 run_case "stack-limit" "$D3_JUDGE_C_ID" \
   $'#include <stdio.h>\n__attribute__((noinline)) void dive(int n) { volatile char pad[1024 * 1024]; pad[0] = (char)n; if (n > 0) dive(n - 1); if (pad[0] == 127) puts("never"); }\nint main(void) { dive(16); puts("OPEN"); return 0; }' \
   "" "" '^Runtime Error' 2 5 262144 "" "" "" 8192 60 1024
+run_case "file-size-control" "$D3_JUDGE_PYTHON3_ID" \
+  $'with open("large.bin", "wb") as output:\n    output.write(b"x" * (256 * 1024))\nprint("OPEN")' \
+  "" $'OPEN\n' '^Accepted$' 2 5 262144 "" "" "" 65536 60 1024
 run_case "file-size-limit" "$D3_JUDGE_PYTHON3_ID" \
   $'with open("large.bin", "wb") as output:\n    output.write(b"x" * (256 * 1024))\nprint("OPEN")' \
   "" "" '^Runtime Error' 2 5 262144 "" "" "" 65536 60 64
