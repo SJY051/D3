@@ -152,7 +152,8 @@ Do not delete the shared VPC, subnet, route table, internet gateway, account-lev
 | API auth and request/resource limits | PASS |
 | Submission network isolation | PASS: opt-in HTTP 422, host reached `1.1.1.1:53/TCP`, executed code could not |
 | Six-language hello-world and deterministic sum | PASS: 12/12 cases |
-| Request/resource boundaries | PASS: numeric ceilings and disabled network, callback, wait, batch, deletion, compiler-option, argument and additional-file shapes rejected |
+| Provider option/resource boundaries | PASS: numeric ceilings and disabled network, callback, wait, batch, deletion, compiler-option, argument and additional-file shapes rejected |
+| Source, stdin and expected-output body-size caps | PENDING: Judge0 CE 1.13.1 exposes no per-field ceiling; the authenticated Judge adapter must reject oversized fields before provider access in issue #13 |
 | Accepted, wrong answer, compilation, runtime, CPU/wall timeout, memory, process/thread, stack and file size | PASS: 25/25 execution cases, including positive controls for process, stack and file-size limits |
 | Platform failure normalization | PASS in PR #20 fake-adapter test; live outage injection NOT RUN |
 | Runtime log privacy | PASS after overlay and secret rotation: 0 secret/source matches |
