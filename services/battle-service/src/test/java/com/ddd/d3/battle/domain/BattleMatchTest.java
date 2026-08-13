@@ -118,6 +118,9 @@ class BattleMatchTest {
         match.handle(new BattleMatch.AdvanceTime());
 
         assertEquals(BattleMatch.State.JUDGING, match.state());
+
+        match.handle(new BattleMatch.BeginJudging());
+        assertEquals(BattleMatch.State.JUDGING, match.state());
     }
 
     @Test
@@ -166,6 +169,20 @@ class BattleMatchTest {
         clock.advance(Duration.ofSeconds(30));
         match.handle(new BattleMatch.AdvanceTime());
         assertEquals(PLAYER_TWO, match.result().orElseThrow().winnerId());
+    }
+
+    @Test
+    void d3Btl002AdvancesToANewerOutOfOrderDisconnectGeneration() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+        clock.advance(Duration.ofSeconds(10));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 2));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+
+        assertTrue(match.isDisconnected(PLAYER_ONE));
+        assertEquals(START.plusSeconds(40), match.reconnectDeadline(PLAYER_ONE).orElseThrow());
     }
 
     @Test

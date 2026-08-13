@@ -200,6 +200,7 @@ public final class BattleMatch {
 
         if (state == State.RUNNING && !now.isBefore(matchDeadline)) {
             state = State.JUDGING;
+            judgingStarted = true;
         }
     }
 
@@ -215,7 +216,10 @@ public final class BattleMatch {
             if (connectionGeneration <= activeGeneration) {
                 return;
             }
-            throw new IllegalStateException("Player is already disconnected");
+            successfullyReconnectedGenerations.merge(playerId, activeGeneration, Math::max);
+            reconnectGenerations.put(playerId, connectionGeneration);
+            reconnectDeadlines.put(playerId, clock.instant().plus(RECONNECT_GRACE_PERIOD));
+            return;
         }
         Long completedGeneration = successfullyReconnectedGenerations.get(playerId);
         if (completedGeneration != null && connectionGeneration <= completedGeneration) {
