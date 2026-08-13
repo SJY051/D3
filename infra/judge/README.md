@@ -62,7 +62,7 @@ Judge0 CE 1.13.1 runs its server and worker containers with Docker `privileged: 
 
 ## Runtime matrix
 
-This matrix comes from the authenticated `/languages` response and SSM command `6b382536-38e4-40ef-b420-04ef35b4b014`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays, enforcing unique exact runtime mappings, ignoring an injected hostile curl configuration, bypassing hostile proxy variables, comparing host and sandbox reachability, rejecting every advertised disabled or above-ceiling request shape, and asserting every required execution-resource default and per-request boundary with positive controls. Its deletion check waits for a terminal submission before requiring the disabled-specific HTTP 403 response.
+This matrix comes from the authenticated `/languages` response and SSM command `52b8543b-59de-4ca1-bd2e-df1bda357c35`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding and restarting the fail-fast repository startup overlays, enforcing unique exact runtime mappings, ignoring an injected hostile curl configuration, bypassing hostile proxy variables, comparing host and sandbox reachability, rejecting every advertised disabled or above-ceiling request shape, and asserting every required execution-resource default and per-request boundary with positive controls. Its deletion check waits for a terminal submission before requiring the disabled-specific HTTP 403 response.
 
 | Product language | Judge0 ID | Observed runtime | Hello-world | Deterministic case |
 |---|---:|---|---|---|
@@ -77,9 +77,9 @@ The TypeScript compiler did not finish inside a two-second compilation envelope.
 
 ## Startup log hardening
 
-Judge0 CE 1.13.1's bundled server and worker scripts pipe the complete exported environment through `tee`, which places API, database, Redis and Rails secrets in container logs. D³ mounts [`startup/server`](startup/server) and [`startup/workers`](startup/workers) through [`docker-compose.override.yml`](docker-compose.override.yml). The overlay suppresses stdout while retaining the root-readable `/api/environment` file with mode `0640`.
+Judge0 CE 1.13.1's bundled server and worker scripts pipe the complete exported environment through `tee`, which places API, database, Redis and Rails secrets in container logs. D³ mounts [`startup/server`](startup/server) and [`startup/workers`](startup/workers) through [`docker-compose.override.yml`](docker-compose.override.yml). The overlay hardens `/api/environment` to `root:judge0 0640` before writing secrets, suppresses stdout, and refuses to launch the server or workers if file creation, ownership, mode, or writing fails.
 
-The initially exposed generated values were rotated, the empty bootstrap database volume was recreated, and old containers were removed before smoke execution. Post-smoke validation reported zero secret-pattern and zero known-source lines in server/worker logs. The bound startup files match repository SHA-256 values `6a10c0fbec18ecbf57460df7d9a943cbdccd4f8111418dc8791ce974d4bc83d7` and `0fff12be85fff1141805a859f895a10370d3e23de55c1df3e2d330e90f9028af`. Do not run the unmodified upstream startup commands on this host.
+The initially exposed generated values were rotated, the empty bootstrap database volume was recreated, and old containers were removed before smoke execution. Post-smoke validation reported zero secret-pattern and zero known-source lines in server/worker logs. The bound startup files match repository SHA-256 values `402f45f8b4ca0554d54b779567137d3f4900cb08f3ceb690f0945a572636b00b` and `ca8df9bcbf73acffa0aec460fb9e77a22479940c8a900318e7713466ea084519`. Do not run the unmodified upstream startup commands on this host.
 
 ## Sanitized smoke
 
@@ -156,6 +156,7 @@ Do not delete the shared VPC, subnet, route table, internet gateway, account-lev
 | Source, stdin and expected-output body-size caps | PENDING: Judge0 CE 1.13.1 exposes no per-field ceiling; the authenticated Judge adapter must reject oversized fields before provider access in issue #13 |
 | Accepted, wrong answer, compilation, runtime, CPU/wall timeout, memory, process/thread, stack and file size | PASS: 35/35 execution cases, including ten omission-based default checks; memory, process/thread, stack and file size each have paired below-bound success and above-bound failure controls |
 | Platform failure normalization | PASS in PR #20 fake-adapter test; live outage injection NOT RUN |
+| Startup environment hardening | PASS: local failure injection stops both startup paths for touch, ownership, mode and write failures; live files are `root:judge0 0640` after restart |
 | Runtime log privacy | PASS after overlay and secret rotation: 0 secret/source matches |
 | Reboot persistence | PASS: systemd active, cgroup v1, repository overlay hashes, authenticated Python execution, and zero secret log matches |
 | Real Judge service adapter | NOT IMPLEMENTED; tracked by issue #13 |

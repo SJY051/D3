@@ -152,6 +152,9 @@ jobs:
       - name: Validate observability Compose model
         run: docker compose -f infra/compose.yaml --profile observability config --quiet
 
+      - name: Verify Judge startup permission failures are fatal
+        run: bash infra/judge/startup/test-fail-fast.sh
+
   delivery-boundary:
     name: Delivery boundary (no deploy)
     needs: [repository-checks, frontend, backend, infrastructure]

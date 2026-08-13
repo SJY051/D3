@@ -1,8 +1,15 @@
 #!/bin/bash
 source ./scripts/load-config
-export | sudo tee /api/environment >/dev/null
-sudo chown root:judge0 /api/environment
-sudo chmod 0640 /api/environment
+
+environment_setup_failed() {
+    echo "Judge0 environment file hardening failed; refusing to start the server." >&2
+    exit 1
+}
+
+sudo touch /api/environment || environment_setup_failed
+sudo chown root:judge0 /api/environment || environment_setup_failed
+sudo chmod 0640 /api/environment || environment_setup_failed
+export | sudo tee /api/environment >/dev/null || environment_setup_failed
 
 for _ in $(seq 1 "$RESTART_MAX_TRIES"); do
     [[ -f tmp/pids/server.pid ]] && rm -f -- tmp/pids/server.pid
