@@ -1,7 +1,10 @@
 # Cloud architecture
 
-Owner: 윤서진  
+Owner: 윤서진
+
 Status: Awaiting AWS account binding
+
+Last verified: 2026-08-13 against the deployment target and unresolved AWS bindings
 
 ```mermaid
 flowchart TB
@@ -24,4 +27,3 @@ flowchart TB
 - Activate S3 and CloudFront only when a P1 upload requirement survives scope review.
 - Keep Judge0 on isolated compute with no public submission endpoint and no execution egress.
 - If managed-service provisioning is blocked, deploy the same application images to one application EC2 host with Compose while keeping Judge0 on a separate host.
-

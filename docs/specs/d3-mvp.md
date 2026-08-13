@@ -1,9 +1,16 @@
 # D³ MVP Specification
 
-Status: Initial baseline  
-Product: D³ (Dopamin-Driven Development)  
-Development lead: 윤서진  
+Status: Initial baseline
+
+Product: D³ (Dopamin-Driven Development)
+
+Development lead: 윤서진
+
+Owner: 윤서진
+
 Delivery window: 2026-08-13 through 2026-08-20
+
+Last verified: 2026-08-13 against the planning PDF and agreed product decisions
 
 ## Context
 
@@ -19,6 +26,49 @@ The team has four members and must also produce the required planning, architect
 - Demonstrate clear service ownership, synchronous and event-driven communication, isolated persistence, and observable operations.
 - Give four developers a consistent repository, contract, verification, and AI-agent workflow.
 - Preserve explicit extension points without requiring speculative services in the MVP.
+
+## Delivery priority
+
+- **P0 / MUST:** required for the integrated demonstration and feature-freeze acceptance. A P0 clause is normative for this prototype.
+- **P1 / SHOULD:** retained in the product contract but activated only after the P0 path remains integrated. An unavailable P1 surface stays behind a feature boundary and does not block P0 acceptance.
+
+The Core 10 below are the normative P0 outcomes. The Optional 10 are P1 outcomes; their requirement clauses use explicit P1 activation language rather than unconditional MVP language.
+
+## Internal scoring-priority plan
+
+The bootcamp planning PDF describes a generic planning shape of ten core items at seven points each and ten optional items at three points each. It does not provide a separate free-topic rubric or prescribe the D³ feature names below. This table mirrors that shape only as an **internal delivery and evidence priority**: `MUST` protects the continuous demonstration path, while `SHOULD` is attempted only after the required path remains integrated. The numbers are planning weights, not a claim of awarded points.
+
+### Core 10 — P0 MUST
+
+| ID | Weight | Judge-readable outcome | Requirement source | Required evidence | Current evidence |
+|---|---:|---|---|---|---|
+| M-01 | 7 | A user registers, signs in, refreshes and revokes a local account session | D3-ID-001 | Auth integration and negative authorization tests | Disabled test scaffold; not implemented |
+| M-02 | 7 | Two users selecting the same language enter one ranked match | D3-BTL-001 | Two-client matchmaking test and queue trace | Contract/test scaffold; not implemented |
+| M-03 | 7 | Both clients follow one server-owned clock and match lifecycle, including reconnect, surrender and incident void | D3-BTL-002 | Deterministic state tests plus two-session evidence | Disabled state test scaffold; not implemented |
+| M-04 | 7 | Run and Submit use an isolated Judge0 boundary with six explicit language mappings and classified failures | D3-JDG-001 | Six runtime smokes and failure normalization tests | Judge activation checklist; runtime versions `UNKNOWN` |
+| M-05 | 7 | A committed result explains speed, dynamic efficiency and submission discipline without claiming measured Big-O | D3-BTL-003 | Formula examples, boundary tests and repeatability sample | Requirement only; calibration `UNKNOWN` |
+| M-06 | 7 | Players exchange at least one warned, reversible, server-authoritative attack without mutating stored source | D3-BTL-004 | Browser/editor test, event trace and source-integrity assertion | Wireframe/test scaffold; not implemented |
+| M-07 | 7 | A ranked result updates public rating and separate seasonal RP/tier exactly once | D3-BTL-005 | Rating/RP tests and idempotent persistence evidence | Contract/test scaffold; not implemented |
+| M-08 | 7 | A developer feed publishes Markdown with fenced code while preserving visibility and source privacy | D3-COM-001 | Rendering, character-count, audience and privacy tests | Route/wireframe scaffold; not implemented |
+| M-09 | 7 | The committed ranked result creates a public result post and traceable searchable match record | D3-STAT-001 | Outbox/inbox replay plus UI trace to match ID | Event schemas exist; projections not implemented |
+| M-10 | 7 | The team rehearses one deterministic end-to-end build with preflight, observability and a labeled backup | D3-UX-002, D3-QLT-001, D3-SEC-001 | Frozen revision, live Scenario A, security review and recording | Preflight/runbook baseline; live evidence not run |
+
+### Optional 10 — P1 SHOULD
+
+| ID | Weight | Judge-readable outcome | Requirement source | Activation evidence | Current evidence |
+|---|---:|---|---|---|---|
+| S-01 | 3 | A local account explicitly links GitHub OAuth without email-based silent merge | D3-ID-001 | OAuth state/linking integration tests | Planned; not implemented |
+| S-02 | 3 | Invite or public rooms run without changing ranked rating or RP | D3-BTL-001 | Unranked room test with zero rating mutation | Planned; not implemented |
+| S-03 | 3 | Solo practice reuses the judge pipeline and retains a private accepted solution | D3-SOLO-001 | Solo run/submit and privacy test | Route/wireframe scaffold; not implemented |
+| S-04 | 3 | Following feed, follows, comments and likes extend the public microblog | D3-COM-001 | Audience and interaction integration tests | Logical ERD only; not implemented |
+| S-05 | 3 | Player records add language statistics, peak tier, leaderboard position and detailed score evidence | D3-STAT-001 | Projection and record UI tests | Wireframe/contract baseline only |
+| S-06 | 3 | Operators manage a reviewed six-problem catalog through bounded metadata controls | D3-JDG-001, D3-ADM-001 | Six fixture reviews, role tests, and reproducibility evidence | Route/wireframe scaffold; not implemented |
+| S-07 | 3 | Low-confidence static complexity evidence is labelled unknown and transfers weight to runtime evidence | D3-BTL-003 | Confidence-boundary and fallback tests | Algorithm and calibration `UNKNOWN` |
+| S-08 | 3 | The full attack set adds Caesar veil and low-frequency caret move with block or reflect | D3-BTL-004 | Cross-browser editor/undo and balance evidence | Planned; not implemented |
+| S-09 | 3 | Opponent activity adds safe structural progress, cursor and typing signals without identifiers or literals | D3-BTL-002 | Redaction contract and browser privacy tests | Contract shape pending |
+| S-10 | 3 | Circle/private audience UI and opt-in unranked result posts activate over the already recognized persistence audiences | D3-COM-001 | Visibility migration and authorization tests | Logical model only; UI outside P0 |
+
+An item moves from planned to evidenced only when its named behavior and verification both exist. Partial implementation, a route shell, a skipped test or an architecture diagram remains partial evidence rather than a completed feature.
 
 ## Non-goals
 
@@ -41,73 +91,87 @@ The team has four members and must also produce the required planning, architect
 
 ### D3-ID-001 — Account and identity
 
-The system shall support local email/password registration and GitHub OAuth sign-in. A user shall have one internal identity and separately linked login credentials. Matching email addresses shall not silently merge accounts. After sign-in, the user shall remain authenticated through a short-lived access credential and a revocable rotating refresh session.
+**P0:** The system shall support local email/password registration. A user shall have one internal identity, and after sign-in shall remain authenticated through a short-lived access credential and a revocable rotating refresh session.
+
+**P1:** When GitHub OAuth is activated, it shall use a separately linked login identity. Matching email addresses shall not silently merge accounts.
 
 ### D3-BTL-001 — Ranked and unranked entry
 
-The system shall provide automatic ranked matchmaking and unranked room entry. Ranked matching shall begin with users who selected the same language and have nearby public rating, then widen the rating interval as wait time increases. Invite or public-room matches shall not change rating or seasonal rank.
+**P0:** The system shall provide automatic ranked matchmaking. Ranked matching shall begin with users who selected the same language and have nearby public rating, then widen the rating interval as wait time increases.
 
-The MVP shall support C, C++, Java, Python 3, JavaScript, and TypeScript in its language catalog. A ranked MVP match assigns the language selected by the player; a future rule may require a larger language pool at higher tiers.
+**P0:** The language catalog shall support C, C++, Java, Python 3, JavaScript, and TypeScript. A ranked match assigns the language selected by the player; a future rule may require a larger language pool at higher tiers.
+
+**P1:** When unranked invite or public rooms are activated, their matches shall not change rating or seasonal rank.
 
 ### D3-BTL-002 — Authoritative real-time match
 
-A match shall progress through explicit server-owned states equivalent to lobby, ready, running, judging, and finished. The server's timestamps and state shall decide deadlines and outcomes. A client may compensate for network round-trip time only when rendering its timer.
+**P0:** A match shall progress through explicit server-owned states equivalent to lobby, ready, running, judging, and finished. The server's timestamps and state shall decide deadlines and outcomes. A client may compensate for network round-trip time only when rendering its timer.
 
-Players shall see a masked representation of opponent activity, including structural progress, cursor position, typing activity, and run or submit state, without seeing identifiers and literals during the match.
+**P0:** Players shall see opponent connectivity and masked run or submit state without receiving opponent identifiers, literals, or source during the match.
 
-A disconnected player shall be visibly marked, may reconnect for 30 seconds, and shall lose when that period expires. The match timer continues during disconnection. Surrender shall immediately award the opponent a victory. A confirmed platform or Judge incident shall void the match rather than change rating.
+**P0:** A disconnected player shall be visibly marked, may reconnect for 30 seconds, and shall lose when that period expires. The match timer continues during disconnection. Surrender shall immediately award the opponent a victory. A confirmed platform or Judge incident shall commit the domain void outcome without changing rating; `match.finished.v1.result` serializes that outcome as `VOIDED`.
+
+**P1:** When detailed opponent activity is activated, it shall add redacted structural progress, cursor position, and typing activity without exposing identifiers, literals, or source.
 
 ### D3-JDG-001 — Run, submit, and judge
 
-`Run` shall evaluate only public examples and shall not count as a submission attempt. `Submit` shall evaluate hidden tests and increment the attempt count. A correct submission shall lock further submissions for that player.
+**P0:** `Run` shall evaluate only public examples and shall not count as a submission attempt. `Submit` shall evaluate hidden tests and increment the attempt count. A correct submission shall lock further submissions for that player.
 
-The judge result shall distinguish accepted, wrong answer, compilation error, runtime error, timeout, memory limit, and platform failure. User-controlled code shall execute without network access and within explicit CPU, wall-time, memory, process/thread, stack, and file-size limits.
+**P0:** The judge result shall distinguish accepted, wrong answer, compilation error, runtime error, timeout, memory limit, and platform failure. User-controlled code shall execute without network access and within explicit CPU, wall-time, memory, process/thread, stack, and file-size limits.
 
-The initial problem set shall contain at least one deterministic demonstration problem and six reviewed problems: two Easy, two Medium, and two Hard. Each reviewed problem shall include public examples, hidden correctness cases, size-tier performance cases, and expected-complexity metadata.
+**P0:** The initial problem set shall contain at least one deterministic demonstration problem with public examples, hidden correctness cases, and size-tier performance cases.
+
+**P1:** When the reviewed catalog is activated, it shall add six problems—two Easy, two Medium, and two Hard—with public examples, hidden correctness cases, size-tier performance cases, and expected-complexity metadata.
 
 ### D3-BTL-003 — Match outcome and performance score
 
-When exactly one player solves the problem, that player wins. When both solve it, the outcome shall compare solve speed, efficiency, and submission discipline using an externally configurable initial weighting of 50%, 35%, and 15%. When neither solves it, the outcome shall compare hidden-test progress, efficiency, and submission discipline; an exact tie is a draw.
+**P0:** When exactly one player solves the problem, that player wins. When both solve it, the outcome shall compare solve speed, dynamically measured efficiency, and submission discipline using an externally configurable initial weighting of 50%, 35%, and 15%. When neither solves it, the outcome shall compare hidden-test progress, dynamic efficiency, and submission discipline; an exact tie is a draw.
 
-Efficiency shall combine repeated size-tier runtime measurement with a bounded static complexity heuristic. The initial split is 80% dynamic and 20% static. A low-confidence static result shall be reported as unknown and its weight transferred to dynamic evidence. The product shall not present measured runtime as proof of exact Big-O complexity.
+**P0:** Dynamic efficiency shall use repeated size-tier runtime measurement. The product shall not present measured runtime as proof of exact Big-O complexity.
+
+**P1:** When static complexity evidence is activated, efficiency shall use an initial 80% dynamic and 20% bounded-static split. A low-confidence static result shall be reported as unknown and its weight transferred to dynamic evidence.
 
 ### D3-BTL-004 — Attack interaction
 
-Valid coding progress, first-time public-test progress, and bounded passive gain shall produce attack energy without rewarding delete-and-retype repetition. Language-aware parser or linter evidence may award first-time completion of a syntactically valid line, but client analysis shall never be authoritative for scoring or judging. Attack commands and effects shall be server-authoritative, finite, logged, and replayable for diagnosis.
+**P0:** First-time public-test progress and bounded passive gain shall produce attack energy without rewarding repetition. Attack commands and effects shall be server-authoritative, finite, logged, and replayable for diagnosis.
 
-The MVP shall expose three effects:
+**P0:** The battle shall expose a temporary non-destructive garbage overlay. Players shall receive a warning window and may spend energy to block or reflect the attack. The display effect shall never mutate stored source.
 
-- a temporary non-destructive garbage overlay;
-- a temporary Caesar-style display veil on selected rows;
-- a low-frequency, high-cost caret move to a valid row.
+**P1:** When advanced progress analysis is activated, valid coding progress and language-aware parser or linter evidence may award first-time completion of a syntactically valid line; client analysis remains non-authoritative for scoring and judging.
 
-Players shall receive a warning window and may spend energy to block or reflect an attack. Display attacks shall never mutate the stored source. Caret movement may affect subsequent user input but shall preserve normal editor undo behavior.
+**P1:** The advanced attack set shall add a temporary Caesar-style display veil on selected rows and a low-frequency, high-cost caret move to a valid row. The veil shall not mutate stored source. Caret movement may affect subsequent input but shall preserve normal editor undo behavior. Both effects use the warning, block, and reflect rules.
 
 ### D3-BTL-005 — Rating and seasonal rank
 
-After five placement matches, the system shall publicly show a rating, seasonal RP, tier/division, and leaderboard position where applicable. During placement, the visible tier shall remain `Unranked`.
+**P0:** After five placement matches, the system shall publicly show a rating, seasonal RP, and tier/division. During placement, the visible tier shall remain `Unranked`.
 
-The tier order shall be Bronze, Silver, Gold, Platinum, Diamond, Master, and Grandmaster. Bronze through Diamond shall use divisions III through I. Rating shall use an initial high adjustment factor and a lower established-player factor behind a replaceable calculation boundary. Seasonal RP and tier shall not be treated as the matchmaking rating itself.
+**P0:** The tier order shall be Bronze, Silver, Gold, Platinum, Diamond, Master, and Grandmaster. Bronze through Diamond shall use divisions III through I. Rating shall use an initial high adjustment factor and a lower established-player factor behind a replaceable calculation boundary. Seasonal RP and tier shall not be treated as the matchmaking rating itself.
+
+**P1:** When leaderboard enrichment is activated, the public record shall add leaderboard position, language statistics, and peak-tier details.
 
 ### D3-SOLO-001 — Solo practice
 
-A signed-in player shall be able to select a problem and language, run public examples, submit to hidden tests, and retain an accepted private solution. Solo attempts shall use the same language and judge result contracts as battles and shall not affect ranked rating or RP.
+**P1:** When solo practice is activated, a signed-in player shall be able to select a problem and language, run public examples, submit to hidden tests, and retain an accepted private solution. Solo attempts shall use the same language and judge result contracts as battles and shall not affect ranked rating or RP.
 
 ### D3-COM-001 — Developer microblog
 
-The community shall provide public and following feeds, profiles, follows, Markdown posts, fenced code blocks, comments, likes, and ranked-result auto-posts. Code blocks shall not count toward the prose character limit. Ranked result summaries shall be public; source code shall remain private unless the user explicitly shares it. Unranked result posts shall be opt-in.
+**P0:** The community shall provide a public feed, profiles, Markdown posts, fenced code blocks, and ranked-result auto-posts. Code blocks shall not count toward the prose character limit. Ranked result summaries shall be public; source code shall remain private unless the user explicitly shares it.
 
-The persistence model shall recognize public, followers, circle, and private visibility, while the MVP user interface is required to complete only public and followers visibility.
+**P0:** The persistence model shall recognize public, followers, circle, and private audiences. The P0 interface is required to expose only public visibility.
+
+**P1:** When social interactions are activated, the community shall add a following feed, follows, comments, and likes. Circle/private audience controls and opt-in unranked result posts are also P1 surfaces.
 
 ### D3-STAT-001 — Searchable developer record
 
-A user shall be searchable by handle. The public record shall show rating, tier, RP, peak tier, win/loss record, win rate, language statistics, recent matches, and match details. Match details shall include score composition, attempts, attack history, and measured execution evidence without revealing private source code.
+**P0:** A user shall be searchable by handle. The public record shall show rating, tier, RP, win/loss record, win rate, recent matches, and a traceable basic match result without revealing private source code.
 
-Community-facing statistics may be eventually consistent, but every displayed projection shall retain an identifier that can be traced to the authoritative identity or battle record.
+**P0:** Community-facing statistics may be eventually consistent, but every displayed projection shall retain an identifier and source version that can be traced to the authoritative identity or battle record.
+
+**P1:** When record enrichment is activated, the public record shall add peak tier, leaderboard position, language statistics, score composition, attempts, attack history, and measured execution evidence.
 
 ### D3-ADM-001 — Bounded problem operation
 
-A problem operator shall be able to list seeded problems, inspect their metadata, activate or deactivate them, and perform bounded metadata edits. The MVP need not author hidden tests or full problem packages through the browser. Version-controlled fixtures and database seeds remain the reproducible source of initial problem data.
+**P1:** When problem operation is activated, an authorized operator shall be able to list seeded problems, inspect their metadata, activate or deactivate them, and perform bounded metadata edits. The interface need not author hidden tests or full problem packages. Version-controlled fixtures and database seeds remain the reproducible source of initial problem data.
 
 ## Experience requirements
 
@@ -172,16 +236,20 @@ The repository shall retain current sources for requirements, workflow, system a
 1. The judge adapter returns a classified platform failure rather than a user-code failure.
 2. The battle is voided, neither player's rating or RP changes, and an operator can trace the incident through correlation identifiers and health signals.
 
-### Scenario D — Solo and community privacy
+### Scenario D — P0 community formatting and privacy
 
-1. A user solves a problem in solo mode and retains a private accepted solution.
-2. A Markdown post with a fenced code block renders correctly without counting code toward prose limits.
-3. The source remains absent from public match history until explicitly shared.
+1. A Markdown post with a fenced code block renders correctly without counting code toward prose limits.
+2. The source remains absent from public match history until explicitly shared.
+
+### Scenario E — P1 solo practice
+
+1. When the solo feature boundary is activated, a user solves a problem in solo mode and retains a private accepted solution without changing rating or RP.
 
 ## Acceptance criteria
 
 - Scenario A completes end to end with two independent browser sessions and no manual database edits.
 - Scenarios B and C produce the specified outcomes without duplicate result or rating records.
+- Scenario D verifies the P0 Markdown character-count and private-source boundaries; Scenario E is required only when its P1 feature boundary is activated.
 - Every supported language has a mapped judge runtime, a verified hello-world smoke case, and an explicit unavailable state when its runtime is unhealthy.
 - The demonstration problem produces repeatable correctness and scoring results within documented tolerance on the designated judge host.
 - Public record data can be traced to committed source events and does not expose accepted source by default.

@@ -16,7 +16,13 @@
             "matchId": { "type": "string", "format": "uuid" },
             "result": { "enum": ["PLAYER_ONE_WIN", "PLAYER_TWO_WIN", "DRAW", "VOIDED"] },
             "ranked": { "type": "boolean" },
-            "playerIds": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "string", "format": "uuid" } }
+            "playerIds": {
+              "type": "array",
+              "description": "Seat-ordered player IDs: index 0 is PLAYER_ONE and index 1 is PLAYER_TWO.",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": { "type": "string", "format": "uuid" }
+            }
           },
           "additionalProperties": false
         }
