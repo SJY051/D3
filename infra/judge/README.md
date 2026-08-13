@@ -62,7 +62,7 @@ Judge0 CE 1.13.1 runs its server and worker containers with Docker `privileged: 
 
 ## Runtime matrix
 
-This matrix comes from the authenticated `/languages` response and command `5c3d9729-3a29-4d47-9201-1e475988d8c1`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays, enforcing unique exact runtime mappings, ignoring an injected hostile curl configuration, bypassing hostile proxy variables, and asserting the 65,536 KiB memory boundary.
+This matrix comes from the authenticated `/languages` response and command `5494ec49-a254-4033-9f8c-280c5f0fa99b`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays, enforcing unique exact runtime mappings, ignoring an injected hostile curl configuration, bypassing hostile proxy variables, comparing host and sandbox reachability, and asserting CPU and memory boundaries.
 
 | Product language | Judge0 ID | Observed runtime | Hello-world | Deterministic case |
 |---|---:|---|---|---|
@@ -150,9 +150,9 @@ Do not delete the shared VPC, subnet, route table, internet gateway, account-lev
 | IMDSv2 and secret read scope | PASS |
 | Digest-pinned containers and cgroup v1 | PASS |
 | API auth and request/resource limits | PASS |
-| Submission network isolation | PASS: opt-in HTTP 422 and executed outbound socket blocked |
+| Submission network isolation | PASS: opt-in HTTP 422, host reached `1.1.1.1:53/TCP`, executed code could not |
 | Six-language hello-world and deterministic sum | PASS: 12/12 cases |
-| Accepted, wrong answer, compilation, runtime, timeout, memory | PASS: memory-pressure evidence asserted exactly 65,536 KiB |
+| Accepted, wrong answer, compilation, runtime, timeout, memory | PASS: one-second CPU evidence was 1.093 s; memory-pressure evidence was exactly 65,536 KiB |
 | Platform failure normalization | PASS in PR #20 fake-adapter test; live outage injection NOT RUN |
 | Runtime log privacy | PASS after overlay and secret rotation: 0 secret/source matches |
 | Reboot persistence | PASS: systemd active, cgroup v1, repository overlay hashes, authenticated Python execution, and zero secret log matches |
