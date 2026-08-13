@@ -63,6 +63,16 @@ class DeterministicFakeJudgeAdapterTest {
         assertTrue(compilationError.runtimeMeasurements().isEmpty());
     }
 
+    @Test
+    void d3Jdg001RunEvaluatesOnlyThePublicExampleWithoutPerformanceEvidence() {
+        JudgeExecutionResult result = adapter.execute(runCommand("D3_FAKE_ACCEPTED"));
+
+        assertEquals(JudgeStatus.ACCEPTED, result.status());
+        assertEquals(1, result.passedCount());
+        assertEquals(1, result.totalCount());
+        assertTrue(result.runtimeMeasurements().isEmpty());
+    }
+
     private static SubmissionCommand command(String sourceCode) {
         return new SubmissionCommand(
                 UUID.fromString("11111111-1111-4111-8111-111111111111"),
@@ -74,6 +84,20 @@ class DeterministicFakeJudgeAdapterTest {
                 JudgeLanguage.PYTHON3,
                 sourceCode,
                 1,
+                "corr-1");
+    }
+
+    private static SubmissionCommand runCommand(String sourceCode) {
+        return new SubmissionCommand(
+                UUID.fromString("11111111-1111-4111-8111-111111111111"),
+                UUID.fromString("22222222-2222-4222-8222-222222222222"),
+                null,
+                UUID.fromString("44444444-4444-4444-8444-444444444444"),
+                1,
+                SubmissionMode.RUN,
+                JudgeLanguage.PYTHON3,
+                sourceCode,
+                null,
                 "corr-1");
     }
 }

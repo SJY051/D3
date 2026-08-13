@@ -64,15 +64,32 @@ public final class JudgeSubmissionService {
 
     public SafeEvaluationEvidence evaluate(UUID submissionId) {
         Objects.requireNonNull(submissionId, "submissionId");
-        JudgeSubmission submission = repository.findById(submissionId)
+        JudgeSubmission current = repository.findById(submissionId)
                 .orElseThrow(() -> new SubmissionNotFoundException(submissionId));
-        if (submission.evidence() != null) {
-            return submission.evidence();
+        if (current.evidence() != null) {
+            return current.evidence();
         }
 
-        var result = executionAdapter.execute(submission.command());
-        SafeEvaluationEvidence evidence = SafeEvaluationEvidence.from(submission, result);
-        return repository.save(submission.complete(evidence)).evidence();
+        JudgeSubmission claimed = repository.claimForEvaluation(submissionId).orElseGet(() -> {
+            JudgeSubmission latest = repository.findById(submissionId)
+                    .orElseThrow(() -> new SubmissionNotFoundException(submissionId));
+            if (latest.evidence() != null) {
+                return latest;
+            }
+            throw new EvaluationInProgressException(submissionId);
+        });
+        if (claimed.evidence() != null) {
+            return claimed.evidence();
+        }
+
+        try {
+            var result = executionAdapter.execute(claimed.command());
+            SafeEvaluationEvidence evidence = SafeEvaluationEvidence.from(claimed, result);
+            return repository.completeEvaluation(claimed.complete(evidence)).evidence();
+        } catch (RuntimeException exception) {
+            repository.releaseEvaluationClaim(submissionId);
+            throw exception;
+        }
     }
 
     private static String fingerprint(SubmissionCommand command) {

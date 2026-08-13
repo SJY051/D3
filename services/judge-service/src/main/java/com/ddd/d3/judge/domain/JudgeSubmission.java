@@ -24,6 +24,20 @@ public record JudgeSubmission(
         return new SubmissionAcceptance(id, JudgeStatus.QUEUED, command.mode(), command.language(), acceptedAt);
     }
 
+    public JudgeSubmission startEvaluation() {
+        if (status != JudgeStatus.QUEUED) {
+            throw new IllegalStateException("only a queued submission can start evaluation");
+        }
+        return new JudgeSubmission(id, command, requestFingerprint, JudgeStatus.RUNNING, acceptedAt, null);
+    }
+
+    public JudgeSubmission requeueEvaluation() {
+        if (status != JudgeStatus.RUNNING) {
+            throw new IllegalStateException("only a running submission can be requeued");
+        }
+        return new JudgeSubmission(id, command, requestFingerprint, JudgeStatus.QUEUED, acceptedAt, null);
+    }
+
     public JudgeSubmission complete(SafeEvaluationEvidence completedEvidence) {
         return new JudgeSubmission(
                 id,

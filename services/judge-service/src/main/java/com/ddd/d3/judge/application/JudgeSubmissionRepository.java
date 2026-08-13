@@ -15,5 +15,12 @@ public interface JudgeSubmissionRepository {
      */
     JudgeSubmission insertOrGet(JudgeSubmission submission);
 
-    JudgeSubmission save(JudgeSubmission submission);
+    /** Atomically transitions QUEUED to RUNNING and returns the claim only to its winner. */
+    Optional<JudgeSubmission> claimForEvaluation(UUID submissionId);
+
+    /** Completes a submission only while its evaluation claim is held. */
+    JudgeSubmission completeEvaluation(JudgeSubmission submission);
+
+    /** Returns a failed worker claim to QUEUED so a transport retry can resume it. */
+    void releaseEvaluationClaim(UUID submissionId);
 }

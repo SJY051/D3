@@ -6,6 +6,7 @@ import com.ddd.d3.judge.domain.JudgeLanguage;
 import com.ddd.d3.judge.domain.JudgeStatus;
 import com.ddd.d3.judge.domain.RuntimeMeasurement;
 import com.ddd.d3.judge.domain.SubmissionCommand;
+import com.ddd.d3.judge.domain.SubmissionMode;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
@@ -35,6 +36,16 @@ public final class DeterministicFakeJudgeAdapter implements JudgeExecutionAdapte
             case "D3_FAKE_PLATFORM_FAILURE" -> JudgeStatus.PLATFORM_FAILURE;
             default -> JudgeStatus.WRONG_ANSWER;
         };
+        if (command.mode() == SubmissionMode.RUN) {
+            return new JudgeExecutionResult(
+                    status,
+                    status == JudgeStatus.ACCEPTED ? 1 : 0,
+                    1,
+                    List.of(),
+                    "fake-v1",
+                    "fake-" + command.language().name().toLowerCase() + "-v1",
+                    clock.instant());
+        }
         boolean accepted = status == JudgeStatus.ACCEPTED;
         int passedCount = accepted ? 3 : status == JudgeStatus.WRONG_ANSWER ? 2 : 0;
         List<RuntimeMeasurement> measurements = switch (status) {

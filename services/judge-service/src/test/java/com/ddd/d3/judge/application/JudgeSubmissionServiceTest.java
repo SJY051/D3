@@ -2,7 +2,9 @@ package com.ddd.d3.judge.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ddd.d3.judge.domain.JudgeExecutionResult;
 import com.ddd.d3.judge.domain.JudgeLanguage;
@@ -21,9 +23,12 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -135,6 +140,63 @@ class JudgeSubmissionServiceTest {
         assertFalse(serializedEvidence.contains("hidden"));
     }
 
+    @Test
+    void d3Jdg001ClaimsOneEvaluationForConcurrentWorkerDeliveries() throws Exception {
+        InMemoryRepository repository = new InMemoryRepository();
+        CountDownLatch executionStarted = new CountDownLatch(1);
+        CountDownLatch allowCompletion = new CountDownLatch(1);
+        AtomicInteger executionCount = new AtomicInteger();
+        var result = new JudgeExecutionResult(
+                JudgeStatus.ACCEPTED,
+                1,
+                1,
+                List.of(),
+                "fake-v1",
+                "fake-python3-v1",
+                ACCEPTED_AT.plusSeconds(1));
+        JudgeSubmissionService service = new JudgeSubmissionService(
+                repository,
+                new JudgeExecutionAdapter() {
+                    @Override
+                    public boolean isAvailable(JudgeLanguage language) {
+                        return true;
+                    }
+
+                    @Override
+                    public JudgeExecutionResult execute(SubmissionCommand command) {
+                        executionCount.incrementAndGet();
+                        executionStarted.countDown();
+                        try {
+                            if (!allowCompletion.await(5, TimeUnit.SECONDS)) {
+                                throw new IllegalStateException("test execution did not resume");
+                            }
+                        } catch (InterruptedException exception) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException("test execution interrupted", exception);
+                        }
+                        return result;
+                    }
+                },
+                Clock.fixed(ACCEPTED_AT, ZoneOffset.UTC),
+                () -> SUBMISSION_ID);
+        service.accept(submitCommand("private-source"));
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var winner = executor.submit(() -> service.evaluate(SUBMISSION_ID));
+            assertTrue(executionStarted.await(5, TimeUnit.SECONDS));
+            var duplicate = executor.submit(() -> service.evaluate(SUBMISSION_ID));
+
+            ExecutionException duplicateFailure = assertThrows(
+                    ExecutionException.class, () -> duplicate.get(5, TimeUnit.SECONDS));
+            assertInstanceOf(EvaluationInProgressException.class, duplicateFailure.getCause());
+            allowCompletion.countDown();
+            SafeEvaluationEvidence evidence = winner.get(5, TimeUnit.SECONDS);
+
+            assertEquals(1, executionCount.get());
+            assertEquals(evidence, service.evaluate(SUBMISSION_ID));
+        }
+    }
+
     private static JudgeSubmissionService service(boolean available) {
         return new JudgeSubmissionService(
                 new InMemoryRepository(),
@@ -180,10 +242,35 @@ class JudgeSubmissionServiceTest {
         }
 
         @Override
-        public JudgeSubmission save(JudgeSubmission submission) {
-            submissions.put(submission.id(), submission);
+        public Optional<JudgeSubmission> claimForEvaluation(UUID submissionId) {
+            var claimed = new AtomicReference<JudgeSubmission>();
+            submissions.computeIfPresent(submissionId, (ignored, current) -> {
+                if (current.status() == JudgeStatus.QUEUED) {
+                    JudgeSubmission running = current.startEvaluation();
+                    claimed.set(running);
+                    return running;
+                }
+                return current;
+            });
+            return Optional.ofNullable(claimed.get());
+        }
+
+        @Override
+        public JudgeSubmission completeEvaluation(JudgeSubmission submission) {
+            submissions.compute(submission.id(), (ignored, current) -> {
+                if (current == null || current.status() != JudgeStatus.RUNNING) {
+                    throw new IllegalStateException("submission is not claimed for evaluation");
+                }
+                return submission;
+            });
             submissionIdsByIdempotencyKey.put(submission.command().idempotencyKey(), submission.id());
             return submission;
+        }
+
+        @Override
+        public void releaseEvaluationClaim(UUID submissionId) {
+            submissions.computeIfPresent(submissionId, (ignored, current) ->
+                    current.status() == JudgeStatus.RUNNING ? current.requeueEvaluation() : current);
         }
     }
 }
