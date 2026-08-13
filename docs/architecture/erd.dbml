@@ -376,7 +376,7 @@ Table community_db.post_like {
 Table community_db.profile_projection {
   user_id uuid [pk, note: 'Logical identity aggregate reference']
   handle text [not null, unique]
-  display_name text [not null]
+  display_name text [note: 'Null until an enriched Identity contract is applied']
   public_rating int
   rp int
   tier text
@@ -391,9 +391,9 @@ Table community_db.match_projection {
   player_ids jsonb [not null]
   result community_match_result [not null]
   ranked boolean [not null]
-  score_summary jsonb [not null]
-  attack_summary jsonb [not null]
-  execution_summary jsonb [not null, note: 'No private source or hidden test data']
+  score_summary jsonb [note: 'Null until an enriched Battle contract is applied']
+  attack_summary jsonb [note: 'Null until an enriched Battle contract is applied']
+  execution_summary jsonb [note: 'Null until an enriched Battle contract is applied; no private source or hidden test data']
   source_version bigint [not null]
   projected_at timestamptz [not null]
 }
