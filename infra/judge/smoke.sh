@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set +x
 set -euo pipefail
 
 readonly base_url="${JUDGE0_BASE_URL:-http://127.0.0.1:2358}"
@@ -95,6 +96,9 @@ run_case() {
   local expected_memory="${10:-}"
   local expected_time_min="${11:-}"
   local expected_time_max="${12:-}"
+  local stack_limit="${13:-65536}"
+  local process_limit="${14:-60}"
+  local file_limit="${15:-1024}"
   local payload token result status actual_memory
 
   payload="$(jq -cn \
@@ -105,6 +109,9 @@ run_case() {
     --argjson cpuLimit "$cpu_limit" \
     --argjson wallLimit "$wall_limit" \
     --argjson memoryLimit "$memory_limit" \
+    --argjson stackLimit "$stack_limit" \
+    --argjson processLimit "$process_limit" \
+    --argjson fileLimit "$file_limit" \
     '{
       source_code: $sourceCode,
       language_id: $languageId,
@@ -113,6 +120,9 @@ run_case() {
       cpu_time_limit: $cpuLimit,
       wall_time_limit: $wallLimit,
       memory_limit: $memoryLimit,
+      stack_limit: $stackLimit,
+      max_processes_and_or_threads: $processLimit,
+      max_file_size: $fileLimit,
       enable_network: false
     }')"
   token="$(auth_curl \
@@ -241,3 +251,12 @@ run_case "compilation-error" "$D3_JUDGE_C_ID" 'int main(void) { this is invalid;
 run_case "runtime-error" "$D3_JUDGE_PYTHON3_ID" 'raise RuntimeError("redacted smoke")' "" "" '^Runtime Error'
 run_case "time-limit" "$D3_JUDGE_PYTHON3_ID" 'while True: pass' "" "" '^Time Limit Exceeded$' 1 2 262144 "" 0.9 1.5
 run_case "memory-pressure" "$D3_JUDGE_PYTHON3_ID" 'bytearray(300 * 1024 * 1024)' "" "" '^Runtime Error' 2 5 65536 65536
+run_case "process-limit" "$D3_JUDGE_PYTHON3_ID" \
+  $'import os, time\nchildren = []\nblocked = False\ntry:\n    for _ in range(20):\n        pid = os.fork()\n        if pid == 0:\n            time.sleep(0.2)\n            os._exit(0)\n        children.append(pid)\nexcept OSError:\n    blocked = True\nfinally:\n    for pid in children:\n        try:\n            os.waitpid(pid, 0)\n        except ChildProcessError:\n            pass\nprint("BLOCKED" if blocked else "OPEN")' \
+  "" $'BLOCKED\n' '^Accepted$' 2 5 262144 "" "" "" 65536 8 1024
+run_case "stack-limit" "$D3_JUDGE_C_ID" \
+  $'#include <stdio.h>\n__attribute__((noinline)) void dive(int n) { volatile char pad[1024 * 1024]; pad[0] = (char)n; if (n > 0) dive(n - 1); if (pad[0] == 127) puts("never"); }\nint main(void) { dive(16); puts("OPEN"); return 0; }' \
+  "" "" '^Runtime Error' 2 5 262144 "" "" "" 8192 60 1024
+run_case "file-size-limit" "$D3_JUDGE_PYTHON3_ID" \
+  $'with open("large.bin", "wb") as output:\n    output.write(b"x" * (256 * 1024))\nprint("OPEN")' \
+  "" "" '^Runtime Error' 2 5 262144 "" "" "" 65536 60 64

@@ -108,7 +108,7 @@ export D3_JUDGE_TYPESCRIPT_ID=<verified-id>
 unset JUDGE0_AUTH_HEADER JUDGE0_AUTH_TOKEN
 ```
 
-The suite proves unauthenticated rejection, authenticated version/worker discovery, network opt-in rejection, a blocked outbound socket from executed code after the host reaches the same endpoint, six hello-world executions, the same deterministic sum problem in all six languages, and wrong-answer, compilation, runtime, timeout, and memory-pressure behavior. The one-second CPU case must report between 0.9 and 1.5 seconds, distinguishing it from the two-second default. Judge0 reports memory pressure as a bounded `Runtime Error (NZEC)` at exactly 65,536 KiB for the smoke request; the Judge adapter owns normalization to D³ `MEMORY_LIMIT`. A live infrastructure outage is not induced by this suite; `PLATFORM_FAILURE` normalization is covered by the deterministic adapter test from PR #20.
+The suite proves unauthenticated rejection, authenticated version/worker discovery, network opt-in rejection, a blocked outbound socket from executed code after the host reaches the same endpoint, six hello-world executions, the same deterministic sum problem in all six languages, and wrong-answer, compilation, runtime, timeout, memory, process/thread, stack, and file-size boundaries. The one-second CPU case must report between 0.9 and 1.5 seconds, distinguishing it from the two-second default. Judge0 reports memory pressure as a bounded `Runtime Error (NZEC)` at exactly 65,536 KiB for the smoke request; the Judge adapter owns normalization to D³ `MEMORY_LIMIT`. A live infrastructure outage is not induced by this suite; `PLATFORM_FAILURE` normalization is covered by the deterministic adapter test from PR #20.
 
 ## Start, stop, and inspect
 
