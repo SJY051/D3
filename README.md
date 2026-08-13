@@ -8,7 +8,7 @@ Status: Contributor baseline; product behavior pending
 
 Last verified: 2026-08-14 against repository commands, paths, scaffold evidence and the lead developer AWS identity
 
-> **현재 상태 (2026-08-13): 구조 스캐폴드.** 라우트 셸, 서비스 경계, 버전된 계약, 로컬 인프라 모델과 비활성 요구사항 테스트가 있습니다. 인증, 매칭, 판정, 대전, 커뮤니티 동작은 아직 구현 완료로 볼 수 없습니다. 상세 상태와 필요한 증거는 [산출물 현황](docs/artifact-status.md)을 따릅니다.
+> **현재 상태 (2026-08-14): 구조 스캐폴드.** 라우트 셸, 서비스 경계, 버전된 계약, 로컬 인프라 모델과 비활성 요구사항 테스트가 있습니다. 인증, 매칭, 판정, 대전, 커뮤니티 동작은 아직 구현 완료로 볼 수 없습니다. 상세 상태와 필요한 증거는 [산출물 현황](docs/artifact-status.md)을 따릅니다.
 
 ## 왜 D³인가
 
