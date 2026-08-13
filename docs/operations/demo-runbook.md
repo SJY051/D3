@@ -40,7 +40,7 @@ Credentials stay outside the repository and recording. Seeded demo identities mu
 | Reviewed WF-01~08 | 최정민 | UI review is recorded before styled acceptance | Review required |
 | Scenario A | Service owners | Two browsers complete ranked flow without database edits | Blocked: behavior not implemented |
 | Scenarios B and C | Battle/Judge owners | Reconnect, surrender and incident void are deterministic | Blocked: behavior not implemented |
-| Six language runtimes | Judge owner | Versioned smoke cases pass on designated host | `UNKNOWN` |
+| Six language runtimes | Judge owner | Versioned smoke cases pass on designated host | PASS: pinned Judge0 CE 1.13.1 matrix and 12/12 language cases; real application adapter remains blocked by #13 |
 | Observability | 윤서진 | Health, correlation and failure views are identified | Baseline only |
 | Deployment target | 윤서진 | Environment and rollback owner are bound | AWS `UNKNOWN`; local fallback planned |
 | Backup recording | 최정민 | Same build and real services are visibly labeled | Not recorded |

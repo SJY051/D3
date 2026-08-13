@@ -92,7 +92,8 @@ run_case() {
   local cpu_limit="${7:-2}"
   local wall_limit="${8:-5}"
   local memory_limit="${9:-262144}"
-  local payload token result status
+  local expected_memory="${10:-}"
+  local payload token result status actual_memory
 
   payload="$(jq -cn \
     --arg sourceCode "$source_code" \
@@ -123,6 +124,14 @@ run_case() {
     jq -cn --arg caseLabel "$label" --arg expected "$expected_status_pattern" --argjson actual "$result" \
       '{case: $caseLabel, result: "FAIL", expectedStatusPattern: $expected, actual: $actual}'
     return 1
+  fi
+  if [[ -n "$expected_memory" ]]; then
+    actual_memory="$(jq -er '.memory' <<<"$result")"
+    if [[ "$actual_memory" != "$expected_memory" ]]; then
+      jq -cn --arg caseLabel "$label" --argjson expectedMemory "$expected_memory" --argjson actual "$result" \
+        '{case: $caseLabel, result: "FAIL", expectedMemoryKiB: $expectedMemory, actual: $actual}'
+      return 1
+    fi
   fi
   jq -cn --arg caseLabel "$label" --argjson actual "$result" \
     '{case: $caseLabel, result: "PASS", evidence: $actual}'
@@ -211,4 +220,4 @@ run_case "wrong-answer" "$D3_JUDGE_PYTHON3_ID" $'a, b = map(int, input().split()
 run_case "compilation-error" "$D3_JUDGE_C_ID" 'int main(void) { this is invalid; }' "" "" '^Compilation Error$'
 run_case "runtime-error" "$D3_JUDGE_PYTHON3_ID" 'raise RuntimeError("redacted smoke")' "" "" '^Runtime Error'
 run_case "time-limit" "$D3_JUDGE_PYTHON3_ID" 'while True: pass' "" "" '^Time Limit Exceeded$' 1 2 262144
-run_case "memory-pressure" "$D3_JUDGE_PYTHON3_ID" 'bytearray(300 * 1024 * 1024)' "" "" '^Runtime Error' 2 5 65536
+run_case "memory-pressure" "$D3_JUDGE_PYTHON3_ID" 'bytearray(300 * 1024 * 1024)' "" "" '^Runtime Error' 2 5 65536 65536
