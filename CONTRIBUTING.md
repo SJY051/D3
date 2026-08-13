@@ -12,6 +12,10 @@ Every change starts from an assigned issue with requirement IDs and observable a
 
 Do not make direct changes on `main`. Keep one concern per pull request and link the issue with `Closes #<number>` when the PR fully resolves it.
 
+## Pull request lifecycle
+
+Open pull requests as Ready for review by default so configured CI and bot reviews start immediately. Use Draft only when the task explicitly requests it or the change is intentionally incomplete and must remain outside normal review. Convert a Draft to Ready before requesting review or handing it off for merge.
+
 ## Pull request evidence
 
 Include:
@@ -23,4 +27,3 @@ Include:
 - risks, deferred work, and rollback notes.
 
 Codex review supplements one human approval. Resolve review conversations and required checks before squash merge.
-
