@@ -48,15 +48,19 @@ class DeterministicFakeJudgeAdapterTest {
     }
 
     @Test
-    void d3Btl003ReturnsRepeatedSizeTierEvidenceOnlyForAcceptedCode() {
+    void d3Btl003ReturnsRepeatedSizeTierEvidenceForPassedCorrectnessTiers() {
         JudgeExecutionResult accepted = adapter.execute(command("D3_FAKE_ACCEPTED"));
-        JudgeExecutionResult rejected = adapter.execute(command("D3_FAKE_WRONG_ANSWER"));
+        JudgeExecutionResult wrongAnswer = adapter.execute(command("D3_FAKE_WRONG_ANSWER"));
+        JudgeExecutionResult compilationError = adapter.execute(command("D3_FAKE_COMPILATION_ERROR"));
 
         assertEquals(3, accepted.passedCount());
         assertEquals(3, accepted.totalCount());
         assertEquals(3, accepted.runtimeMeasurements().size());
         assertTrue(accepted.runtimeMeasurements().stream().allMatch(sample -> sample.sampleCount() >= 3));
-        assertTrue(rejected.runtimeMeasurements().isEmpty());
+        assertEquals(2, wrongAnswer.passedCount());
+        assertEquals(2, wrongAnswer.runtimeMeasurements().size());
+        assertTrue(wrongAnswer.runtimeMeasurements().stream().allMatch(sample -> sample.sampleCount() >= 3));
+        assertTrue(compilationError.runtimeMeasurements().isEmpty());
     }
 
     private static SubmissionCommand command(String sourceCode) {
