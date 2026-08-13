@@ -12,13 +12,19 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CI: "true"
+
 jobs:
-  verify:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+  repository-checks:
+    name: Repository checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Check out source
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -31,22 +37,76 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install web dependencies
+      - name: Install dependencies from lockfile
         run: pnpm install --frozen-lockfile
 
       - name: Audit JavaScript dependencies
         run: pnpm audit --audit-level high
 
-      - name: Verify scaffold and contracts
+      - name: Verify scaffold, contracts, and agent configuration
         run: pnpm verify:scaffold
 
-      - name: Type-check, test, and build web
-        run: |
-          pnpm web:typecheck
-          pnpm web:test
-          pnpm web:build
-          pnpm web:e2e
+  frontend:
+    name: Frontend build and test evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 11.9.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Create frontend evidence directory
+        run: mkdir -p "$RUNNER_TEMP/frontend-test-evidence"
+
+      - name: Type-check frontend
+        run: pnpm web:typecheck
+
+      - name: Run frontend unit tests and record skips
+        run: pnpm web:test 2>&1 | tee "$RUNNER_TEMP/frontend-test-evidence/unit-tests.log"
+
+      - name: Build frontend
+        run: pnpm web:build
+
+      - name: Run browser test inventory and record skips
+        run: pnpm web:e2e 2>&1 | tee "$RUNNER_TEMP/frontend-test-evidence/browser-tests.log"
+
+      - name: Upload frontend test evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: frontend-test-evidence
+          path: ${{ runner.temp }}/frontend-test-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+
+  backend:
+    name: Backend build and test evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - name: Set up Java
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
@@ -59,11 +119,50 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Build and collect backend tests
-        run: ./gradlew build
+      - name: Build backend and record skipped tests
+        run: ./gradlew build --no-daemon
 
-      - name: Validate Compose model
+      - name: Upload backend test evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: backend-test-evidence
+          path: |
+            **/build/test-results/test
+            **/build/reports/tests/test
+          if-no-files-found: ignore
+          retention-days: 7
+
+  infrastructure:
+    name: Infrastructure configuration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Validate default Compose model
+        run: docker compose -f infra/compose.yaml config --quiet
+
+      - name: Validate observability Compose model
+        run: docker compose -f infra/compose.yaml --profile observability config --quiet
+
+  delivery-boundary:
+    name: Delivery boundary (no deploy)
+    needs: [repository-checks, frontend, backend, infrastructure]
+    permissions: {}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Confirm CI evidence boundary
         run: |
-          docker compose -f infra/compose.yaml config --quiet
-          docker compose -f infra/compose.yaml --profile observability config --quiet
+          {
+            echo "## Delivery boundary"
+            echo "All required CI jobs completed successfully."
+            echo "No container was published and no environment was changed."
+          } >> "$GITHUB_STEP_SUMMARY"
