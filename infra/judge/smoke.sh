@@ -247,7 +247,7 @@ run_default_case() {
   started_ms="$(date +%s%3N)"
   result="$(wait_for_submission "$token")"
   ended_ms="$(date +%s%3N)"
-  elapsed_seconds="$(jq -cn --argjson start "$started_ms" --argjson end "$ended_ms" '($end - $start) / 1000')"
+  elapsed_seconds="$(jq -cn --argjson start "$started_ms" --argjson finish "$ended_ms" '($finish - $start) / 1000')"
   status="$(jq -er '.status' <<<"$result")"
   if [[ ! "$status" =~ $expected_status_pattern ]]; then
     jq -cn --arg caseLabel "$label" --arg expected "$expected_status_pattern" --argjson actual "$result" \
