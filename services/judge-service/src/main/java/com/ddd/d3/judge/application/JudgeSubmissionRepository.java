@@ -9,5 +9,11 @@ public interface JudgeSubmissionRepository {
 
     Optional<JudgeSubmission> findById(UUID submissionId);
 
+    /**
+     * Atomically inserts by idempotency key or returns the already committed submission.
+     * Implementations must never replace the winner of a concurrent insert.
+     */
+    JudgeSubmission insertOrGet(JudgeSubmission submission);
+
     JudgeSubmission save(JudgeSubmission submission);
 }

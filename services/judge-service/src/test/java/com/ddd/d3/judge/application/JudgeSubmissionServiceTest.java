@@ -16,11 +16,14 @@ import com.ddd.d3.judge.domain.SubmissionMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -43,6 +46,32 @@ class JudgeSubmissionServiceTest {
 
         assertEquals(SUBMISSION_ID, first.submissionId());
         assertEquals(first, retry);
+    }
+
+    @Test
+    void d3Jdg001ReturnsOneSubmissionIdForConcurrentEquivalentRetries() throws Exception {
+        InMemoryRepository repository = new InMemoryRepository();
+        AtomicLong idSequence = new AtomicLong(10);
+        JudgeSubmissionService service = new JudgeSubmissionService(
+                repository,
+                language -> true,
+                Clock.fixed(ACCEPTED_AT, ZoneOffset.UTC),
+                () -> new UUID(0, idSequence.getAndIncrement()));
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> {
+                start.await(5, TimeUnit.SECONDS);
+                return service.accept(submitCommand("print(input())"));
+            });
+            var second = executor.submit(() -> {
+                start.await(5, TimeUnit.SECONDS);
+                return service.accept(submitCommand("print(input())"));
+            });
+            start.countDown();
+
+            assertEquals(first.get(5, TimeUnit.SECONDS).submissionId(), second.get(5, TimeUnit.SECONDS).submissionId());
+        }
     }
 
     @Test
@@ -129,13 +158,12 @@ class JudgeSubmissionServiceTest {
     }
 
     private static final class InMemoryRepository implements JudgeSubmissionRepository {
-        private final Map<UUID, JudgeSubmission> submissions = new HashMap<>();
+        private final ConcurrentHashMap<UUID, JudgeSubmission> submissions = new ConcurrentHashMap<>();
+        private final ConcurrentHashMap<UUID, UUID> submissionIdsByIdempotencyKey = new ConcurrentHashMap<>();
 
         @Override
         public Optional<JudgeSubmission> findByIdempotencyKey(UUID idempotencyKey) {
-            return submissions.values().stream()
-                    .filter(submission -> submission.command().idempotencyKey().equals(idempotencyKey))
-                    .findFirst();
+            return Optional.ofNullable(submissionIdsByIdempotencyKey.get(idempotencyKey)).map(submissions::get);
         }
 
         @Override
@@ -144,8 +172,17 @@ class JudgeSubmissionServiceTest {
         }
 
         @Override
+        public JudgeSubmission insertOrGet(JudgeSubmission submission) {
+            UUID storedId = submissionIdsByIdempotencyKey.computeIfAbsent(
+                    submission.command().idempotencyKey(), ignored -> submission.id());
+            submissions.putIfAbsent(storedId, submission);
+            return submissions.get(storedId);
+        }
+
+        @Override
         public JudgeSubmission save(JudgeSubmission submission) {
             submissions.put(submission.id(), submission);
+            submissionIdsByIdempotencyKey.put(submission.command().idempotencyKey(), submission.id());
             return submission;
         }
     }

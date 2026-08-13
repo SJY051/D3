@@ -55,7 +55,11 @@ public final class JudgeSubmissionService {
                 fingerprint,
                 JudgeStatus.QUEUED,
                 clock.instant());
-        return repository.save(submission).acceptance();
+        JudgeSubmission stored = repository.insertOrGet(submission);
+        if (!stored.requestFingerprint().equals(fingerprint)) {
+            throw new IdempotencyConflictException();
+        }
+        return stored.acceptance();
     }
 
     public SafeEvaluationEvidence evaluate(UUID submissionId) {
