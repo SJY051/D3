@@ -58,6 +58,8 @@ The Judge0 release archive and all three image digests are fixed. Changing any v
 
 Host-wide outbound access remains available for SSM, Secrets Manager, package retrieval, and image bootstrap. Isolation is enforced separately inside Judge0 with `ENABLE_NETWORK=false` and `ALLOW_ENABLE_NETWORK=false`; this distinction must not be replaced with an inaccurate claim that the EC2 host has no egress.
 
+Judge0 CE 1.13.1 runs its server and worker containers with Docker `privileged: true` to manage isolate/cgroup execution. This is why the runtime remains on dedicated disposable compute with no application workloads, no inbound administration, and no shared service database. Treat host compromise as a rebuild event; do not co-locate the application stack on this instance.
+
 ## Runtime matrix
 
 This matrix comes from the authenticated `/languages` response and command `00f2045c-40aa-4ac6-a630-527d30acc2fa`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays.
