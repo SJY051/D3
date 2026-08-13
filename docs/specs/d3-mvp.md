@@ -236,16 +236,20 @@ The repository shall retain current sources for requirements, workflow, system a
 1. The judge adapter returns a classified platform failure rather than a user-code failure.
 2. The battle is voided, neither player's rating or RP changes, and an operator can trace the incident through correlation identifiers and health signals.
 
-### Scenario D — P1 solo and community privacy
+### Scenario D — P0 community formatting and privacy
 
-1. A user solves a problem in solo mode and retains a private accepted solution.
-2. A Markdown post with a fenced code block renders correctly without counting code toward prose limits.
-3. The source remains absent from public match history until explicitly shared.
+1. A Markdown post with a fenced code block renders correctly without counting code toward prose limits.
+2. The source remains absent from public match history until explicitly shared.
+
+### Scenario E — P1 solo practice
+
+1. When the solo feature boundary is activated, a user solves a problem in solo mode and retains a private accepted solution without changing rating or RP.
 
 ## Acceptance criteria
 
 - Scenario A completes end to end with two independent browser sessions and no manual database edits.
 - Scenarios B and C produce the specified outcomes without duplicate result or rating records.
+- Scenario D verifies the P0 Markdown character-count and private-source boundaries; Scenario E is required only when its P1 feature boundary is activated.
 - Every supported language has a mapped judge runtime, a verified hello-world smoke case, and an explicit unavailable state when its runtime is unhealthy.
 - The demonstration problem produces repeatable correctness and scoring results within documented tolerance on the designated judge host.
 - Public record data can be traced to committed source events and does not expose accepted source by default.

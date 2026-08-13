@@ -59,8 +59,21 @@ sequenceDiagram
   alt RUN result or non-accepted SUBMIT
     BT-->>G: Return bounded judge status; keep match RUNNING
     G-->>WA: Forward caller-visible result
-  else Accepted SUBMIT or authoritative deadline
-    BT->>BT: Lock only the accepted SUBMIT
+  else First accepted SUBMIT
+    BT->>BT: Lock solver and close new submissions at server acceptance time
+    BT->>BT: Await SUBMIT jobs already accepted before the cutoff
+    Note over BT,J: Finish when cutoff jobs resolve or a bounded judging timeout expires
+    BT->>BT: Include a second accepted cutoff job in both-solve scoring
+    Note over BT,J: Outcome calculation waits for an approved safe scoring-evidence boundary
+    BT->>BT: Commit outcome, named score components and calculation version
+    BT-->>G: Per-player final outcome, score, rating and RP
+    G-->>WA: Forward Player A result
+    G-->>WB: Forward Player B result
+    BT-->>K: match.finished.v1 and rating.changed.v1
+    K-->>C: Idempotent projection events
+    C->>C: Build result post and searchable record
+  else Authoritative match deadline
+    BT->>BT: Await accepted in-flight SUBMIT jobs within the bounded judging timeout
     Note over BT,J: Outcome calculation waits for an approved safe scoring-evidence boundary
     BT->>BT: Commit outcome, named score components and calculation version
     BT-->>G: Per-player final outcome, score, rating and RP
