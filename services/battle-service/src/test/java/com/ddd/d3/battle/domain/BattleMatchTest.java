@@ -113,12 +113,12 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
-        match.handle(new BattleMatch.Disconnect(PLAYER_ONE));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         assertTrue(match.isDisconnected(PLAYER_ONE));
         assertEquals(START.plusSeconds(30), match.reconnectDeadline(PLAYER_ONE).orElseThrow());
 
         clock.advance(Duration.ofMillis(29_999));
-        match.handle(new BattleMatch.Reconnect(PLAYER_ONE));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
 
         assertFalse(match.isDisconnected(PLAYER_ONE));
         assertEquals(BattleMatch.State.RUNNING, match.state());
@@ -129,14 +129,31 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
-        match.handle(new BattleMatch.Disconnect(PLAYER_ONE));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         clock.advance(Duration.ofSeconds(1));
-        match.handle(new BattleMatch.Reconnect(PLAYER_ONE));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
 
-        match.handle(new BattleMatch.Reconnect(PLAYER_ONE));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
 
         assertFalse(match.isDisconnected(PLAYER_ONE));
         assertEquals(BattleMatch.State.RUNNING, match.state());
+    }
+
+    @Test
+    void d3Btl002DoesNotApplyAnOldReconnectRetryToANewerDisconnectGeneration() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 2));
+
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+
+        assertTrue(match.isDisconnected(PLAYER_ONE));
+        clock.advance(Duration.ofSeconds(30));
+        match.handle(new BattleMatch.AdvanceTime());
+        assertEquals(PLAYER_TWO, match.result().orElseThrow().winnerId());
     }
 
     @Test
@@ -144,9 +161,9 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
-        match.handle(new BattleMatch.Disconnect(PLAYER_ONE));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         clock.advance(Duration.ofSeconds(30));
-        match.handle(new BattleMatch.Reconnect(PLAYER_ONE));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
 
         BattleMatch.Result result = match.result().orElseThrow();
         assertEquals(BattleMatch.State.FINISHED, match.state());
@@ -161,13 +178,29 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
-        match.handle(new BattleMatch.Disconnect(PLAYER_TWO));
+        match.handle(new BattleMatch.Disconnect(PLAYER_TWO, 1));
         clock.advance(Duration.ofSeconds(30).plusNanos(1));
         match.handle(new BattleMatch.AdvanceTime());
 
         BattleMatch.Result result = match.result().orElseThrow();
         assertEquals(BattleMatch.State.FINISHED, match.state());
         assertEquals(PLAYER_ONE, result.winnerId());
+        assertEquals(BattleMatch.ResolutionReason.DISCONNECT_TIMEOUT, result.reason());
+    }
+
+    @Test
+    void d3Btl002ResolvesAnExpiredReconnectBeforeBeginningJudging() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+        clock.advance(Duration.ofSeconds(30));
+
+        match.handle(new BattleMatch.BeginJudging());
+
+        BattleMatch.Result result = match.result().orElseThrow();
+        assertEquals(BattleMatch.State.FINISHED, match.state());
+        assertEquals(PLAYER_TWO, result.winnerId());
         assertEquals(BattleMatch.ResolutionReason.DISCONNECT_TIMEOUT, result.reason());
     }
 
@@ -248,7 +281,7 @@ class BattleMatchTest {
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> match.handle(new BattleMatch.Disconnect("outsider")));
+                () -> match.handle(new BattleMatch.Disconnect("outsider", 1)));
         assertThrows(
                 IllegalArgumentException.class,
                 () -> match.handle(new BattleMatch.Surrender("outsider")));
