@@ -1,16 +1,85 @@
 # Deployment plan
 
-Owner: 윤서진  
-Status: Local baseline; AWS binding pending
+Owner: 윤서진
+
+Status: Local baseline; cloud pipeline planned; AWS binding pending
+
+Last verified: 2026-08-13 against the Compose model, CI scaffold and cloud target
+
+Related: [cloud architecture](../architecture/cloud.md), [local infrastructure](../../infra/README.md), [test plan](../quality/test-plan.md)
+
+## Deployment truth
+
+The current GitHub Actions workflow validates the repository; it does not build or publish container images and does not deploy. ECR, ECS, RDS, ElastiCache, MSK, Judge0 EC2, OIDC and Terraform state remain `UNKNOWN` until the bootcamp AWS account supplies bindings. The sequence below is the gated target, not evidence of an active pipeline.
 
 ## Local profiles
 
-- Default: PostgreSQL databases, Redis, and Kafka.
+- Default: PostgreSQL databases, Redis and Kafka.
 - `observability`: Prometheus and Grafana.
-- `judge`: reserved for a pinned self-hosted Judge0 bundle after its image and security configuration pass smoke review.
+- `judge`: reserved for a pinned self-hosted Judge0 bundle after image and security review.
 - Application processes run from the IDE or repository commands during normal development.
 
-The project contract is the Docker API and Compose specification. Docker Desktop is the current macOS runtime; another compatible runtime may be used when it passes Compose and Testcontainers checks.
+The runtime contract is the Docker API and Compose specification. Docker Desktop is the current macOS runtime; another compatible runtime may be used after Compose and Testcontainers checks pass.
+
+## Promotion sequence
+
+```mermaid
+flowchart LR
+  PR["Pull request"] --> CI["CI: contracts, web, Java, Compose"]
+  CI --> Review["Codex review + human approval"]
+  Review --> Main["Squash merge to main"]
+  Main --> Image["Build and scan immutable images"]
+  Image --> Registry["Push digest-tagged images to ECR"]
+  Registry --> Approve["Environment approval"]
+  Approve --> Migrate["Forward-only Flyway migration job"]
+  Migrate --> Deploy["Deploy candidate revision"]
+  Deploy --> Verify["Readiness, smoke, contract and preflight"]
+  Verify -->|pass| Promote["Promote traffic and record evidence"]
+  Verify -->|fail| Rollback["Restore prior image revision"]
+  Rollback --> VerifyOld["Verify prior revision and open incident"]
+```
+
+### 1. CI gate
+
+On a pull request and `main` push, install pinned toolchains, audit dependencies, validate scaffold/contracts/agent config, type-check/test/build Web, validate the Gradle wrapper, build/test Java and validate Compose profiles. The exact workflow implementation is owned separately; this document consumes its recorded result.
+
+Promotion stops on a required failure. Skipped behavior tests are reported as skips and never converted into a green feature claim.
+
+### 2. Image gate
+
+After a verified `main` build, create one image per deployable application from the same revision. Record source SHA, build time, base-image digest, SBOM, vulnerability scan and resulting image digest. Publish only immutable revision tags and digests; mutable convenience tags are never deployment evidence.
+
+Containerfiles and the registry workflow are not present yet. Image evidence is therefore `NOT RUN`.
+
+### 3. Authentication and approval gate
+
+Use GitHub OIDC with a least-privilege environment role; do not store long-lived AWS keys. Protect the target environment with explicit approval. Bind account, region, role ARN, ECR repositories, cluster/service names and secret paths before enabling the job.
+
+All bindings are currently `UNKNOWN`, so no cloud deployment is authorized by this plan alone.
+
+### 4. Migration gate
+
+Run reviewed, forward-only Flyway migrations with a dedicated migration identity before application traffic promotion. Confirm backups and compatibility with both the previous and candidate application revisions. Network calls do not run inside schema transactions.
+
+Destructive or incompatible migrations require a separate expand-and-contract rollout. Production schema rollback is a forward fix or restore decision, not an automatic down migration.
+
+### 5. Candidate deploy
+
+Deploy digest-pinned application images behind the ALB with no traffic or the smallest supported canary. Judge0 stays on separate private EC2 compute and is never exposed directly. RDS databases and roles remain service-specific; Redis stores only expiring coordination state.
+
+Record deployment ID, image digests, migration version, configuration version, operator and start time.
+
+### 6. Verify and promote
+
+Require readiness for gateway and all domain services, database/broker/cache connectivity, contract smoke, one sanitized identity request and `pnpm demo:preflight` against the target. A Judge deployment additionally requires the pinned six-language smoke matrix and resource-limit/isolation checks.
+
+Promote traffic only when the required checks pass. Archive results with the revision and environment; health alone does not prove Scenario A.
+
+### 7. Rollback
+
+Rollback triggers include failed readiness, rising required-request errors, contract incompatibility, duplicate results, authorization/privacy regression or failed Judge smoke. Stop promotion, route traffic to the last verified image digests, verify readiness and domain smoke, then open an incident with the correlation and deployment IDs.
+
+Keep a compatible previous application revision available. Do not automatically reverse a committed database migration. If the schema is incompatible or data integrity is uncertain, stop writes and choose a reviewed forward fix or backup restore.
 
 ## Cloud target
 
@@ -18,18 +87,19 @@ The project contract is the Docker API and Compose specification. Docker Desktop
 - Images: ECR, published only after a verified `main` build.
 - Durable data: RDS PostgreSQL with service-specific databases and credentials.
 - Ephemeral data: ElastiCache Redis.
-- Events: Amazon MSK.
+- Events: Amazon MSK when the assigned quota permits it.
 - User-code execution: separate private Judge0 EC2.
 - Optional media: S3 presigned upload and CloudFront only after P1 activation.
 - Secrets: Secrets Manager or Parameter Store; CI authentication through GitHub OIDC.
 
-## Fallback
+## Local and EC2 fallback
 
-When managed services or permissions are unavailable, run application images through Compose on one application EC2 host while preserving a separate Judge0 host. Document every substituted managed boundary in the presentation.
+When managed services or permissions are unavailable, run application images with Compose on one application EC2 host while preserving a separate Judge0 host. If no cloud host is available, rehearse the same verified revision locally. The fallback must pass its own preflight and be identified in the presentation; it is not evidence that the target managed architecture was deployed.
 
 ## Unresolved bindings
 
-- AWS account, region, IAM boundary, quotas, DNS, certificate, and allowed service classes.
+- AWS account, region, IAM boundary, quotas, DNS, certificate and allowed service classes.
 - Instance and managed-service sizes after load and budget measurement.
-- Terraform state backend and deployment approval identity.
-
+- Terraform state backend, deployment approval identity and recovery operator.
+- Containerfiles, registry names, rollout strategy supported by the assigned account and retention policy.
+- Backup/restore objectives, numerical service-level budgets and Judge host calibration profile.

@@ -1,7 +1,10 @@
 # System context
 
-Owner: 윤서진  
+Owner: 윤서진
+
 Status: Initial baseline
+
+Last verified: 2026-08-13 against the MVP system constraints and service boundaries
 
 ```mermaid
 flowchart TB
@@ -32,4 +35,3 @@ flowchart TB
 ```
 
 The browser never calls Judge0 or a service database directly. Managed AWS products are deployment choices for these boundaries, not additional domain owners.
-

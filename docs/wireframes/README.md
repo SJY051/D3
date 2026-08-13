@@ -1,7 +1,11 @@
 # D³ low-fidelity wireframes
 
-Owner: 최정민  
-Status: Review required  
+Owner: 최정민
+
+Status: Review required
+
+Last verified: 2026-08-13 against D3-UX-001 and the current route scaffold
+
 Requirement: D3-UX-001
 
 These wireframes establish information priority and interaction only. They are not styled UI. Each styled route must name its wireframe ID in the implementing issue or component documentation.

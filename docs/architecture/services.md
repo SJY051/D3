@@ -1,7 +1,10 @@
 # Service boundaries
 
-Owner: 윤서진  
+Owner: 윤서진
+
 Status: Initial baseline
+
+Last verified: 2026-08-13 against the MVP system constraints and public contract inventory
 
 | Boundary | Owns | Does not own | Initial caller or consumer |
 |---|---|---|---|
@@ -22,6 +25,17 @@ Gateway authentication does not replace service authorization. Every domain serv
 - Identity publishes `user-profile.changed.v1` for consumer-owned projections.
 - Every consumer records `eventId` or an equivalent inbox key before applying an event.
 - A projection may be stale, but it must retain the authoritative aggregate ID and version.
+
+## Contract activation gap
+
+The current v1 event inventory is sufficient only for a basic projection. `match.finished.v1` omits score composition, attempts, attack history, and execution evidence. `rating.changed.v1` omits leaderboard position, language statistics, and peak tier. `user-profile.changed.v1` omits display name. Consequently, the target Community projection fields in `erd.dbml` cannot all be populated from the current schemas.
+
+Before an enriched Community projection is implemented, approve one of these versioned boundaries:
+
+- a new event version carrying the minimum privacy-reviewed summary; or
+- a bounded versioned read API/read model owned by the authoritative service and keyed by the event's aggregate ID and version.
+
+Community stores the returned data in its own database. Cross-service tables, foreign keys, entities, and database queries remain prohibited. Existing v1 stubs are not completion evidence for the enriched record.
 
 ## Persistence rules
 

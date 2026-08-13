@@ -1,13 +1,418 @@
-// D³ logical ERD scaffold — D3-DOC-001
-// Physical columns and relationships are intentionally absent until the owning
-// issue defines invariants and migration acceptance evidence.
+// D³ logical ERD — D3-DOC-001
+// Owner: service owners
+// Status: logical baseline; physical migrations and query evidence pending
+// Last verified: 2026-08-13 against docs/specs/d3-mvp.md and services.md
+//
+// Each schema below represents a separately owned PostgreSQL database, not a
+// shared physical schema. Refs exist only inside one service database.
+// Cross-boundary *_id values are logical contract references and never FKs.
 
-// identity_db candidates: users, auth_identities, refresh_sessions
-// battle_db candidates: problems, matches, match_players, ratings, seasons, outbox_events
-// judge_db candidates: submissions, judge_runs, evaluation_evidence, outbox_events
-// community_db candidates: posts, follows, comments, likes, profile_projections,
-//                          match_projections, inbox_events
+Project d3 {
+  database_type: "PostgreSQL"
+  Note: 'Logical submission model. Flyway migrations remain authoritative once implemented.'
+}
 
-// Cross-database foreign keys are prohibited. Cross-boundary references use
-// stable IDs plus contract versions and are drawn as logical references only.
+Enum identity_login_provider {
+  PASSWORD
+  GITHUB
+}
 
+Enum battle_match_status {
+  LOBBY
+  READY
+  RUNNING
+  JUDGING
+  FINISHED
+}
+
+// VOIDED is the match-finished.v1 contract value for the domain VOID outcome.
+Enum battle_match_result {
+  PLAYER_ONE_WIN
+  PLAYER_TWO_WIN
+  DRAW
+  VOIDED
+}
+
+Enum judge_submission_mode {
+  RUN
+  SUBMIT
+}
+
+Enum judge_run_status {
+  QUEUED
+  RUNNING
+  ACCEPTED
+  WRONG_ANSWER
+  COMPILATION_ERROR
+  RUNTIME_ERROR
+  TIME_LIMIT
+  MEMORY_LIMIT
+  PLATFORM_FAILURE
+}
+
+Enum community_post_visibility {
+  PUBLIC
+  FOLLOWERS
+  CIRCLE
+  PRIVATE
+}
+
+// Projection-local copy of the match-finished.v1 contract values.
+Enum community_match_result {
+  PLAYER_ONE_WIN
+  PLAYER_TWO_WIN
+  DRAW
+  VOIDED
+}
+
+Table identity_db.user_account {
+  id uuid [pk]
+  handle text [not null, unique]
+  email text [not null, unique]
+  password_hash text
+  display_name text [not null]
+  bio text
+  status text [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table identity_db.login_identity {
+  id uuid [pk]
+  user_id uuid [not null]
+  provider identity_login_provider [not null]
+  provider_subject text [not null]
+  created_at timestamptz [not null]
+
+  Indexes {
+    (provider, provider_subject) [unique]
+    user_id
+  }
+}
+
+Table identity_db.refresh_session {
+  id uuid [pk]
+  user_id uuid [not null]
+  token_hash text [not null, unique]
+  expires_at timestamptz [not null]
+  rotated_from_id uuid
+  revoked_at timestamptz
+  created_at timestamptz [not null]
+
+  Indexes {
+    (user_id, expires_at)
+  }
+}
+
+Table identity_db.outbox_event {
+  id uuid [pk]
+  aggregate_id uuid [not null]
+  aggregate_version bigint [not null]
+  event_type text [not null]
+  payload jsonb [not null, note: 'Public profile projection data only; no credentials or tokens']
+  occurred_at timestamptz [not null]
+  published_at timestamptz
+
+  Indexes {
+    (published_at, occurred_at)
+    (aggregate_id, aggregate_version, event_type) [unique]
+  }
+}
+
+Ref: identity_db.login_identity.user_id > identity_db.user_account.id
+Ref: identity_db.refresh_session.user_id > identity_db.user_account.id
+Ref: identity_db.refresh_session.rotated_from_id > identity_db.refresh_session.id
+
+Table battle_db.problem {
+  id uuid [pk]
+  slug text [not null, unique]
+  version int [not null]
+  title text [not null]
+  difficulty text [not null]
+  expected_complexity text
+  active boolean [not null, default: false]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table battle_db.match {
+  id uuid [pk]
+  problem_id uuid [not null]
+  ranked boolean [not null]
+  status battle_match_status [not null]
+  result battle_match_result
+  server_started_at timestamptz
+  deadline_at timestamptz
+  finished_at timestamptz
+  void_reason text
+  aggregate_version bigint [not null, default: 0]
+  created_at timestamptz [not null]
+}
+
+Table battle_db.match_player {
+  match_id uuid [not null]
+  user_id uuid [not null, note: 'Logical identity contract reference; no cross-database FK']
+  seat smallint [not null]
+  language_key text [not null]
+  connection_state text [not null]
+  reconnect_deadline_at timestamptz
+  accepted_submission_id uuid [note: 'Logical judge contract reference; no cross-database FK']
+  attempts int [not null, default: 0]
+  score numeric
+  rating_before int
+  rating_after int
+  rp_before int
+  rp_after int
+
+  Indexes {
+    (match_id, user_id) [pk]
+    (user_id, match_id)
+  }
+}
+
+Table battle_db.attack_event {
+  id uuid [pk]
+  match_id uuid [not null]
+  sequence bigint [not null]
+  actor_user_id uuid [not null, note: 'Logical identity contract reference']
+  target_user_id uuid [not null, note: 'Logical identity contract reference']
+  attack_type text [not null]
+  resolution text [not null]
+  energy_cost int [not null]
+  occurred_at timestamptz [not null]
+
+  Indexes {
+    (match_id, sequence) [unique]
+  }
+}
+
+Table battle_db.rating {
+  user_id uuid [pk, note: 'Logical identity contract reference']
+  public_rating int [not null]
+  placement_count int [not null, default: 0]
+  games_played int [not null, default: 0]
+  updated_at timestamptz [not null]
+}
+
+Table battle_db.season_rank {
+  season_id uuid [not null]
+  user_id uuid [not null, note: 'Logical identity contract reference']
+  rp int [not null]
+  tier text [not null]
+  division text
+  peak_tier text [not null]
+  updated_at timestamptz [not null]
+
+  Indexes {
+    (season_id, user_id) [pk]
+    (season_id, rp)
+  }
+}
+
+Table battle_db.outbox_event {
+  id uuid [pk]
+  aggregate_id uuid [not null]
+  aggregate_version bigint [not null]
+  event_type text [not null]
+  payload jsonb [not null]
+  occurred_at timestamptz [not null]
+  published_at timestamptz
+
+  Indexes {
+    (published_at, occurred_at)
+    (aggregate_id, aggregate_version, event_type) [unique]
+  }
+}
+
+Table battle_db.inbox_event {
+  event_id uuid [pk]
+  event_type text [not null]
+  aggregate_id uuid [not null]
+  aggregate_version bigint [not null]
+  received_at timestamptz [not null]
+  applied_at timestamptz
+
+  Indexes {
+    (aggregate_id, aggregate_version, event_type) [unique]
+  }
+}
+
+Ref: battle_db.match.problem_id > battle_db.problem.id
+Ref: battle_db.match_player.match_id > battle_db.match.id
+Ref: battle_db.attack_event.match_id > battle_db.match.id
+
+Table judge_db.submission {
+  id uuid [pk]
+  idempotency_key text [not null, unique]
+  user_id uuid [not null, note: 'Logical identity contract reference']
+  match_id uuid [note: 'Logical battle contract reference; null for solo']
+  problem_id uuid [not null, note: 'Versioned logical problem reference']
+  problem_version int [not null]
+  mode judge_submission_mode [not null]
+  language_key text [not null]
+  source_code text [not null, note: 'Private by default; excluded from public events and logs']
+  attempt_number int
+  accepted_at timestamptz
+  created_at timestamptz [not null]
+
+  Indexes {
+    (match_id, user_id, attempt_number)
+    (user_id, created_at)
+  }
+}
+
+Table judge_db.judge_run {
+  id uuid [pk]
+  submission_id uuid [not null]
+  adapter_version text [not null]
+  runtime_version text [not null]
+  status judge_run_status [not null]
+  cpu_time_ms bigint
+  wall_time_ms bigint
+  memory_kib bigint
+  started_at timestamptz
+  completed_at timestamptz
+  correlation_id text [not null]
+}
+
+Table judge_db.evaluation_evidence {
+  id uuid [pk]
+  judge_run_id uuid [not null]
+  case_group text [not null]
+  passed_count int [not null]
+  total_count int [not null]
+  measured_runtime_ms bigint
+  static_complexity text
+  static_confidence numeric
+  created_at timestamptz [not null]
+}
+
+Table judge_db.outbox_event {
+  id uuid [pk]
+  aggregate_id uuid [not null]
+  aggregate_version bigint [not null]
+  event_type text [not null]
+  payload jsonb [not null, note: 'Must exclude source_code and hidden tests']
+  occurred_at timestamptz [not null]
+  published_at timestamptz
+
+  Indexes {
+    (published_at, occurred_at)
+    (aggregate_id, aggregate_version, event_type) [unique]
+  }
+}
+
+Ref: judge_db.judge_run.submission_id > judge_db.submission.id
+Ref: judge_db.evaluation_evidence.judge_run_id > judge_db.judge_run.id
+
+Table community_db.post {
+  id uuid [pk]
+  author_user_id uuid [not null, note: 'Logical identity contract reference']
+  visibility community_post_visibility [not null]
+  prose_markdown text [not null]
+  match_projection_id uuid
+  audience_circle_id uuid
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Indexes {
+    (author_user_id, created_at)
+    (visibility, created_at)
+  }
+}
+
+Table community_db.circle {
+  id uuid [pk]
+  owner_user_id uuid [not null, note: 'Logical identity contract reference']
+  name text [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Indexes {
+    (owner_user_id, name) [unique]
+  }
+}
+
+Table community_db.circle_member {
+  circle_id uuid [not null]
+  member_user_id uuid [not null, note: 'Logical identity contract reference']
+  added_at timestamptz [not null]
+
+  Indexes {
+    (circle_id, member_user_id) [pk]
+    (member_user_id, circle_id)
+  }
+}
+
+Table community_db.follow {
+  follower_user_id uuid [not null, note: 'Logical identity contract reference']
+  followed_user_id uuid [not null, note: 'Logical identity contract reference']
+  created_at timestamptz [not null]
+
+  Indexes {
+    (follower_user_id, followed_user_id) [pk]
+    (followed_user_id, created_at)
+  }
+}
+
+Table community_db.comment {
+  id uuid [pk]
+  post_id uuid [not null]
+  author_user_id uuid [not null, note: 'Logical identity contract reference']
+  body_markdown text [not null]
+  created_at timestamptz [not null]
+}
+
+Table community_db.post_like {
+  post_id uuid [not null]
+  user_id uuid [not null, note: 'Logical identity contract reference']
+  created_at timestamptz [not null]
+
+  Indexes {
+    (post_id, user_id) [pk]
+  }
+}
+
+Table community_db.profile_projection {
+  user_id uuid [pk, note: 'Logical identity aggregate reference']
+  handle text [not null, unique]
+  display_name text [not null]
+  public_rating int
+  rp int
+  tier text
+  peak_tier text
+  identity_source_version bigint [not null]
+  rating_source_version bigint [note: 'Null until the first Battle rating projection is applied']
+  projected_at timestamptz [not null]
+}
+
+Table community_db.match_projection {
+  match_id uuid [pk, note: 'Logical battle aggregate reference']
+  player_ids jsonb [not null]
+  result community_match_result [not null]
+  ranked boolean [not null]
+  score_summary jsonb [not null]
+  attack_summary jsonb [not null]
+  execution_summary jsonb [not null, note: 'No private source or hidden test data']
+  source_version bigint [not null]
+  projected_at timestamptz [not null]
+}
+
+Table community_db.inbox_event {
+  event_id uuid [pk]
+  event_type text [not null]
+  aggregate_id uuid [not null]
+  aggregate_version bigint [not null]
+  received_at timestamptz [not null]
+  applied_at timestamptz
+
+  Indexes {
+    (aggregate_id, aggregate_version, event_type) [unique]
+  }
+}
+
+Ref: community_db.post.match_projection_id > community_db.match_projection.match_id
+Ref: community_db.post.audience_circle_id > community_db.circle.id
+Ref: community_db.circle_member.circle_id > community_db.circle.id
+Ref: community_db.comment.post_id > community_db.post.id
+Ref: community_db.post_like.post_id > community_db.post.id
