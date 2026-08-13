@@ -93,6 +93,8 @@ run_case() {
   local wall_limit="${8:-5}"
   local memory_limit="${9:-262144}"
   local expected_memory="${10:-}"
+  local expected_time_min="${11:-}"
+  local expected_time_max="${12:-}"
   local payload token result status actual_memory
 
   payload="$(jq -cn \
@@ -130,6 +132,18 @@ run_case() {
     if [[ "$actual_memory" != "$expected_memory" ]]; then
       jq -cn --arg caseLabel "$label" --argjson expectedMemory "$expected_memory" --argjson actual "$result" \
         '{case: $caseLabel, result: "FAIL", expectedMemoryKiB: $expectedMemory, actual: $actual}'
+      return 1
+    fi
+  fi
+  if [[ -n "$expected_time_min" || -n "$expected_time_max" ]]; then
+    if [[ -z "$expected_time_min" || -z "$expected_time_max" ]] ||
+      ! jq -e --argjson min "$expected_time_min" --argjson max "$expected_time_max" \
+        '.time != null and ((.time | tonumber) >= $min) and ((.time | tonumber) <= $max)' \
+        >/dev/null <<<"$result"; then
+      jq -cn --arg caseLabel "$label" \
+        --arg expectedMin "$expected_time_min" --arg expectedMax "$expected_time_max" \
+        --argjson actual "$result" \
+        '{case: $caseLabel, result: "FAIL", expectedTimeSeconds: {min: $expectedMin, max: $expectedMax}, actual: $actual}'
       return 1
     fi
   fi
@@ -188,6 +202,12 @@ if [[ "$network_code" != "422" ]]; then
 fi
 jq -cn --arg status "$network_code" '{check: "submission-network-opt-in-denied", result: "PASS", httpStatus: $status}'
 
+if ! timeout 5 bash -c 'exec 3<>/dev/tcp/1.1.1.1/53; exec 3>&-'; then
+  echo "Host egress control could not reach 1.1.1.1:53/TCP; sandbox network evidence is inconclusive." >&2
+  exit 1
+fi
+jq -cn '{check: "host-egress-control", result: "PASS", endpoint: "1.1.1.1:53/TCP"}'
+
 run_case "hello-c" "$D3_JUDGE_C_ID" $'#include <stdio.h>\nint main(void) { puts("D3"); return 0; }' "" $'D3\n' '^Accepted$'
 run_case "hello-cpp" "$D3_JUDGE_CPP_ID" $'#include <iostream>\nint main() { std::cout << "D3\\n"; }' "" $'D3\n' '^Accepted$'
 run_case "hello-java" "$D3_JUDGE_JAVA_ID" $'class Main { public static void main(String[] args) { System.out.println("D3"); } }' "" $'D3\n' '^Accepted$'
@@ -219,5 +239,5 @@ run_case "submission-network-denied" "$D3_JUDGE_PYTHON3_ID" \
 run_case "wrong-answer" "$D3_JUDGE_PYTHON3_ID" $'a, b = map(int, input().split())\nprint(a - b)' $'2 3\n' $'5\n' '^Wrong Answer$'
 run_case "compilation-error" "$D3_JUDGE_C_ID" 'int main(void) { this is invalid; }' "" "" '^Compilation Error$'
 run_case "runtime-error" "$D3_JUDGE_PYTHON3_ID" 'raise RuntimeError("redacted smoke")' "" "" '^Runtime Error'
-run_case "time-limit" "$D3_JUDGE_PYTHON3_ID" 'while True: pass' "" "" '^Time Limit Exceeded$' 1 2 262144
+run_case "time-limit" "$D3_JUDGE_PYTHON3_ID" 'while True: pass' "" "" '^Time Limit Exceeded$' 1 2 262144 "" 0.9 1.5
 run_case "memory-pressure" "$D3_JUDGE_PYTHON3_ID" 'bytearray(300 * 1024 * 1024)' "" "" '^Runtime Error' 2 5 65536 65536
