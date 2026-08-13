@@ -4,7 +4,7 @@ Owner: 윤서진
 
 Status: Required-source baseline; implementation and final presentation evidence pending
 
-Last verified: 2026-08-13 against the 18-page bootcamp planning PDF and repository sources
+Last verified: 2026-08-14 against the 18-page bootcamp planning PDF, repository sources and bound AWS identity
 
 Requirement: D3-DOC-001
 
@@ -14,16 +14,16 @@ The planning PDF names the ten artifact classes below. This table is the authori
 
 | # | Required artifact | Repository source | Owner | Status | Last verification point | Evidence still required |
 |---:|---|---|---|---|---|---|
-| 1 | Requirements specification: core/optional, priority and MUST/SHOULD | [MVP specification](specs/d3-mvp.md#internal-scoring-priority-plan) | 윤서진 | Baseline | 2026-08-13 · PDF/source cross-check | Implemented evidence per matrix item; final rubric confirmation |
+| 1 | Requirements specification: core/optional, priority and MUST/SHOULD | [MVP specification](specs/d3-mvp.md#internal-scoring-priority-plan) | 윤서진 | Baseline | 2026-08-14 · PDF/source and AWS activation-gate cross-check | Implemented evidence per matrix item; final rubric confirmation |
 | 2 | Workflow Swimlane | [Ranked workflow](architecture/workflow.md) | 최정민 | Target baseline | 2026-08-13 · scenarios and contracts cross-check | Render review and Scenario A/B/C runtime traces |
 | 3 | System architecture | [System context](architecture/system-context.md) | 윤서진 | Baseline | 2026-08-13 · boundary source review | Running topology and final deployment substitutions |
 | 4 | Service architecture | [Service boundaries](architecture/services.md) | 윤서진 | Baseline | 2026-08-13 · ownership/contract review | Implemented endpoints, events and ownership evidence |
 | 5 | Service database ERD | [Logical ERD](architecture/erd.dbml) | Service owners | Logical baseline: 26 tables, 14 intra-service refs | 2026-08-14 · federation, judge-correlation and contract review | Rendered diagram, Flyway migrations and query/index evidence |
-| 6 | Cloud architecture | [Cloud architecture](architecture/cloud.md) | 윤서진 | Awaiting binding | 2026-08-13 · target/fallback review | AWS account, region, IAM, quota and deployed-resource evidence `UNKNOWN` |
+| 6 | Cloud architecture | [Cloud architecture](architecture/cloud.md) | 윤서진 | Account/region confirmed; services pending | 2026-08-14 · STS identity and target/fallback review | IAM, quota and deployed-resource evidence `UNKNOWN` |
 | 7 | Wireframes and functions | [WF-01 through WF-08](wireframes/README.md) | 최정민 | Review required | 2026-08-13 · route/requirement mapping review | Team sign-off and styled-screen linkage/screenshots |
 | 8 | Test plan: unit, integration, load and chaos | [Test plan](quality/test-plan.md) | 최정민 and service owners | Plan baseline | 2026-08-13 · test/CI source review | Functional activation, designated host, load and chaos reports |
-| 9 | Deployment plan: CI/CD, procedure and rollback | [Deployment plan](operations/deployment-plan.md) | 윤서진 | Local baseline; cloud planned | 2026-08-13 · Compose/CI source review | Images, AWS/OIDC bindings, deploy and rollback rehearsal |
-| 10 | Source and README | [README](../README.md), repository and [public contracts](../contracts/README.md) | Team | Contributor baseline | 2026-08-13 · repository path/command review | Integrated behavior, final revision, license decision and release evidence |
+| 9 | Deployment plan: CI/CD, procedure and rollback | [Deployment plan](operations/deployment-plan.md) | 윤서진 | Local baseline; developer account bound; cloud resources pending | 2026-08-14 · Compose/CI and AWS binding review | Images, AWS/OIDC bindings, deploy and rollback rehearsal |
+| 10 | Source and README | [README](../README.md), repository and [public contracts](../contracts/README.md) | Team | Contributor baseline | 2026-08-14 · repository path, command and AWS onboarding review | Integrated behavior, final revision, license decision and release evidence |
 
 ## Supporting presentation sources
 

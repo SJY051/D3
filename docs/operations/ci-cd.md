@@ -60,7 +60,7 @@ Report command outcomes as pass, fail, skip, and not-run separately. A local run
 
 ## Future container delivery
 
-CI deliberately stops before a container build because the repository does not yet define reviewed, reproducible application-image inputs. It also has no assigned AWS account, region, IAM boundary, registry, deployment environment, or approval identity. Adding a registry login or a nominal deploy step before those bindings exist would misrepresent CD readiness.
+CI deliberately stops before a container build because the repository does not yet define reviewed, reproducible application-image inputs. The assigned AWS account and Seoul region are confirmed, but the IAM boundary, registry, deployment environment, OIDC role, and approval identity are not. Adding a registry login or a nominal deploy step before those bindings exist would misrepresent CD readiness.
 
 Activate container delivery in a separate, reviewed change only after the deployment-plan bindings are resolved. The intended boundary is:
 

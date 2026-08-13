@@ -2,9 +2,9 @@
 
 Owner: 윤서진
 
-Status: Awaiting AWS account binding
+Status: Account and region confirmed; IAM and service bindings pending
 
-Last verified: 2026-08-13 against the deployment target and unresolved AWS bindings
+Last verified: 2026-08-14 against the assigned account, Seoul region and unresolved deployment bindings
 
 ```mermaid
 flowchart TB
@@ -23,7 +23,7 @@ flowchart TB
 
 ## Activation gates
 
-- Bind account, region, IAM boundary, quota, and allowed managed services before writing Terraform resources.
+- The assigned account is `811221506617` in `ap-northeast-2`; bind its IAM boundary, quotas, and allowed managed services before writing Terraform resources.
 - Activate S3 and CloudFront only when a P1 upload requirement survives scope review.
 - Keep Judge0 on isolated compute with no public submission endpoint and no execution egress.
 - If managed-service provisioning is blocked, deploy the same application images to one application EC2 host with Compose while keeping Judge0 on a separate host.
