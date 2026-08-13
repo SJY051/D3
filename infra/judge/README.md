@@ -62,7 +62,7 @@ Judge0 CE 1.13.1 runs its server and worker containers with Docker `privileged: 
 
 ## Runtime matrix
 
-This matrix comes from the authenticated `/languages` response and SSM command `88d5eba5-f3c2-403a-9917-ac5210031178`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays, enforcing unique exact runtime mappings, ignoring an injected hostile curl configuration, bypassing hostile proxy variables, comparing host and sandbox reachability, rejecting every advertised disabled or above-ceiling request shape, and asserting every required execution-resource default and per-request boundary with positive controls. Its deletion check waits for a terminal submission before requiring the disabled-specific HTTP 403 response.
+This matrix comes from the authenticated `/languages` response and SSM command `6b382536-38e4-40ef-b420-04ef35b4b014`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays, enforcing unique exact runtime mappings, ignoring an injected hostile curl configuration, bypassing hostile proxy variables, comparing host and sandbox reachability, rejecting every advertised disabled or above-ceiling request shape, and asserting every required execution-resource default and per-request boundary with positive controls. Its deletion check waits for a terminal submission before requiring the disabled-specific HTTP 403 response.
 
 | Product language | Judge0 ID | Observed runtime | Hello-world | Deterministic case |
 |---|---:|---|---|---|
@@ -154,7 +154,7 @@ Do not delete the shared VPC, subnet, route table, internet gateway, account-lev
 | Six-language hello-world and deterministic sum | PASS: 12/12 cases |
 | Provider request/resource boundaries | PASS: 16/16 numeric-ceiling or disabled-feature shapes rejected |
 | Source, stdin and expected-output body-size caps | PENDING: Judge0 CE 1.13.1 exposes no per-field ceiling; the authenticated Judge adapter must reject oversized fields before provider access in issue #13 |
-| Accepted, wrong answer, compilation, runtime, CPU/wall timeout, memory, process/thread, stack and file size | PASS: 31/31 execution cases, including six omission-based default checks and positive controls |
+| Accepted, wrong answer, compilation, runtime, CPU/wall timeout, memory, process/thread, stack and file size | PASS: 35/35 execution cases, including ten omission-based default checks; memory, process/thread, stack and file size each have paired below-bound success and above-bound failure controls |
 | Platform failure normalization | PASS in PR #20 fake-adapter test; live outage injection NOT RUN |
 | Runtime log privacy | PASS after overlay and secret rotation: 0 secret/source matches |
 | Reboot persistence | PASS: systemd active, cgroup v1, repository overlay hashes, authenticated Python execution, and zero secret log matches |
