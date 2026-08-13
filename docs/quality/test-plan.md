@@ -4,7 +4,7 @@ Owner: 최정민 and service owners
 
 Status: Initial executable baseline; behavior, load and chaos evidence pending
 
-Last verified: 2026-08-13 against D3-QLT-001, current test sources and CI scaffold
+Last verified: 2026-08-14 against D3-QLT-001, current test sources, CI scaffold and Judge0 host boundary
 
 Requirement: D3-QLT-001
 
@@ -16,7 +16,7 @@ Requirement: D3-QLT-001
 | Adapter integration | PostgreSQL, Redis, Kafka, outbox/inbox | Testcontainers dependencies and disabled tests | Real-container transaction, uniqueness and retry evidence | SKIP: adapters not implemented |
 | Contract | HTTP, events, WebSocket | Ten parseable versioned documents, Judge v1 acceptance/evidence boundary and privacy samples | Producer/consumer compatibility and negative samples | PARTIAL PASS; Judge v1 active, other HTTP behavior incomplete |
 | Browser | Ranked golden path and privacy | Skipped Playwright Scenario A | Two independent sessions with fake judge | SKIP: vertical slice absent |
-| Judge smoke | Runtime mapping and isolation | Activation checklist | Real Judge0 cases for six pinned runtimes | NOT RUN: host/runtime `UNKNOWN` |
+| Judge smoke | Runtime mapping and isolation | Bound zero-ingress host, pinned images, hardened startup and executable sanitized smoke | Real Judge0 cases for six pinned runtimes | PASS: six hello-world plus six deterministic cases; live outage injection NOT RUN |
 | Load | Match fan-out, judge queue, feed reads | Scenario definitions below | Versioned report on designated host | NOT RUN |
 | Chaos | Reconnect, broker lag, cache loss, Judge failure | Scenario definitions below | Recovery and no-duplicate assertions | NOT RUN |
 | Demo preflight | Full-stack dependency readiness | HTTP/TCP checker | All required live dependencies pass on frozen build | NOT RUN for full stack |

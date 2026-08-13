@@ -32,7 +32,7 @@ Last verified: 2026-08-14 against repository commands, paths, scaffold evidence 
 | Data | 서비스별 PostgreSQL 소유권과 논리 ERD | 마이그레이션 미구현 |
 | Local infra | PostgreSQL, Redis, Kafka 및 선택적 관측성 Compose 모델 | 구성 검증 대상; 실행 상태는 별도 확인 필요 |
 | Quality | 요구사항에 매핑된 비활성 테스트와 검증 스크립트 | 구조 증거이며 기능 통과가 아님 |
-| Cloud/Judge0 | 목표 구조와 활성화 게이트 | 계정·서울 리전 확인; IAM·서비스·호스트 `UNKNOWN` |
+| Cloud/Judge0 | 전용 zero-ingress Judge0 호스트와 고정 6개 런타임 활성; 애플리케이션 목표 구조 | Judge0 PASS; 애플리케이션 IAM·서비스는 `UNKNOWN` |
 
 ## 아키텍처
 
