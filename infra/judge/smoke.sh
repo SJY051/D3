@@ -431,14 +431,26 @@ run_default_case "default-cpu-time" "$D3_JUDGE_PYTHON3_ID" 'while True: pass' \
   "" "" '^Time Limit Exceeded$' "" 1.8 2.6
 run_default_case "default-wall-time" "$D3_JUDGE_PYTHON3_ID" \
   $'import time\ntime.sleep(7)\nprint("OPEN")' "" "" '^Time Limit Exceeded$' "" 0 0.2 4.5 6.5
+run_default_case "default-memory-control" "$D3_JUDGE_PYTHON3_ID" \
+  $'value = bytearray(245 * 1024 * 1024)\nprint("OPEN" if len(value) else "EMPTY")' \
+  "" $'OPEN\n' '^Accepted$'
 run_default_case "default-memory" "$D3_JUDGE_PYTHON3_ID" \
   'bytearray(300 * 1024 * 1024)' "" "" '^Runtime Error' 262144
+run_default_case "default-process-control" "$D3_JUDGE_PYTHON3_ID" \
+  $'import os, time\nchildren = []\nblocked = False\ntry:\n    for _ in range(55):\n        pid = os.fork()\n        if pid == 0:\n            time.sleep(0.2)\n            os._exit(0)\n        children.append(pid)\nexcept OSError:\n    blocked = True\nfinally:\n    for pid in children:\n        try:\n            os.waitpid(pid, 0)\n        except ChildProcessError:\n            pass\nprint("BLOCKED" if blocked else "OPEN")' \
+  "" $'OPEN\n' '^Accepted$'
 run_default_case "default-process-limit" "$D3_JUDGE_PYTHON3_ID" \
   $'import os, time\nchildren = []\nblocked = False\ntry:\n    for _ in range(70):\n        pid = os.fork()\n        if pid == 0:\n            time.sleep(0.2)\n            os._exit(0)\n        children.append(pid)\nexcept OSError:\n    blocked = True\nfinally:\n    for pid in children:\n        try:\n            os.waitpid(pid, 0)\n        except ChildProcessError:\n            pass\nprint("BLOCKED" if blocked else "OPEN")' \
   "" $'BLOCKED\n' '^Accepted$'
+run_default_case "default-stack-control" "$D3_JUDGE_C_ID" \
+  $'#include <stdio.h>\n__attribute__((noinline)) void dive(int n) { volatile char pad[1024 * 1024]; pad[0] = (char)n; if (n > 0) dive(n - 1); if (pad[0] == 127) puts("never"); }\nint main(void) { dive(56); puts("OPEN"); return 0; }' \
+  "" $'OPEN\n' '^Accepted$'
 run_default_case "default-stack-limit" "$D3_JUDGE_C_ID" \
   $'#include <stdio.h>\n__attribute__((noinline)) void dive(int n) { volatile char pad[1024 * 1024]; pad[0] = (char)n; if (n > 0) dive(n - 1); if (pad[0] == 127) puts("never"); }\nint main(void) { dive(80); puts("OPEN"); return 0; }' \
   "" "" '^Runtime Error'
+run_default_case "default-file-size-control" "$D3_JUDGE_PYTHON3_ID" \
+  $'with open("large.bin", "wb") as output:\n    output.write(b"x" * (1000 * 1024))\nprint("OPEN")' \
+  "" $'OPEN\n' '^Accepted$'
 run_default_case "default-file-size" "$D3_JUDGE_PYTHON3_ID" \
   $'with open("large.bin", "wb") as output:\n    output.write(b"x" * (2 * 1024 * 1024))\nprint("OPEN")' \
   "" "" '^Runtime Error'
