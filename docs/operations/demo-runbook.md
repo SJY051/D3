@@ -14,7 +14,7 @@ The target allocation is 15 minutes of presentation and demonstration plus 5 min
 
 ## Evidence boundary
 
-The current repository can validate scaffold structure, contracts, builds and the Compose model. The live ranked path, real Judge0 execution, AWS deployment, final screenshots, measured latency and backup recording are **not yet evidenced**. Mark each item below with a revision and capture time during rehearsal; do not replace a failed live step with an unlabeled mock.
+The current repository can validate scaffold structure, contracts, builds and the Compose model. A dedicated AWS Judge0 host and its six-language smoke are active, but the real Judge adapter, live ranked path, application deployment, final screenshots, measured latency and backup recording are **not yet evidenced**. Mark each item below with a revision and capture time during rehearsal; do not replace a failed live step with an unlabeled mock.
 
 ## Freeze one demonstrable build
 

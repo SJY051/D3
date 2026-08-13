@@ -1,0 +1,9 @@
+services:
+  server:
+    command: ["./scripts/d3-server"]
+    volumes:
+      - ./startup/server:/api/scripts/d3-server:ro
+  workers:
+    command: ["./scripts/d3-workers"]
+    volumes:
+      - ./startup/workers:/api/scripts/d3-workers:ro

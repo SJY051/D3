@@ -2,21 +2,21 @@
 
 Owner: 윤서진
 
-Status: Local baseline; developer account bound; cloud resources and pipeline pending
+Status: Local baseline; developer account and isolated Judge0 host bound; application cloud resources and pipeline pending
 
-Last verified: 2026-08-14 against the Compose model, CI scaffold, assigned account and cloud target
+Last verified: 2026-08-14 against the Compose model, CI scaffold, assigned account and Judge0 host boundary
 
 Related: [cloud architecture](../architecture/cloud.md), [AWS CLI developer profile](aws-cli-setup.md), [local infrastructure](../../infra/README.md), [test plan](../quality/test-plan.md)
 
 ## Deployment truth
 
-The assigned account `811221506617`, Seoul region and lead developer IAM login are confirmed. The current GitHub Actions workflow validates the repository; it does not build or publish container images and does not deploy. ECR, ECS, RDS, ElastiCache, MSK, Judge0 EC2, OIDC and Terraform state remain `UNKNOWN` until IAM, quota and service bindings are reviewed. The sequence below is the gated target, not evidence of an active pipeline.
+The assigned account `811221506617`, Seoul region and lead developer IAM login are confirmed. A dedicated, zero-ingress Judge0 EC2 host is bound and tracked in [`infra/judge/README.md`](../../infra/judge/README.md); its activation is separate from application deployment. The current GitHub Actions workflow validates the repository; it does not build or publish container images and does not deploy. ECR, ECS, RDS, ElastiCache, MSK, OIDC and Terraform state remain `UNKNOWN` until IAM, quota and service bindings are reviewed. The sequence below is the gated target, not evidence of an active application pipeline.
 
 ## Local profiles
 
 - Default: PostgreSQL databases, Redis and Kafka.
 - `observability`: Prometheus and Grafana.
-- `judge`: reserved for a pinned self-hosted Judge0 bundle after image and security review.
+- `judge`: the local profile remains reserved; the bound AWS Judge0 host uses a separately pinned bundle and its own security review.
 - Application processes run from the IDE or repository commands during normal development.
 
 The runtime contract is the Docker API and Compose specification. Docker Desktop is the current macOS runtime; another compatible runtime may be used after Compose and Testcontainers checks pass.
@@ -88,7 +88,7 @@ Keep a compatible previous application revision available. Do not automatically 
 - Durable data: RDS PostgreSQL with service-specific databases and credentials.
 - Ephemeral data: ElastiCache Redis.
 - Events: Amazon MSK when the assigned quota permits it.
-- User-code execution: separate private Judge0 EC2.
+- User-code execution: separate zero-ingress Judge0 EC2; migration from its bootstrap public subnet to the final private-service path remains pending.
 - Optional media: S3 presigned upload and CloudFront only after P1 activation.
 - Secrets: Secrets Manager or Parameter Store; CI authentication through GitHub OIDC.
 
@@ -98,7 +98,7 @@ When managed services or permissions are unavailable, run application images wit
 
 ## Unresolved bindings
 
-- IAM boundary, quotas, DNS, certificate and allowed service classes in account `811221506617` and region `ap-northeast-2`.
+- Application IAM boundary, quotas, DNS, certificate and allowed managed-service classes in account `811221506617` and region `ap-northeast-2`; the narrow Judge0 host role is bound separately.
 - Instance and managed-service sizes after load and budget measurement.
 - Terraform state backend, deployment approval identity and recovery operator.
 - Containerfiles, registry names, rollout strategy supported by the assigned account and retention policy.
