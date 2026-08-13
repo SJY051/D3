@@ -223,7 +223,9 @@ run_default_case() {
   local expected_memory="${7:-}"
   local expected_time_min="${8:-}"
   local expected_time_max="${9:-}"
-  local payload token result status actual_memory
+  local expected_elapsed_min="${10:-}"
+  local expected_elapsed_max="${11:-}"
+  local payload token result status actual_memory started_ms ended_ms elapsed_seconds
 
   payload="$(jq -cn \
     --arg sourceCode "$source_code" \
@@ -242,7 +244,10 @@ run_default_case() {
     --request POST \
     --data "$payload" \
     "${base_url}/submissions?base64_encoded=false&wait=false" | jq -er '.token')"
+  started_ms="$(date +%s%3N)"
   result="$(wait_for_submission "$token")"
+  ended_ms="$(date +%s%3N)"
+  elapsed_seconds="$(jq -cn --argjson start "$started_ms" --argjson end "$ended_ms" '($end - $start) / 1000')"
   status="$(jq -er '.status' <<<"$result")"
   if [[ ! "$status" =~ $expected_status_pattern ]]; then
     jq -cn --arg caseLabel "$label" --arg expected "$expected_status_pattern" --argjson actual "$result" \
@@ -269,8 +274,20 @@ run_default_case() {
       return 1
     fi
   fi
-  jq -cn --arg caseLabel "$label" --argjson actual "$result" \
-    '{case: $caseLabel, result: "PASS", evidence: $actual}'
+  if [[ -n "$expected_elapsed_min" || -n "$expected_elapsed_max" ]]; then
+    if [[ -z "$expected_elapsed_min" || -z "$expected_elapsed_max" ]] ||
+      ! jq -en --argjson elapsed "$elapsed_seconds" \
+        --argjson min "$expected_elapsed_min" --argjson max "$expected_elapsed_max" \
+        '$elapsed >= $min and $elapsed <= $max' >/dev/null; then
+      jq -cn --arg caseLabel "$label" \
+        --arg expectedMin "$expected_elapsed_min" --arg expectedMax "$expected_elapsed_max" \
+        --argjson elapsed "$elapsed_seconds" --argjson actual "$result" \
+        '{case: $caseLabel, result: "FAIL", expectedElapsedSeconds: {min: $expectedMin, max: $expectedMax}, elapsedSeconds: $elapsed, actual: $actual}'
+      return 1
+    fi
+  fi
+  jq -cn --arg caseLabel "$label" --argjson actual "$result" --argjson elapsed "$elapsed_seconds" \
+    '{case: $caseLabel, result: "PASS", evidence: ($actual + {elapsedSeconds: $elapsed})}'
 }
 
 unauthenticated_code="$(curl -q --noproxy '*' --silent --show-error --max-time 5 \
@@ -413,7 +430,7 @@ run_case "file-size-limit" "$D3_JUDGE_PYTHON3_ID" \
 run_default_case "default-cpu-time" "$D3_JUDGE_PYTHON3_ID" 'while True: pass' \
   "" "" '^Time Limit Exceeded$' "" 1.8 2.6
 run_default_case "default-wall-time" "$D3_JUDGE_PYTHON3_ID" \
-  $'import time\ntime.sleep(7)\nprint("OPEN")' "" "" '^Time Limit Exceeded$' "" 0 0.2
+  $'import time\ntime.sleep(7)\nprint("OPEN")' "" "" '^Time Limit Exceeded$' "" 0 0.2 4.5 6.5
 run_default_case "default-memory" "$D3_JUDGE_PYTHON3_ID" \
   'bytearray(300 * 1024 * 1024)' "" "" '^Runtime Error' 262144
 run_default_case "default-process-limit" "$D3_JUDGE_PYTHON3_ID" \
