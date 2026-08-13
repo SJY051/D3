@@ -83,7 +83,7 @@ validate_language_mapping() {
   fi
 }
 
-assert_limit_rejected() {
+assert_request_rejected() {
   local label="$1"
   local field="$2"
   local value="$3"
@@ -102,11 +102,11 @@ assert_limit_rejected() {
     --output "$response_file" --write-out '%{http_code}' \
     "${base_url}/submissions?base64_encoded=false&wait=false" || true)"
   if [[ "$http_code" != "422" ]]; then
-    echo "Expected ${label} ceiling rejection HTTP 422, got ${http_code}." >&2
+    echo "Expected ${label} request rejection HTTP 422, got ${http_code}." >&2
     return 1
   fi
   jq -cn --arg limit "$label" --arg status "$http_code" \
-    '{check: "server-limit-ceiling", limit: $limit, result: "PASS", httpStatus: $status}'
+    '{check: "server-request-boundary", boundary: $limit, result: "PASS", httpStatus: $status}'
 }
 
 run_case() {
@@ -238,15 +238,15 @@ if [[ "$network_code" != "422" ]]; then
 fi
 jq -cn --arg status "$network_code" '{check: "submission-network-opt-in-denied", result: "PASS", httpStatus: $status}'
 
-assert_limit_rejected "cpu-time" "cpu_time_limit" 11
-assert_limit_rejected "wall-time" "wall_time_limit" 16
-assert_limit_rejected "extra-time" "cpu_extra_time" 0.6
-assert_limit_rejected "memory" "memory_limit" 262145
-assert_limit_rejected "stack" "stack_limit" 65537
-assert_limit_rejected "process-or-thread" "max_processes_and_or_threads" 61
-assert_limit_rejected "file-size" "max_file_size" 1025
-assert_limit_rejected "archive-extraction" "max_extract_size" 1025
-assert_limit_rejected "repeated-runs" "number_of_runs" 4
+assert_request_rejected "cpu-time-ceiling" "cpu_time_limit" 11
+assert_request_rejected "wall-time-ceiling" "wall_time_limit" 16
+assert_request_rejected "extra-time-ceiling" "cpu_extra_time" 0.6
+assert_request_rejected "memory-ceiling" "memory_limit" 262145
+assert_request_rejected "stack-ceiling" "stack_limit" 65537
+assert_request_rejected "process-or-thread-ceiling" "max_processes_and_or_threads" 61
+assert_request_rejected "file-size-ceiling" "max_file_size" 1025
+assert_request_rejected "additional-files-disabled" "additional_files" '"AA=="'
+assert_request_rejected "repeated-runs-ceiling" "number_of_runs" 4
 
 if ! timeout 5 bash -c 'exec 3<>/dev/tcp/1.1.1.1/53; exec 3>&-'; then
   echo "Host egress control could not reach 1.1.1.1:53/TCP; sandbox network evidence is inconclusive." >&2

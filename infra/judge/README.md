@@ -51,7 +51,7 @@ The Judge0 release archive and all three image digests are fixed. Changing any v
 | Extra / wall time | 0.5 s default and maximum / 5 s default, 15 s maximum |
 | Memory / stack | 262,144 KiB / 65,536 KiB maximum |
 | Processes or threads | 60 maximum |
-| File and archive extraction | 1,024 KiB each maximum |
+| File / archive input | 1,024 KiB file maximum; additional files and archive extraction disabled |
 | Repeated runs | 3 maximum |
 | Workers / queue | 2 / 20 |
 | Host cgroup mode | v1, required by this Judge0 release |
