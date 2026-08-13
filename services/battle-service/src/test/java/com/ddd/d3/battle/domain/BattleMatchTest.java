@@ -54,6 +54,19 @@ class BattleMatchTest {
     }
 
     @Test
+    void d3Btl002TreatsARepeatedCompletedReadyCommandAsAnIdempotentRetry() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = new BattleMatch("match-1", PLAYER_ONE, PLAYER_TWO, clock);
+
+        match.handle(new BattleMatch.Ready(PLAYER_ONE));
+        match.handle(new BattleMatch.Ready(PLAYER_TWO));
+
+        match.handle(new BattleMatch.Ready(PLAYER_TWO));
+
+        assertEquals(BattleMatch.State.READY, match.state());
+    }
+
+    @Test
     void d3Btl002RejectsCommandsThatDoNotMatchTheCurrentState() {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = new BattleMatch("match-1", PLAYER_ONE, PLAYER_TWO, clock);

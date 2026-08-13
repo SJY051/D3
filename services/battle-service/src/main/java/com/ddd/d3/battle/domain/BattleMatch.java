@@ -122,8 +122,11 @@ public final class BattleMatch {
     }
 
     private void ready(String playerId) {
-        requireState(State.LOBBY);
         requireParticipant(playerId);
+        if (readyPlayers.contains(playerId)) {
+            return;
+        }
+        requireState(State.LOBBY);
         readyPlayers.add(playerId);
         if (readyPlayers.size() == 2) {
             state = State.READY;
