@@ -12,9 +12,9 @@ Requirement: D3-QLT-001
 
 | Layer | Primary risk | Current evidence | Completion evidence | Status |
 |---|---|---|---|---|
-| Domain unit | Match state, outcome, rating, energy | Requirement-named disabled tests | Deterministic examples, boundaries and clock control | SKIP: behavior skeletons disabled |
+| Domain unit | Match state, outcome, rating, energy | Active Battle lifecycle and fake-Judge boundary tests; remaining requirement skeletons disabled | Deterministic examples, boundaries and clock control | PARTIAL: active Judge/Battle slices plus remaining skips |
 | Adapter integration | PostgreSQL, Redis, Kafka, outbox/inbox | Testcontainers dependencies and disabled tests | Real-container transaction, uniqueness and retry evidence | SKIP: adapters not implemented |
-| Contract | HTTP, events, WebSocket | Ten parseable versioned documents and privacy sample | Producer/consumer compatibility and negative samples | Scaffold PASS; behavior incomplete |
+| Contract | HTTP, events, WebSocket | Ten parseable versioned documents, Judge v1 acceptance/evidence boundary and privacy samples | Producer/consumer compatibility and negative samples | PARTIAL PASS; Judge v1 active, other HTTP behavior incomplete |
 | Browser | Ranked golden path and privacy | Skipped Playwright Scenario A | Two independent sessions with fake judge | SKIP: vertical slice absent |
 | Judge smoke | Runtime mapping and isolation | Activation checklist | Real Judge0 cases for six pinned runtimes | NOT RUN: host/runtime `UNKNOWN` |
 | Load | Match fan-out, judge queue, feed reads | Scenario definitions below | Versioned report on designated host | NOT RUN |

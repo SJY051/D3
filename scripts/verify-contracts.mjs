@@ -104,4 +104,20 @@ if (matchFinished({ ...matchEvent, data: { ...matchEvent.data, sourceCode: "priv
   throw new Error("match.finished accepted private source outside its public contract");
 }
 
-console.log(`contracts: PASS (${files.length} JSON documents, 6 compiled JSON Schemas, privacy sample)`);
+const judgeContract = parsedContracts.find(({ label }) => label === "contracts/http/judge.openapi.json")?.contract;
+const acceptJudgeSubmission = judgeContract?.paths?.["/internal/v1/judge/submissions"]?.post;
+const readJudgeEvidence = judgeContract?.paths?.["/internal/v1/judge/submissions/{submissionId}/evidence"]?.get;
+if (!acceptJudgeSubmission || !readJudgeEvidence) {
+  throw new Error("judge v1 acceptance and safe-evidence operations must both be present");
+}
+const safeEvidence = judgeContract.components?.schemas?.SafeEvaluationEvidence;
+if (!safeEvidence || safeEvidence.additionalProperties !== false) {
+  throw new Error("judge safe evidence must be a closed schema");
+}
+for (const privateField of ["sourceCode", "hiddenTests", "compilerCommand", "rawDiagnostics"]) {
+  if (Object.hasOwn(safeEvidence.properties ?? {}, privateField)) {
+    throw new Error(`judge safe evidence exposes private field: ${privateField}`);
+  }
+}
+
+console.log(`contracts: PASS (${files.length} JSON documents, 6 compiled JSON Schemas, privacy and Judge v1 samples)`);
