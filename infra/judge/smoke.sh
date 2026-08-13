@@ -30,7 +30,7 @@ trap 'rm -rf -- "$tmp_dir"' EXIT
 available_languages=""
 
 auth_curl() {
-  curl --noproxy '*' --fail --silent --show-error --max-time 15 \
+  curl -q --noproxy '*' --fail --silent --show-error --max-time 15 \
     --header "${JUDGE0_AUTH_HEADER}: ${JUDGE0_AUTH_TOKEN}" \
     "$@"
 }
@@ -38,7 +38,7 @@ auth_curl() {
 auth_curl_with_timeout() {
   local timeout_seconds="$1"
   shift
-  curl --noproxy '*' --fail --silent --show-error --max-time "$timeout_seconds" \
+  curl -q --noproxy '*' --fail --silent --show-error --max-time "$timeout_seconds" \
     --header "${JUDGE0_AUTH_HEADER}: ${JUDGE0_AUTH_TOKEN}" \
     "$@"
 }
@@ -137,7 +137,7 @@ run_case() {
     '{case: $caseLabel, result: "PASS", evidence: $actual}'
 }
 
-unauthenticated_code="$(curl --noproxy '*' --silent --show-error --max-time 5 \
+unauthenticated_code="$(curl -q --noproxy '*' --silent --show-error --max-time 5 \
   --output "$tmp_dir/unauthenticated.json" --write-out '%{http_code}' \
   "${base_url}/version" || true)"
 if [[ "$unauthenticated_code" != "401" ]]; then
@@ -176,7 +176,7 @@ printf '%s' "$available_languages" | jq -c --argjson ids "$language_ids" \
 
 network_payload="$(jq -cn --argjson languageId "$D3_JUDGE_PYTHON3_ID" \
   '{source_code: "print(1)", language_id: $languageId, enable_network: true}')"
-network_code="$(curl --noproxy '*' --silent --show-error --max-time 10 \
+network_code="$(curl -q --noproxy '*' --silent --show-error --max-time 10 \
   --header "${JUDGE0_AUTH_HEADER}: ${JUDGE0_AUTH_TOKEN}" \
   --header 'Content-Type: application/json' \
   --request POST --data "$network_payload" \

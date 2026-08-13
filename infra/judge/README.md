@@ -83,7 +83,7 @@ The initially exposed generated values were rotated, the empty bootstrap databas
 
 ## Sanitized smoke
 
-Run [`smoke.sh`](smoke.sh) on the instance through SSM. It refuses non-loopback endpoints, forces every loopback request to bypass environment proxies, reads credentials only from environment variables, emits no source, compiler output, hidden input, API credential, or submission token, and deletes its temporary response files.
+Run [`smoke.sh`](smoke.sh) on the instance through SSM. It refuses non-loopback endpoints, disables default curl configuration, forces every loopback request to bypass environment proxies, reads credentials only from environment variables, emits no source, compiler output, hidden input, API credential, or submission token, and deletes its temporary response files.
 
 On the instance, obtain the authentication values without printing them, export the six IDs from the verified matrix, and run the script:
 
