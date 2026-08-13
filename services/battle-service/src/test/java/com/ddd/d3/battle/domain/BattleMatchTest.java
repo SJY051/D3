@@ -244,6 +244,20 @@ class BattleMatchTest {
     }
 
     @Test
+    void d3Btl002RetainsJudgingIdempotencyAfterTerminalResolution() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+
+        match.handle(new BattleMatch.BeginJudging());
+        match.handle(new BattleMatch.PlatformIncident("incident-1"));
+
+        match.handle(new BattleMatch.BeginJudging());
+
+        assertEquals(BattleMatch.State.FINISHED, match.state());
+        assertEquals(BattleMatch.ResolutionReason.PLATFORM_INCIDENT, match.result().orElseThrow().reason());
+    }
+
+    @Test
     void d3Btl002DoesNotThrowWhenALateDisconnectResolvesTheMatch() {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);

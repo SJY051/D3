@@ -82,6 +82,7 @@ public final class BattleMatch {
     private State state = State.LOBBY;
     private Instant startedAt;
     private Instant matchDeadline;
+    private boolean judgingStarted;
     private Result result;
 
     public BattleMatch(String matchId, String playerOneId, String playerTwoId, Clock clock) {
@@ -164,15 +165,17 @@ public final class BattleMatch {
     }
 
     private void beginJudging() {
-        if (state == State.JUDGING) {
+        if (judgingStarted) {
             return;
         }
         requireState(State.RUNNING);
         advanceTime();
         if (result != null || state == State.JUDGING) {
+            judgingStarted = state == State.JUDGING;
             return;
         }
         state = State.JUDGING;
+        judgingStarted = true;
     }
 
     private void advanceTime() {
