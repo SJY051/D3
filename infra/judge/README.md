@@ -152,7 +152,7 @@ Do not delete the shared VPC, subnet, route table, internet gateway, account-lev
 | API auth and request/resource limits | PASS |
 | Submission network isolation | PASS: opt-in HTTP 422, host reached `1.1.1.1:53/TCP`, executed code could not |
 | Six-language hello-world and deterministic sum | PASS: 12/12 cases |
-| Request/resource ceilings | PASS: 9/9 forbidden or above-ceiling shapes rejected with HTTP 422 |
+| Request/resource boundaries | PASS: numeric ceilings and disabled network, callback, wait, batch, deletion, compiler-option, argument and additional-file shapes rejected |
 | Accepted, wrong answer, compilation, runtime, CPU/wall timeout, memory, process/thread, stack and file size | PASS: 25/25 execution cases, including positive controls for process, stack and file-size limits |
 | Platform failure normalization | PASS in PR #20 fake-adapter test; live outage injection NOT RUN |
 | Runtime log privacy | PASS after overlay and secret rotation: 0 secret/source matches |

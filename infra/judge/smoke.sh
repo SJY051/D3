@@ -109,6 +109,31 @@ assert_request_rejected() {
     '{check: "server-request-boundary", boundary: $limit, result: "PASS", httpStatus: $status}'
 }
 
+assert_endpoint_rejected() {
+  local label="$1"
+  local method="$2"
+  local path="$3"
+  local payload="$4"
+  local response_file http_code
+  local -a data_args=()
+
+  response_file="$tmp_dir/endpoint-${label}.json"
+  if [[ -n "$payload" ]]; then
+    data_args=(--header 'Content-Type: application/json' --data "$payload")
+  fi
+  http_code="$(curl -q --noproxy '*' --silent --show-error --max-time 10 \
+    --header "${JUDGE0_AUTH_HEADER}: ${JUDGE0_AUTH_TOKEN}" \
+    --request "$method" "${data_args[@]}" \
+    --output "$response_file" --write-out '%{http_code}' \
+    "${base_url}${path}" || true)"
+  if [[ ! "$http_code" =~ ^(400|403|405|422)$ ]]; then
+    echo "Expected ${label} endpoint rejection, got HTTP ${http_code}." >&2
+    return 1
+  fi
+  jq -cn --arg boundary "$label" --arg status "$http_code" \
+    '{check: "server-request-boundary", boundary: $boundary, result: "PASS", httpStatus: $status}'
+}
+
 run_case() {
   local label="$1"
   local language_id="$2"
@@ -247,6 +272,21 @@ assert_request_rejected "process-or-thread-ceiling" "max_processes_and_or_thread
 assert_request_rejected "file-size-ceiling" "max_file_size" 1025
 assert_request_rejected "additional-files-disabled" "additional_files" '"AA=="'
 assert_request_rejected "repeated-runs-ceiling" "number_of_runs" 4
+assert_request_rejected "callback-disabled" "callback_url" '"http://127.0.0.1:9/d3-disabled-callback"'
+assert_request_rejected "compiler-options-disabled" "compiler_options" '"-O3"'
+assert_request_rejected "command-arguments-disabled" "command_line_arguments" '"--help"'
+
+basic_payload="$(jq -cn --argjson languageId "$D3_JUDGE_PYTHON3_ID" \
+  '{source_code: "print(1)", language_id: $languageId, enable_network: false}')"
+assert_endpoint_rejected "wait-disabled" "POST" "/submissions?base64_encoded=false&wait=true" "$basic_payload"
+batch_payload="$(jq -cn --argjson languageId "$D3_JUDGE_PYTHON3_ID" \
+  '{submissions: [{source_code: "print(1)", language_id: $languageId, enable_network: false}]}')"
+assert_endpoint_rejected "batch-disabled" "POST" "/submissions/batch?base64_encoded=false" "$batch_payload"
+delete_token="$(auth_curl \
+  --header 'Content-Type: application/json' --request POST --data "$basic_payload" \
+  "${base_url}/submissions?base64_encoded=false&wait=false" | jq -er '.token')"
+assert_endpoint_rejected "deletion-disabled" "DELETE" "/submissions/${delete_token}?base64_encoded=false" ""
+unset delete_token
 
 if ! timeout 5 bash -c 'exec 3<>/dev/tcp/1.1.1.1/53; exec 3>&-'; then
   echo "Host egress control could not reach 1.1.1.1:53/TCP; sandbox network evidence is inconclusive." >&2
