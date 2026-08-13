@@ -41,5 +41,6 @@ The canonical skill source is `.agents/skills`. `.claude/skills` contains thin a
 
 ## Automation guardrails
 
+- Open pull requests as Ready for review by default so configured CI and bot reviews start. Use Draft only when explicitly requested or when intentionally incomplete work must stay outside normal review; convert it to Ready before requesting review.
 - `.codex/hooks.json` and `.claude/settings.json` revalidate shared agent guidance after edits. Review and trust the Codex hook in `/hooks` on first use; never bypass hook trust.
 - Lefthook runs scaffold checks before commits and validates Conventional Commit titles. Install it with `pnpm install` or `pnpm hooks:install`.
