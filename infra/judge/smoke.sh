@@ -114,6 +114,7 @@ assert_endpoint_rejected() {
   local method="$2"
   local path="$3"
   local payload="$4"
+  local expected_status="$5"
   local response_file http_code
   local -a data_args=()
 
@@ -126,8 +127,8 @@ assert_endpoint_rejected() {
     --request "$method" "${data_args[@]}" \
     --output "$response_file" --write-out '%{http_code}' \
     "${base_url}${path}" || true)"
-  if [[ ! "$http_code" =~ ^(400|403|405|422)$ ]]; then
-    echo "Expected ${label} endpoint rejection, got HTTP ${http_code}." >&2
+  if [[ "$http_code" != "$expected_status" ]]; then
+    echo "Expected ${label} endpoint rejection HTTP ${expected_status}, got ${http_code}." >&2
     return 1
   fi
   jq -cn --arg boundary "$label" --arg status "$http_code" \
@@ -278,14 +279,15 @@ assert_request_rejected "command-arguments-disabled" "command_line_arguments" '"
 
 basic_payload="$(jq -cn --argjson languageId "$D3_JUDGE_PYTHON3_ID" \
   '{source_code: "print(1)", language_id: $languageId, enable_network: false}')"
-assert_endpoint_rejected "wait-disabled" "POST" "/submissions?base64_encoded=false&wait=true" "$basic_payload"
+assert_endpoint_rejected "wait-disabled" "POST" "/submissions?base64_encoded=false&wait=true" "$basic_payload" "400"
 batch_payload="$(jq -cn --argjson languageId "$D3_JUDGE_PYTHON3_ID" \
   '{submissions: [{source_code: "print(1)", language_id: $languageId, enable_network: false}]}')"
-assert_endpoint_rejected "batch-disabled" "POST" "/submissions/batch?base64_encoded=false" "$batch_payload"
+assert_endpoint_rejected "batch-disabled" "POST" "/submissions/batch?base64_encoded=false" "$batch_payload" "400"
 delete_token="$(auth_curl \
   --header 'Content-Type: application/json' --request POST --data "$basic_payload" \
   "${base_url}/submissions?base64_encoded=false&wait=false" | jq -er '.token')"
-assert_endpoint_rejected "deletion-disabled" "DELETE" "/submissions/${delete_token}?base64_encoded=false" ""
+wait_for_submission "$delete_token" >/dev/null
+assert_endpoint_rejected "deletion-disabled" "DELETE" "/submissions/${delete_token}?base64_encoded=false" "" "403"
 unset delete_token
 
 if ! timeout 5 bash -c 'exec 3<>/dev/tcp/1.1.1.1/53; exec 3>&-'; then
