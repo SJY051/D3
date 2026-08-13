@@ -4,7 +4,7 @@ Owner: 윤서진
 
 Status: Initial baseline
 
-Last verified: 2026-08-13 against the MVP system constraints and public contract inventory
+Last verified: 2026-08-14 against the MVP system constraints and public contract inventory
 
 | Boundary | Owns | Does not own | Initial caller or consumer |
 |---|---|---|---|
@@ -19,7 +19,7 @@ Gateway authentication does not replace service authorization. Every domain serv
 
 ## Communication rules
 
-- Battle requests judge job acceptance synchronously through a versioned client boundary.
+- Battle requests judge job acceptance synchronously through a versioned client boundary, then persists the returned stable submission ID with its match, player and attempt before acknowledging acceptance.
 - Judge publishes `submission.judged.v1` after durable evaluation.
 - Battle publishes `match.finished.v1` and `rating.changed.v1` from an outbox after committing the result.
 - Identity publishes `user-profile.changed.v1` for consumer-owned projections.
@@ -28,7 +28,9 @@ Gateway authentication does not replace service authorization. Every domain serv
 
 ## Contract activation gap
 
-The current v1 event inventory is sufficient only for a basic projection. `match.finished.v1` omits score composition, attempts, attack history, and execution evidence. `rating.changed.v1` omits leaderboard position, language statistics, and peak tier. `user-profile.changed.v1` omits display name. Consequently, the target Community projection fields in `erd.dbml` cannot all be populated from the current schemas.
+The current Judge HTTP stub does not define a stable submission acceptance response or safe evidence read operation. `submission.judged.v1` carries an opaque evidence version but not the hidden-test progress and dynamic runtime inputs Battle needs for D3-BTL-003. Judge acceptance, Battle's durable submission correlation, and scoring remain activation blockers until those versioned boundaries are approved.
+
+The current v1 event inventory is sufficient only for a basic Community projection. `match.finished.v1` defines seat-ordered player IDs, but omits score composition, attempts, attack history, and execution evidence. `rating.changed.v1` omits leaderboard position, language statistics, and peak tier. `user-profile.changed.v1` omits display name. Consequently, the target enriched Community projection fields in `erd.dbml` cannot all be populated from the current schemas.
 
 Before an enriched Community projection is implemented, approve one of these versioned boundaries:
 

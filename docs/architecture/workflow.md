@@ -4,7 +4,7 @@ Owner: 최정민
 
 Status: Target logical baseline; implementation evidence pending
 
-Last verified: 2026-08-13 against `docs/specs/d3-mvp.md` and versioned contract stubs
+Last verified: 2026-08-14 against `docs/specs/d3-mvp.md` and versioned contract stubs
 
 Requirements: D3-BTL-001 through D3-BTL-005, D3-JDG-001, D3-STAT-001
 
@@ -48,12 +48,16 @@ sequenceDiagram
   WA->>G: Run or submit command
   G->>BT: Match-scoped command
   BT->>J: Accept versioned judge job
+  J-->>BT: Stable submission ID
+  BT->>BT: Persist submission-to-match and player correlation
   J->>J0: Execute within pinned limits
   J0-->>J: Raw execution result
   J->>J: Normalize and persist evidence
   J-->>K: submission.judged.v1
   K-->>BT: Idempotent judged event
-  BT->>BT: Lock accepted submission and determine outcome
+  BT->>BT: Correlate event and lock accepted submission
+  Note over BT,J: Outcome calculation waits for an approved safe scoring-evidence boundary
+  BT->>BT: Determine outcome after scoring evidence is available
   BT-->>G: Per-player final outcome, score, rating and RP
   G-->>WA: Forward Player A result
   G-->>WB: Forward Player B result
@@ -101,7 +105,9 @@ stateDiagram-v2
 
 ## Contract activation gap
 
-The current `match.finished.v1` contains only match ID, result, ranked flag, and player IDs. `rating.changed.v1` provides current rating/RP/tier but not leaderboard, language, or peak data; `user-profile.changed.v1` provides handle but not display name. None of those schemas carries the score composition, attempts, attack history, or execution summary represented by the target record model.
+The current Judge HTTP stub does not yet define the synchronous acceptance response. Before accepting a job to the client, Judge must return a stable submission ID and Battle must durably map it to the match, player and attempt; otherwise a restart cannot correlate a later `submission.judged.v1` event. That event also exposes only status, language and an opaque evidence version, while the Judge HTTP stub has no safe evidence read operation. D3-BTL-003 outcome calculation therefore remains blocked until an approved versioned event summary or Judge-owned read contract exposes the minimum hidden-test progress and dynamic runtime evidence without source or hidden cases.
+
+The current `match.finished.v1` contains only match ID, result, ranked flag, and seat-ordered player IDs; its schema now defines index 0 as `PLAYER_ONE` and index 1 as `PLAYER_TWO`, so a basic winner projection is unambiguous. `rating.changed.v1` provides current rating/RP/tier but not leaderboard, language, or peak data; `user-profile.changed.v1` provides handle but not display name. None of those schemas carries the score composition, attempts, attack history, or execution summary represented by the target record model.
 
 Before Community implements enriched result/profile projections, the team must approve either a new versioned safe-summary event contract or a bounded, versioned read API/read model owned by Battle or Identity. Community may consume that contract and store its own projection; it may not query another service database. The current v1 stubs prove schema shape only and are insufficient completion evidence for detailed D3-STAT-001 records.
 

@@ -1,7 +1,7 @@
 // D³ logical ERD — D3-DOC-001
 // Owner: service owners
 // Status: logical baseline; physical migrations and query evidence pending
-// Last verified: 2026-08-13 against docs/specs/d3-mvp.md and services.md
+// Last verified: 2026-08-14 against the event contracts, MVP specification and service boundaries
 //
 // Each schema below represents a separately owned PostgreSQL database, not a
 // shared physical schema. Refs exist only inside one service database.
@@ -170,6 +170,21 @@ Table battle_db.match_player {
   }
 }
 
+Table battle_db.judge_job_reference {
+  submission_id uuid [pk, note: 'Stable logical Judge submission reference; no cross-database FK']
+  match_id uuid [not null]
+  player_user_id uuid [not null, note: 'Logical identity contract reference']
+  attempt_number int [not null]
+  last_judge_status text [not null]
+  evidence_version text
+  accepted_at timestamptz [not null]
+  last_result_at timestamptz
+
+  Indexes {
+    (match_id, player_user_id, attempt_number) [unique]
+  }
+}
+
 Table battle_db.attack_event {
   id uuid [pk]
   match_id uuid [not null]
@@ -239,6 +254,7 @@ Table battle_db.inbox_event {
 
 Ref: battle_db.match.problem_id > battle_db.problem.id
 Ref: battle_db.match_player.match_id > battle_db.match.id
+Ref: battle_db.judge_job_reference.match_id > battle_db.match.id
 Ref: battle_db.attack_event.match_id > battle_db.match.id
 
 Table judge_db.submission {
@@ -388,7 +404,7 @@ Table community_db.profile_projection {
 
 Table community_db.match_projection {
   match_id uuid [pk, note: 'Logical battle aggregate reference']
-  player_ids jsonb [not null]
+  player_ids jsonb [not null, note: 'Seat order follows match-finished.v1: index 0 is PLAYER_ONE and index 1 is PLAYER_TWO']
   result community_match_result [not null]
   ranked boolean [not null]
   score_summary jsonb [note: 'Null until an enriched Battle contract is applied']
