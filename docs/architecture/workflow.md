@@ -55,15 +55,21 @@ sequenceDiagram
   J->>J: Normalize and persist evidence
   J-->>K: submission.judged.v1
   K-->>BT: Idempotent judged event
-  BT->>BT: Correlate event; lock only an accepted SUBMIT
-  Note over BT,J: Outcome calculation waits for an approved safe scoring-evidence boundary
-  BT->>BT: Commit outcome, named score components and calculation version
-  BT-->>G: Per-player final outcome, score, rating and RP
-  G-->>WA: Forward Player A result
-  G-->>WB: Forward Player B result
-  BT-->>K: match.finished.v1 and rating.changed.v1
-  K-->>C: Idempotent projection events
-  C->>C: Build result post and searchable record
+  BT->>BT: Correlate event by stored mode and command id
+  alt RUN result or non-accepted SUBMIT
+    BT-->>G: Return bounded judge status; keep match RUNNING
+    G-->>WA: Forward caller-visible result
+  else Accepted SUBMIT or authoritative deadline
+    BT->>BT: Lock only the accepted SUBMIT
+    Note over BT,J: Outcome calculation waits for an approved safe scoring-evidence boundary
+    BT->>BT: Commit outcome, named score components and calculation version
+    BT-->>G: Per-player final outcome, score, rating and RP
+    G-->>WA: Forward Player A result
+    G-->>WB: Forward Player B result
+    BT-->>K: match.finished.v1 and rating.changed.v1
+    K-->>C: Idempotent projection events
+    C->>C: Build result post and searchable record
+  end
 ```
 
 ## Server-owned lifecycle

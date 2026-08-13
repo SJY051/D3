@@ -84,7 +84,7 @@ Before opening the browser, confirm:
 
 1. Sign in both seeded users and state which session is Player A or B.
 2. Select the fixed language and enter ranked matchmaking from both sessions.
-3. Point out the shared server start/deadline and masked opponent progress.
+3. Point out the shared server start/deadline plus P0 masked opponent connection and Run/Submit status. Show detailed progress only if its P1 feature boundary has been activated and verified.
 4. Run public examples; trigger one warned, reversible attack and show block or reflect.
 5. Submit the prepared accepted solution through the real judge and show submission lock.
 6. Show the committed outcome, score composition, rating and RP changes in both clients.
