@@ -2,15 +2,15 @@
 
 Owner: 윤서진
 
-Status: Local baseline; cloud pipeline planned; AWS binding pending
+Status: Local baseline; developer account bound; cloud resources and pipeline pending
 
-Last verified: 2026-08-13 against the Compose model, CI scaffold and cloud target
+Last verified: 2026-08-14 against the Compose model, CI scaffold, assigned account and cloud target
 
-Related: [cloud architecture](../architecture/cloud.md), [local infrastructure](../../infra/README.md), [test plan](../quality/test-plan.md)
+Related: [cloud architecture](../architecture/cloud.md), [AWS CLI developer profile](aws-cli-setup.md), [local infrastructure](../../infra/README.md), [test plan](../quality/test-plan.md)
 
 ## Deployment truth
 
-The current GitHub Actions workflow validates the repository; it does not build or publish container images and does not deploy. ECR, ECS, RDS, ElastiCache, MSK, Judge0 EC2, OIDC and Terraform state remain `UNKNOWN` until the bootcamp AWS account supplies bindings. The sequence below is the gated target, not evidence of an active pipeline.
+The assigned account `811221506617`, Seoul region and lead developer IAM login are confirmed. The current GitHub Actions workflow validates the repository; it does not build or publish container images and does not deploy. ECR, ECS, RDS, ElastiCache, MSK, Judge0 EC2, OIDC and Terraform state remain `UNKNOWN` until IAM, quota and service bindings are reviewed. The sequence below is the gated target, not evidence of an active pipeline.
 
 ## Local profiles
 
@@ -53,9 +53,9 @@ Containerfiles and the registry workflow are not present yet. Image evidence is 
 
 ### 3. Authentication and approval gate
 
-Use GitHub OIDC with a least-privilege environment role; do not store long-lived AWS keys. Protect the target environment with explicit approval. Bind account, region, role ARN, ECR repositories, cluster/service names and secret paths before enabling the job.
+Use GitHub OIDC with a least-privilege environment role; do not store long-lived AWS keys. The local [`d3` developer profile](aws-cli-setup.md) is for inspected or explicitly approved operator work and is not a CI credential. Protect the target environment with explicit approval. Bind account, region, role ARN, ECR repositories, cluster/service names and secret paths before enabling the job.
 
-All bindings are currently `UNKNOWN`, so no cloud deployment is authorized by this plan alone.
+Developer authentication does not authorize deployment. The deployment role, approval identity and resource bindings remain `UNKNOWN`, so this plan alone authorizes no cloud mutation.
 
 ### 4. Migration gate
 
@@ -98,7 +98,7 @@ When managed services or permissions are unavailable, run application images wit
 
 ## Unresolved bindings
 
-- AWS account, region, IAM boundary, quotas, DNS, certificate and allowed service classes.
+- IAM boundary, quotas, DNS, certificate and allowed service classes in account `811221506617` and region `ap-northeast-2`.
 - Instance and managed-service sizes after load and budget measurement.
 - Terraform state backend, deployment approval identity and recovery operator.
 - Containerfiles, registry names, rollout strategy supported by the assigned account and retention policy.

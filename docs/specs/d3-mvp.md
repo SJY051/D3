@@ -16,7 +16,7 @@ Last verified: 2026-08-13 against the planning PDF and agreed product decisions
 
 D³ is an eight-day bootcamp prototype that joins a developer microblog with a competitive programming game. The primary demonstration must show one continuous, working experience rather than disconnected feature screens: a user signs in, enters a ranked match, writes and submits code, receives an authoritative result, and sees the result reflected in the community and searchable match history.
 
-The team has four members and must also produce the required planning, architecture, test, deployment, and presentation artifacts. AWS access is not yet available, so local operation is mandatory and cloud resources remain an activation decision rather than a prerequisite for feature work.
+The team has four members and must also produce the required planning, architecture, test, deployment, and presentation artifacts. The assigned AWS account and Seoul region are available, but local operation remains mandatory and cloud resources remain an activation decision rather than a prerequisite for feature work.
 
 ## Goals
 
@@ -78,7 +78,7 @@ An item moves from planned to evidenced only when its named behavior and verific
 - Full mobile code editing, full language-server infrastructure, or passkeys.
 - Complete circles, secret posts, polls, notifications, media processing, or problem-authoring suites.
 - Kubernetes, a dedicated statistics service, or mandatory S3 and CDN usage.
-- Automatic deployment before AWS account, region, quota, and permission constraints are known.
+- Automatic deployment before AWS IAM, quota, resource, and approval constraints are known.
 
 ## Users and roles
 
@@ -262,7 +262,7 @@ The repository shall retain current sources for requirements, workflow, system a
 ## Dependencies and risks
 
 - The free-topic scoring rubric is not yet available; score mapping may need revision without changing the golden path.
-- AWS account timing, service quotas, and regional availability may require the documented EC2/Compose fallback.
+- IAM permissions, service quotas, and regional service availability may require the documented EC2/Compose fallback.
 - Judge host load and language runtime variance may distort performance evidence; calibration must be versioned and tied to a designated host profile.
 - Four developers and eight calendar days make late P1 work a direct risk to integration, documentation, and rehearsal.
 - Caret movement, IME behavior, and masked editor rendering require early browser validation.
@@ -272,7 +272,7 @@ The repository shall retain current sources for requirements, workflow, system a
 ## Open questions
 
 - Exact free-topic scoring and any mandatory presentation structure.
-- AWS account, region, IAM boundary, quota, and available managed-service budget.
+- AWS IAM boundary, quota, and available managed-service budget in the assigned account and Seoul region.
 - Final JWT lifetimes, rating adjustment factors, RP thresholds, and season reset values.
 - Final attack costs, cooldowns, reflection cost, and syntax-progress caps after playtesting.
 - Final prose character limit and the exact circle/private visibility release boundary.

@@ -6,7 +6,7 @@ Owner: D³ team
 
 Status: Contributor baseline; product behavior pending
 
-Last verified: 2026-08-13 against repository commands, paths and scaffold evidence
+Last verified: 2026-08-14 against repository commands, paths, scaffold evidence and the lead developer AWS identity
 
 > **현재 상태 (2026-08-13): 구조 스캐폴드.** 라우트 셸, 서비스 경계, 버전된 계약, 로컬 인프라 모델과 비활성 요구사항 테스트가 있습니다. 인증, 매칭, 판정, 대전, 커뮤니티 동작은 아직 구현 완료로 볼 수 없습니다. 상세 상태와 필요한 증거는 [산출물 현황](docs/artifact-status.md)을 따릅니다.
 
@@ -32,7 +32,7 @@ Last verified: 2026-08-13 against repository commands, paths and scaffold eviden
 | Data | 서비스별 PostgreSQL 소유권과 논리 ERD | 마이그레이션 미구현 |
 | Local infra | PostgreSQL, Redis, Kafka 및 선택적 관측성 Compose 모델 | 구성 검증 대상; 실행 상태는 별도 확인 필요 |
 | Quality | 요구사항에 매핑된 비활성 테스트와 검증 스크립트 | 구조 증거이며 기능 통과가 아님 |
-| Cloud/Judge0 | 목표 구조와 활성화 게이트 | AWS 계정·호스트·버전 `UNKNOWN` |
+| Cloud/Judge0 | 목표 구조와 활성화 게이트 | 계정·서울 리전 확인; IAM·서비스·호스트 `UNKNOWN` |
 
 ## 아키텍처
 
@@ -65,6 +65,8 @@ docs/                      Specifications and submission artifact sources
 - Node.js 24 (`.node-version`)
 - pnpm 11 (`packageManager`는 `pnpm@11.9.0`)
 - Docker API와 Compose 명세를 지원하는 컨테이너 런타임
+
+AWS 작업을 맡은 팀원은 장기 Access Key 대신 [프로젝트용 AWS CLI `d3` 프로필](docs/operations/aws-cli-setup.md)을 설정하고, 작업 세션마다 지정 계정과 IAM 사용자임을 확인합니다. 로컬 개발과 저장소 검증에는 AWS 로그인이 필요하지 않습니다.
 
 ### 의존성과 공용 인프라
 
@@ -111,7 +113,7 @@ docker compose -f infra/compose.yaml --profile observability config --quiet
 4. PR에 요구사항, 계약 영향, 스크린샷 또는 로그, 위험과 후속 작업을 남깁니다.
 5. CI, GitHub Codex 리뷰와 사람 리뷰를 거친 뒤 squash merge합니다.
 
-세부 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md), GitHub·Discord 활성화는 [협업 운영 문서](docs/operations/collaboration.md)를 참고합니다.
+세부 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md), GitHub·Discord 활성화는 [협업 운영 문서](docs/operations/collaboration.md), 클라우드 작업자 인증은 [AWS CLI 설정 가이드](docs/operations/aws-cli-setup.md)를 참고합니다.
 
 ## 제출·발표 자료
 
@@ -122,4 +124,4 @@ docker compose -f infra/compose.yaml --profile observability config --quiet
 - [배포 계획](docs/operations/deployment-plan.md)
 - [보안 검토 경계](docs/quality/security-review.md)
 
-자유 주제의 정확한 채점표, AWS 바인딩, 최종 화면·성능 수치는 아직 확정 증거가 없으므로 `UNKNOWN`입니다.
+자유 주제의 정확한 채점표, AWS 배포 역할·관리형 서비스·호스트 바인딩, 최종 화면·성능 수치는 아직 확정 증거가 없으므로 `UNKNOWN`입니다.
