@@ -62,7 +62,7 @@ Judge0 CE 1.13.1 runs its server and worker containers with Docker `privileged: 
 
 ## Runtime matrix
 
-This matrix comes from the authenticated `/languages` response and command `5494ec49-a254-4033-9f8c-280c5f0fa99b`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays, enforcing unique exact runtime mappings, ignoring an injected hostile curl configuration, bypassing hostile proxy variables, comparing host and sandbox reachability, and asserting CPU and memory boundaries.
+This matrix comes from the authenticated `/languages` response and the latest command recorded in the evidence table below, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays, enforcing unique exact runtime mappings, ignoring an injected hostile curl configuration, bypassing hostile proxy variables, comparing host and sandbox reachability, and asserting every required execution-resource boundary.
 
 | Product language | Judge0 ID | Observed runtime | Hello-world | Deterministic case |
 |---|---:|---|---|---|
@@ -108,7 +108,7 @@ export D3_JUDGE_TYPESCRIPT_ID=<verified-id>
 unset JUDGE0_AUTH_HEADER JUDGE0_AUTH_TOKEN
 ```
 
-The suite proves unauthenticated rejection, authenticated version/worker discovery, network opt-in rejection, a blocked outbound socket from executed code after the host reaches the same endpoint, six hello-world executions, the same deterministic sum problem in all six languages, and wrong-answer, compilation, runtime, timeout, memory, process/thread, stack, and file-size boundaries. The one-second CPU case must report between 0.9 and 1.5 seconds, distinguishing it from the two-second default. Judge0 reports memory pressure as a bounded `Runtime Error (NZEC)` at exactly 65,536 KiB for the smoke request; the Judge adapter owns normalization to D³ `MEMORY_LIMIT`. A live infrastructure outage is not induced by this suite; `PLATFORM_FAILURE` normalization is covered by the deterministic adapter test from PR #20.
+The suite proves unauthenticated rejection, authenticated version/worker discovery, network opt-in rejection, a blocked outbound socket from executed code after the host reaches the same endpoint, six hello-world executions, the same deterministic sum problem in all six languages, and wrong-answer, compilation, runtime, CPU-time, wall-time, memory, process/thread, stack, and file-size boundaries. The one-second CPU case must report between 0.9 and 1.5 CPU seconds, distinguishing it from the two-second default. The one-second wall case sleeps without consuming that CPU budget and must still time out while reporting at most 0.2 CPU seconds. Judge0 reports memory pressure as a bounded `Runtime Error (NZEC)` at exactly 65,536 KiB for the smoke request; the Judge adapter owns normalization to D³ `MEMORY_LIMIT`. A live infrastructure outage is not induced by this suite; `PLATFORM_FAILURE` normalization is covered by the deterministic adapter test from PR #20.
 
 ## Start, stop, and inspect
 
@@ -152,7 +152,7 @@ Do not delete the shared VPC, subnet, route table, internet gateway, account-lev
 | API auth and request/resource limits | PASS |
 | Submission network isolation | PASS: opt-in HTTP 422, host reached `1.1.1.1:53/TCP`, executed code could not |
 | Six-language hello-world and deterministic sum | PASS: 12/12 cases |
-| Accepted, wrong answer, compilation, runtime, timeout, memory | PASS: one-second CPU evidence was 1.093 s; memory-pressure evidence was exactly 65,536 KiB |
+| Accepted, wrong answer, compilation, runtime, CPU/wall timeout, memory, process/thread, stack and file size | PASS on command pending final evidence binding |
 | Platform failure normalization | PASS in PR #20 fake-adapter test; live outage injection NOT RUN |
 | Runtime log privacy | PASS after overlay and secret rotation: 0 secret/source matches |
 | Reboot persistence | PASS: systemd active, cgroup v1, repository overlay hashes, authenticated Python execution, and zero secret log matches |

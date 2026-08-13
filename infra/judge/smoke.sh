@@ -250,6 +250,8 @@ run_case "wrong-answer" "$D3_JUDGE_PYTHON3_ID" $'a, b = map(int, input().split()
 run_case "compilation-error" "$D3_JUDGE_C_ID" 'int main(void) { this is invalid; }' "" "" '^Compilation Error$'
 run_case "runtime-error" "$D3_JUDGE_PYTHON3_ID" 'raise RuntimeError("redacted smoke")' "" "" '^Runtime Error'
 run_case "time-limit" "$D3_JUDGE_PYTHON3_ID" 'while True: pass' "" "" '^Time Limit Exceeded$' 1 2 262144 "" 0.9 1.5
+run_case "wall-time-limit" "$D3_JUDGE_PYTHON3_ID" \
+  $'import time\ntime.sleep(3)\nprint("OPEN")' "" "" '^Time Limit Exceeded$' 10 1 262144 "" 0 0.2
 run_case "memory-pressure" "$D3_JUDGE_PYTHON3_ID" 'bytearray(300 * 1024 * 1024)' "" "" '^Runtime Error' 2 5 65536 65536
 run_case "process-limit" "$D3_JUDGE_PYTHON3_ID" \
   $'import os, time\nchildren = []\nblocked = False\ntry:\n    for _ in range(20):\n        pid = os.fork()\n        if pid == 0:\n            time.sleep(0.2)\n            os._exit(0)\n        children.append(pid)\nexcept OSError:\n    blocked = True\nfinally:\n    for pid in children:\n        try:\n            os.waitpid(pid, 0)\n        except ChildProcessError:\n            pass\nprint("BLOCKED" if blocked else "OPEN")' \
