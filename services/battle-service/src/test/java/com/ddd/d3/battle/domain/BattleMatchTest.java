@@ -169,6 +169,22 @@ class BattleMatchTest {
     }
 
     @Test
+    void d3Btl002RetainsReconnectIdempotencyAcrossCompletedGenerations() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 2));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 2));
+
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+
+        assertFalse(match.isDisconnected(PLAYER_ONE));
+        assertEquals(BattleMatch.State.RUNNING, match.state());
+    }
+
+    @Test
     void d3Btl002ReconnectAtThirtySecondsLosesToTheServerDeadline() {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);

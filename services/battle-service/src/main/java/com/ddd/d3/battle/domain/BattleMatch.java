@@ -226,13 +226,16 @@ public final class BattleMatch {
         requireParticipant(playerId);
         Long activeGeneration = reconnectGenerations.get(playerId);
         if (activeGeneration == null) {
-            if (Objects.equals(successfullyReconnectedGenerations.get(playerId), connectionGeneration)) {
+            Long completedGeneration = successfullyReconnectedGenerations.get(playerId);
+            if (completedGeneration != null && connectionGeneration <= completedGeneration) {
                 return;
             }
             throw new IllegalStateException("Player is not disconnected");
         }
+        Long completedGeneration = successfullyReconnectedGenerations.get(playerId);
         if (connectionGeneration < activeGeneration
-                && Objects.equals(successfullyReconnectedGenerations.get(playerId), connectionGeneration)) {
+                && completedGeneration != null
+                && connectionGeneration <= completedGeneration) {
             return;
         }
         if (connectionGeneration != activeGeneration) {
