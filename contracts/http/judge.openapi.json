@@ -2,10 +2,507 @@
   "openapi": "3.1.0",
   "info": {
     "title": "D3 Judge API",
-    "version": "0.0.0-scaffold",
-    "description": "No operations are implemented in the scaffold."
+    "version": "1.0.0",
+    "description": "Internal Battle-to-Judge submission acceptance and privacy-safe evidence API. Browser clients and Judge0 provider payloads are outside this contract."
   },
-  "x-requirements": ["D3-JDG-001", "D3-BTL-003"],
-  "paths": {}
+  "x-requirements": [
+    "D3-JDG-001",
+    "D3-BTL-003",
+    "D3-SEC-001"
+  ],
+  "paths": {
+    "/internal/v1/judge/submissions": {
+      "post": {
+        "operationId": "acceptJudgeSubmission",
+        "summary": "Idempotently accept a RUN or SUBMIT job",
+        "security": [
+          {
+            "serviceBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmissionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The logical job was accepted or an equivalent retry was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionAcceptance"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "The idempotency key was already used for a different logical command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request or source exceeds the configured private boundary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The selected mapped runtime is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/judge/submissions/{submissionId}/evidence": {
+      "get": {
+        "operationId": "getJudgeEvidence",
+        "summary": "Read the persisted privacy-safe evidence summary",
+        "security": [
+          {
+            "serviceBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "submissionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Persisted evidence safe for Battle scoring",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SafeEvaluationEvidence"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Submission does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Evaluation has not reached a terminal persisted state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "serviceBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "A service credential authorized for the Judge boundary"
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "CorrelationId": {
+        "name": "X-Correlation-Id",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "schemas": {
+      "SubmissionMode": {
+        "type": "string",
+        "enum": [
+          "RUN",
+          "SUBMIT"
+        ]
+      },
+      "JudgeLanguage": {
+        "type": "string",
+        "enum": [
+          "C",
+          "CPP",
+          "JAVA",
+          "PYTHON3",
+          "JAVASCRIPT",
+          "TYPESCRIPT"
+        ]
+      },
+      "TerminalJudgeStatus": {
+        "type": "string",
+        "enum": [
+          "ACCEPTED",
+          "WRONG_ANSWER",
+          "COMPILATION_ERROR",
+          "RUNTIME_ERROR",
+          "TIME_LIMIT",
+          "MEMORY_LIMIT",
+          "PLATFORM_FAILURE"
+        ]
+      },
+      "SubmissionRequest": {
+        "type": "object",
+        "required": [
+          "userId",
+          "problemId",
+          "problemVersion",
+          "mode",
+          "language",
+          "sourceCode"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "matchId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "problemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "problemVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "mode": {
+            "$ref": "#/components/schemas/SubmissionMode"
+          },
+          "language": {
+            "$ref": "#/components/schemas/JudgeLanguage"
+          },
+          "sourceCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536,
+            "x-maxBytes": 65536,
+            "description": "Private source accepted only at the internal Judge boundary; never copied into public events or evidence"
+          },
+          "attemptNumber": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "RUN"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            "then": {
+              "properties": {
+                "attemptNumber": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "SUBMIT"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            "then": {
+              "required": [
+                "attemptNumber"
+              ],
+              "properties": {
+                "attemptNumber": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        ],
+        "additionalProperties": false
+      },
+      "SubmissionAcceptance": {
+        "type": "object",
+        "required": [
+          "submissionId",
+          "status",
+          "mode",
+          "language",
+          "acceptedAt"
+        ],
+        "properties": {
+          "submissionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "const": "QUEUED"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/SubmissionMode"
+          },
+          "language": {
+            "$ref": "#/components/schemas/JudgeLanguage"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuntimeMeasurement": {
+        "type": "object",
+        "required": [
+          "tier",
+          "inputSize",
+          "sampleCount",
+          "medianRuntimeMicros"
+        ],
+        "properties": {
+          "tier": {
+            "type": "string",
+            "enum": [
+              "SMALL",
+              "MEDIUM",
+              "LARGE"
+            ]
+          },
+          "inputSize": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sampleCount": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "medianRuntimeMicros": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "SafeEvaluationEvidence": {
+        "type": "object",
+        "required": [
+          "submissionId",
+          "status",
+          "mode",
+          "language",
+          "problemId",
+          "problemVersion",
+          "passedCount",
+          "totalCount",
+          "runtimeMeasurements",
+          "adapterVersion",
+          "runtimeVersion",
+          "evidenceVersion",
+          "completedAt"
+        ],
+        "properties": {
+          "submissionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TerminalJudgeStatus"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/SubmissionMode"
+          },
+          "language": {
+            "$ref": "#/components/schemas/JudgeLanguage"
+          },
+          "problemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "problemVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "passedCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "runtimeMeasurements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeMeasurement"
+            }
+          },
+          "adapterVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "runtimeVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidenceVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "correlationId"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "correlationId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "The request is invalid",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "A service credential is missing or invalid",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "The authenticated caller is not authorized for the Judge boundary",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
+  }
 }
-

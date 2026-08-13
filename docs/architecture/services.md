@@ -27,9 +27,11 @@ Gateway authentication does not replace service authorization. Every domain serv
 - Every consumer records `eventId` or an equivalent inbox key before applying an event.
 - A projection may be stale, but it must retain the authoritative aggregate ID and version.
 
-## Contract activation gap
+## Contract activation state
 
-The current Judge HTTP stub does not define a stable submission acceptance response or safe evidence read operation. `submission.judged.v1` carries an opaque evidence version but not the accepted job's `RUN`/`SUBMIT` mode, hidden-test progress, or dynamic runtime inputs Battle needs to apply submission locking and D3-BTL-003 scoring after a restart. Judge acceptance, Battle's durable submission and mode correlation, and scoring remain activation blockers until those versioned boundaries are approved.
+Judge HTTP v1 now defines idempotent `RUN`/`SUBMIT` acceptance with a stable submission ID and a bounded evidence read containing the minimum correctness and repeated size-tier runtime summary required by Battle. `submission.judged.v1` remains the completion notification; Battle retains the accepted submission-to-mode correlation and reads the persisted safe evidence by submission ID. The domain seam and deterministic fake adapter validate this boundary without treating fake execution as real-Judge evidence.
+
+Durable PostgreSQL acceptance, asynchronous processing, outbox publication, service-authenticated HTTP handlers, and Battle consumer integration remain implementation work in issue #13. Until those paths have container-backed and producer/consumer evidence, the contract is approved but the end-to-end Judge flow is not complete.
 
 The current v1 event inventory is sufficient for a basic match projection, but not the complete P0 public rating projection. `match.finished.v1` defines seat-ordered player IDs, but omits score composition, attempts, attack history, and execution evidence. `rating.changed.v1` has an unconstrained tier string and omits an independently defined division as well as leaderboard position, language statistics, and peak tier. `user-profile.changed.v1` omits display name. Consequently, division display requires a compatible structured representation or new versioned boundary, and the target enriched Community projection fields in `erd.dbml` cannot all be populated from the current schemas.
 
