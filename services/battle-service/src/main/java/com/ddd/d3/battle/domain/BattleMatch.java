@@ -64,6 +64,7 @@ public final class BattleMatch {
     private final String playerTwoId;
     private final Clock clock;
     private final Set<String> readyPlayers = new HashSet<>();
+    private final Set<String> successfullyReconnectedPlayers = new HashSet<>();
     private final Map<String, Instant> reconnectDeadlines = new LinkedHashMap<>();
     private State state = State.LOBBY;
     private Instant startedAt;
@@ -174,17 +175,22 @@ public final class BattleMatch {
         requireParticipant(playerId);
         advanceTime();
         requireState(State.RUNNING);
+        successfullyReconnectedPlayers.remove(playerId);
         reconnectDeadlines.putIfAbsent(playerId, clock.instant().plus(RECONNECT_GRACE_PERIOD));
     }
 
     private void reconnect(String playerId) {
         requireParticipant(playerId);
         if (!reconnectDeadlines.containsKey(playerId)) {
+            if (successfullyReconnectedPlayers.contains(playerId)) {
+                return;
+            }
             throw new IllegalStateException("Player is not disconnected");
         }
         advanceTime();
         if (result == null) {
             reconnectDeadlines.remove(playerId);
+            successfullyReconnectedPlayers.add(playerId);
         }
     }
 

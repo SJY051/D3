@@ -112,6 +112,21 @@ class BattleMatchTest {
     }
 
     @Test
+    void d3Btl002TreatsARepeatedSuccessfulReconnectAsAnIdempotentRetry() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE));
+        clock.advance(Duration.ofSeconds(1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE));
+
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE));
+
+        assertFalse(match.isDisconnected(PLAYER_ONE));
+        assertEquals(BattleMatch.State.RUNNING, match.state());
+    }
+
+    @Test
     void d3Btl002ReconnectAtThirtySecondsLosesToTheServerDeadline() {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
