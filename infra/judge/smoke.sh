@@ -240,7 +240,7 @@ jq -cn --arg status "$network_code" '{check: "submission-network-opt-in-denied",
 
 assert_limit_rejected "cpu-time" "cpu_time_limit" 11
 assert_limit_rejected "wall-time" "wall_time_limit" 16
-assert_limit_rejected "extra-time" "extra_time" 0.6
+assert_limit_rejected "extra-time" "cpu_extra_time" 0.6
 assert_limit_rejected "memory" "memory_limit" 262145
 assert_limit_rejected "stack" "stack_limit" 65537
 assert_limit_rejected "process-or-thread" "max_processes_and_or_threads" 61
