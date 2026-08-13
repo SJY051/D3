@@ -33,6 +33,11 @@ Enum battle_match_result {
   VOIDED
 }
 
+Enum battle_judge_job_mode {
+  RUN
+  SUBMIT
+}
+
 Enum judge_submission_mode {
   RUN
   SUBMIT
@@ -174,6 +179,7 @@ Table battle_db.judge_job_reference {
   submission_id uuid [pk, note: 'Stable logical Judge submission reference; no cross-database FK']
   match_id uuid [not null]
   player_user_id uuid [not null, note: 'Logical identity contract reference']
+  mode battle_judge_job_mode [not null, note: 'Copied from the accepted command so asynchronous ACCEPTED results retain RUN versus SUBMIT semantics']
   attempt_number int [not null]
   last_judge_status text [not null]
   evidence_version text
@@ -396,6 +402,7 @@ Table community_db.profile_projection {
   public_rating int
   rp int
   tier text
+  division text [note: 'Null until a versioned Battle contract supplies division independently from tier']
   peak_tier text
   identity_source_version bigint [not null]
   rating_source_version bigint [note: 'Null until the first Battle rating projection is applied']
