@@ -62,7 +62,7 @@ Judge0 CE 1.13.1 runs its server and worker containers with Docker `privileged: 
 
 ## Runtime matrix
 
-This matrix comes from the authenticated `/languages` response and the latest command recorded in the evidence table below, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays, enforcing unique exact runtime mappings, ignoring an injected hostile curl configuration, bypassing hostile proxy variables, comparing host and sandbox reachability, and asserting every required execution-resource boundary.
+This matrix comes from the authenticated `/languages` response and SSM command `45f101d7-64a1-4dbf-98c2-4c7b1457585b`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding the repository startup overlays, enforcing unique exact runtime mappings, ignoring an injected hostile curl configuration, bypassing hostile proxy variables, comparing host and sandbox reachability, and asserting every required execution-resource boundary with positive controls.
 
 | Product language | Judge0 ID | Observed runtime | Hello-world | Deterministic case |
 |---|---:|---|---|---|
@@ -152,7 +152,7 @@ Do not delete the shared VPC, subnet, route table, internet gateway, account-lev
 | API auth and request/resource limits | PASS |
 | Submission network isolation | PASS: opt-in HTTP 422, host reached `1.1.1.1:53/TCP`, executed code could not |
 | Six-language hello-world and deterministic sum | PASS: 12/12 cases |
-| Accepted, wrong answer, compilation, runtime, CPU/wall timeout, memory, process/thread, stack and file size | PASS on command pending final evidence binding |
+| Accepted, wrong answer, compilation, runtime, CPU/wall timeout, memory, process/thread, stack and file size | PASS: 25/25 execution cases, including positive controls for process, stack and file-size limits |
 | Platform failure normalization | PASS in PR #20 fake-adapter test; live outage injection NOT RUN |
 | Runtime log privacy | PASS after overlay and secret rotation: 0 secret/source matches |
 | Reboot persistence | PASS: systemd active, cgroup v1, repository overlay hashes, authenticated Python execution, and zero secret log matches |
