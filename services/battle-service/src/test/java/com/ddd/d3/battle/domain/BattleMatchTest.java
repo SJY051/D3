@@ -98,6 +98,18 @@ class BattleMatchTest {
     }
 
     @Test
+    void d3Btl002TreatsAnEquivalentRepeatedStartAsAnIdempotentRetry() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+
+        match.handle(new BattleMatch.Start(Duration.ofMinutes(10)));
+
+        assertEquals(BattleMatch.State.RUNNING, match.state());
+        assertEquals(START, match.startedAt());
+        assertEquals(START.plus(Duration.ofMinutes(10)), match.matchDeadline());
+    }
+
+    @Test
     void d3Btl002MovesToJudgingAfterTheMatchDeadline() {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
@@ -202,6 +214,31 @@ class BattleMatchTest {
         assertEquals(BattleMatch.State.FINISHED, match.state());
         assertEquals(PLAYER_TWO, result.winnerId());
         assertEquals(BattleMatch.ResolutionReason.DISCONNECT_TIMEOUT, result.reason());
+    }
+
+    @Test
+    void d3Btl002TreatsARepeatedBeginJudgingAsAnIdempotentRetry() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+
+        match.handle(new BattleMatch.BeginJudging());
+        match.handle(new BattleMatch.BeginJudging());
+
+        assertEquals(BattleMatch.State.JUDGING, match.state());
+    }
+
+    @Test
+    void d3Btl002DoesNotThrowWhenALateDisconnectResolvesTheMatch() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+        clock.advance(Duration.ofSeconds(30));
+
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+
+        assertEquals(BattleMatch.State.FINISHED, match.state());
+        assertEquals(PLAYER_TWO, match.result().orElseThrow().winnerId());
     }
 
     @Test

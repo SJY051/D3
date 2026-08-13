@@ -147,17 +147,26 @@ public final class BattleMatch {
     }
 
     private void start(Duration duration) {
-        requireState(State.READY);
         Objects.requireNonNull(duration, "duration");
         if (duration.isZero() || duration.isNegative()) {
             throw new IllegalArgumentException("duration must be positive");
         }
+        if (startedAt != null) {
+            if (startedAt.plus(duration).equals(matchDeadline)) {
+                return;
+            }
+            throw new IllegalStateException("Start duration does not match the accepted command");
+        }
+        requireState(State.READY);
         startedAt = clock.instant();
         matchDeadline = startedAt.plus(duration);
         state = State.RUNNING;
     }
 
     private void beginJudging() {
+        if (state == State.JUDGING) {
+            return;
+        }
         requireState(State.RUNNING);
         advanceTime();
         if (result != null || state == State.JUDGING) {
@@ -194,6 +203,9 @@ public final class BattleMatch {
     private void disconnect(String playerId, long connectionGeneration) {
         requireParticipant(playerId);
         advanceTime();
+        if (result != null) {
+            return;
+        }
         requireState(State.RUNNING);
         Long activeGeneration = reconnectGenerations.get(playerId);
         if (activeGeneration != null) {
