@@ -105,7 +105,14 @@ Table identity_db.refresh_session {
   created_at timestamptz [not null]
 
   Indexes {
+    (id, user_id) [unique, note: 'Supports the same-user rotation lineage foreign key']
     (user_id, expires_at)
+    rotated_from_id [unique, note: 'A refresh session can be rotated only once; multiple null roots are allowed']
+  }
+
+  checks {
+    `rotated_from_id IS NULL OR rotated_from_id <> id` [name: 'refresh_session_not_self_rotated']
+    `revoked_at IS NULL OR revoked_at >= created_at` [name: 'refresh_session_revocation_after_creation']
   }
 }
 
@@ -126,7 +133,7 @@ Table identity_db.outbox_event {
 
 Ref: identity_db.login_identity.user_id > identity_db.user_account.id
 Ref: identity_db.refresh_session.user_id > identity_db.user_account.id
-Ref: identity_db.refresh_session.rotated_from_id > identity_db.refresh_session.id
+Ref: identity_db.refresh_session.(rotated_from_id, user_id) > identity_db.refresh_session.(id, user_id)
 
 Table battle_db.problem {
   id uuid [pk]
@@ -161,7 +168,6 @@ Table battle_db.match_player {
   language_key text [not null]
   connection_state text [not null]
   reconnect_deadline_at timestamptz
-  accepted_submission_id uuid [note: 'Logical judge contract reference; no cross-database FK']
   attempts int [not null, default: 0]
   score numeric [note: 'Committed total; null before result calculation']
   speed_score_component numeric [note: 'Committed D3-BTL-003 speed component; null before result calculation']
@@ -190,7 +196,7 @@ Table battle_db.judge_job_reference {
   player_user_id uuid [not null, note: 'Logical identity contract reference']
   mode battle_judge_job_mode [not null, note: 'Copied from the accepted command so asynchronous ACCEPTED results retain RUN versus SUBMIT semantics']
   command_id uuid [not null, unique, note: 'Stable command idempotency key; each distinct RUN receives a new value while retries reuse it']
-  attempt_number int [not null]
+  attempt_number int [note: 'Null for RUN; positive and unique per match player for SUBMIT']
   last_judge_status text [not null]
   evidence_version text
   accepted_at timestamptz [not null]
@@ -198,6 +204,14 @@ Table battle_db.judge_job_reference {
 
   Indexes {
     (match_id, player_user_id, mode, attempt_number)
+    (match_id, player_user_id, attempt_number) [unique, note: 'Partial index for mode = SUBMIT']
+    (match_id, player_user_id) [unique, note: 'Partial index for the single ACCEPTED SUBMIT; this row is the accepted-submission source of truth']
+  }
+
+  checks {
+    `(mode = 'RUN' AND attempt_number IS NULL) OR (mode = 'SUBMIT' AND attempt_number IS NOT NULL AND attempt_number > 0)` [name: 'judge_job_reference_attempt_matches_mode']
+    `(last_judge_status IN ('QUEUED', 'RUNNING') AND evidence_version IS NULL AND last_result_at IS NULL) OR (last_judge_status NOT IN ('QUEUED', 'RUNNING') AND NULLIF(BTRIM(evidence_version), '') IS NOT NULL AND last_result_at IS NOT NULL)` [name: 'judge_job_reference_result_state_consistent']
+    `last_result_at IS NULL OR last_result_at >= accepted_at` [name: 'judge_job_reference_result_after_acceptance']
   }
 }
 
@@ -271,7 +285,10 @@ Table battle_db.inbox_event {
 Ref: battle_db.match.problem_id > battle_db.problem.id
 Ref: battle_db.match_player.match_id > battle_db.match.id
 Ref: battle_db.judge_job_reference.match_id > battle_db.match.id
+Ref: battle_db.judge_job_reference.(match_id, player_user_id) > battle_db.match_player.(match_id, user_id)
 Ref: battle_db.attack_event.match_id > battle_db.match.id
+Ref: battle_db.attack_event.(match_id, actor_user_id) > battle_db.match_player.(match_id, user_id)
+Ref: battle_db.attack_event.(match_id, target_user_id) > battle_db.match_player.(match_id, user_id)
 
 Table judge_db.submission {
   id uuid [pk]
@@ -300,6 +317,7 @@ Table judge_db.submission {
   }
 
   checks {
+    `(mode = 'RUN' AND attempt_number IS NULL) OR (mode = 'SUBMIT' AND attempt_number IS NOT NULL AND attempt_number > 0)` [name: 'submission_attempt_mode']
     `(status = 'RUNNING' AND evaluation_claim_id IS NOT NULL AND claim_started_at IS NOT NULL) OR (status <> 'RUNNING' AND evaluation_claim_id IS NULL AND claim_started_at IS NULL)` [name: 'submission_evaluation_claim_state']
   }
 }
@@ -326,7 +344,7 @@ Table judge_db.evaluation_evidence {
   created_at timestamptz [not null]
 
   Indexes {
-    (judge_run_id, tier)
+    (judge_run_id, tier) [unique]
   }
 }
 
@@ -432,7 +450,8 @@ Table community_db.profile_projection {
 
 Table community_db.match_projection {
   match_id uuid [pk, note: 'Logical battle aggregate reference']
-  player_ids jsonb [not null, note: 'Seat order follows match-finished.v1: index 0 is PLAYER_ONE and index 1 is PLAYER_TWO']
+  player_one_user_id uuid [not null, note: 'Seat-ordered projection of match-finished.v1 playerIds[0]']
+  player_two_user_id uuid [not null, note: 'Seat-ordered projection of match-finished.v1 playerIds[1]']
   result community_match_result [not null]
   ranked boolean [not null]
   score_summary jsonb [note: 'Null until an enriched Battle contract is applied']
@@ -440,6 +459,10 @@ Table community_db.match_projection {
   execution_summary jsonb [note: 'Null until an enriched Battle contract is applied; no private source or hidden test data']
   source_version bigint [not null]
   projected_at timestamptz [not null]
+
+  checks {
+    `player_one_user_id <> player_two_user_id` [name: 'match_projection_players_distinct']
+  }
 }
 
 Table community_db.inbox_event {

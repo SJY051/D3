@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -176,6 +177,65 @@ class JdbcJudgeSubmissionRepositoryTest {
 
         JudgeSubmission recovered = repository.claimForEvaluation(SUBMISSION_ID).orElseThrow();
         assertTrue(recovered.evaluationStartedAt() != null);
+    }
+
+    @Test
+    void d3Jdg001RejectsAttemptNumbersThatDoNotMatchTheSubmissionMode() {
+        assertThrows(DataIntegrityViolationException.class, () -> insertRawSubmission("SUBMIT", null));
+        assertThrows(DataIntegrityViolationException.class, () -> insertRawSubmission("RUN", 1));
+
+        assertEquals(1, insertRawSubmission("RUN", null));
+    }
+
+    @Test
+    void d3Btl003StoresAtMostOneRuntimeMeasurementPerSizeTier() {
+        repository.insertOrGet(queuedSubmission());
+        JudgeSubmission running = repository.claimForEvaluation(SUBMISSION_ID).orElseThrow();
+        running = repository.markEvaluationStarted(SUBMISSION_ID, running.evaluationClaimId());
+        SafeEvaluationEvidence duplicateTierEvidence = new SafeEvaluationEvidence(
+                SUBMISSION_ID,
+                JudgeStatus.ACCEPTED,
+                SubmissionMode.SUBMIT,
+                JudgeLanguage.PYTHON3,
+                UUID.fromString("55555555-5555-4555-8555-555555555555"),
+                1,
+                3,
+                3,
+                List.of(
+                        new RuntimeMeasurement("SMALL", 100, 3, 700),
+                        new RuntimeMeasurement("SMALL", 100, 3, 710)),
+                "judge0-ce-1.13.1",
+                "Python 3.8.1",
+                "judge-evidence-v1",
+                COMPLETED_AT);
+
+        JudgeSubmission completed = running.complete(duplicateTierEvidence);
+        assertThrows(DataIntegrityViolationException.class, () -> repository.completeEvaluation(completed));
+        assertEquals(0, jdbc.sql("select count(*) from judge_run").query(Integer.class).single());
+    }
+
+    private int insertRawSubmission(String mode, Integer attemptNumber) {
+        UUID rowId = UUID.randomUUID();
+        return jdbc.sql("""
+                        insert into submission (
+                            id, idempotency_key, user_id, match_id, problem_id, problem_version,
+                            mode, language_key, source_code, attempt_number, correlation_id,
+                            request_fingerprint, status, accepted_at
+                        ) values (
+                            :id, :idempotencyKey, :userId, :matchId, :problemId, 1,
+                            :mode, 'JAVA', 'fixture', :attemptNumber, 'corr-fixture',
+                            :fingerprint, 'QUEUED', now()
+                        )
+                        """)
+                .param("id", rowId)
+                .param("idempotencyKey", UUID.randomUUID())
+                .param("userId", UUID.randomUUID())
+                .param("matchId", UUID.randomUUID())
+                .param("problemId", UUID.randomUUID())
+                .param("mode", mode)
+                .param("attemptNumber", attemptNumber, java.sql.Types.INTEGER)
+                .param("fingerprint", "fingerprint-" + rowId)
+                .update();
     }
 
     private static JudgeSubmission queuedSubmission() {

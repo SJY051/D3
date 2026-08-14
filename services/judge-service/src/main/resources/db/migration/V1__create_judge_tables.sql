@@ -21,7 +21,7 @@ create table submission (
     created_at timestamptz not null default now(),
     constraint submission_attempt_mode check (
         (mode = 'RUN' and attempt_number is null)
-        or (mode = 'SUBMIT' and attempt_number > 0)
+        or (mode = 'SUBMIT' and attempt_number is not null and attempt_number > 0)
     ),
     constraint submission_claim_state check (
         (status = 'RUNNING' and evaluation_claim_id is not null and claim_started_at is not null)
@@ -63,7 +63,8 @@ create table evaluation_evidence (
     created_at timestamptz not null
 );
 
-create index evaluation_evidence_run_idx on evaluation_evidence (judge_run_id, tier);
+create unique index evaluation_evidence_run_tier_unique_idx
+    on evaluation_evidence (judge_run_id, tier);
 
 create table outbox_event (
     id uuid primary key,

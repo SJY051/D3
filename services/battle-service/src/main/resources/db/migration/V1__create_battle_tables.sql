@@ -63,7 +63,6 @@ create table match_player (
     language_key text not null,
     connection_state text not null,
     reconnect_deadline_at timestamptz,
-    accepted_submission_id uuid,
     attempts integer not null default 0,
     score numeric,
     speed_score_component numeric,
@@ -94,7 +93,7 @@ create table judge_job_reference (
     player_user_id uuid not null,
     mode text not null,
     command_id uuid not null unique,
-    attempt_number integer not null,
+    attempt_number integer,
     last_judge_status text not null,
     evidence_version text,
     accepted_at timestamptz not null,
@@ -102,7 +101,10 @@ create table judge_job_reference (
     constraint judge_job_reference_player_fk
         foreign key (match_id, player_user_id) references match_player(match_id, user_id),
     constraint judge_job_reference_mode_supported check (mode in ('RUN', 'SUBMIT')),
-    constraint judge_job_reference_attempt_non_negative check (attempt_number >= 0),
+    constraint judge_job_reference_attempt_matches_mode check (
+        (mode = 'RUN' and attempt_number is null)
+        or (mode = 'SUBMIT' and attempt_number is not null and attempt_number > 0)
+    ),
     constraint judge_job_reference_status_supported check (
         last_judge_status in (
             'QUEUED',
@@ -115,11 +117,41 @@ create table judge_job_reference (
             'MEMORY_LIMIT',
             'PLATFORM_FAILURE'
         )
-    )
+    ),
+    constraint judge_job_reference_result_state_consistent check (
+        (
+            last_judge_status in ('QUEUED', 'RUNNING')
+            and evidence_version is null
+            and last_result_at is null
+        )
+        or (
+            last_judge_status in (
+                'ACCEPTED',
+                'WRONG_ANSWER',
+                'COMPILATION_ERROR',
+                'RUNTIME_ERROR',
+                'TIME_LIMIT',
+                'MEMORY_LIMIT',
+                'PLATFORM_FAILURE'
+            )
+            and nullif(btrim(evidence_version), '') is not null
+            and last_result_at is not null
+        )
+    ),
+    constraint judge_job_reference_result_after_acceptance
+        check (last_result_at is null or last_result_at >= accepted_at)
 );
 
 create index judge_job_reference_match_player_attempt_idx
     on judge_job_reference (match_id, player_user_id, mode, attempt_number);
+
+create unique index judge_job_reference_submit_attempt_unique_idx
+    on judge_job_reference (match_id, player_user_id, attempt_number)
+    where mode = 'SUBMIT';
+
+create unique index judge_job_reference_one_accepted_submit_idx
+    on judge_job_reference (match_id, player_user_id)
+    where mode = 'SUBMIT' and last_judge_status = 'ACCEPTED';
 
 create table attack_event (
     id uuid primary key,
