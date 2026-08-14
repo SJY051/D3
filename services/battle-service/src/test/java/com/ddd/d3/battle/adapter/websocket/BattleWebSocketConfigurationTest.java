@@ -1,12 +1,20 @@
 package com.ddd.d3.battle.adapter.websocket;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.ddd.d3.battle.application.RetryingBattleSnapshotPublisher;
+import com.ddd.d3.battle.infrastructure.redis.RedisBattleSnapshotChannel;
+import java.time.Duration;
+import java.util.concurrent.ScheduledExecutorService;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistration;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
@@ -57,5 +65,24 @@ class BattleWebSocketConfigurationTest {
         } finally {
             executor.shutdown();
         }
+    }
+
+    @Test
+    void d3Btl002BuildsTheRetryingPublisherWithoutEagerlyResolvingWebSocketSessions() {
+        BattleSnapshotFanoutConfiguration configuration = new BattleSnapshotFanoutConfiguration();
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<BattleWebSocketSessionRegistry> sessions = mock(ObjectProvider.class);
+        RedisBattleSnapshotChannel channel = configuration.battleSnapshotChannel(
+                redis,
+                sessions,
+                Runnable::run,
+                BattleSnapshotFanoutConfiguration.DEFAULT_SNAPSHOT_TOPIC);
+
+        var publisher = configuration.battleSnapshotPublisher(
+                channel, mock(ScheduledExecutorService.class), Duration.ofMillis(250));
+
+        assertInstanceOf(RetryingBattleSnapshotPublisher.class, publisher);
+        verifyNoInteractions(sessions);
     }
 }

@@ -57,6 +57,7 @@ d3:
   battle:
     match-duration: ${D3_BATTLE_MATCH_DURATION:10m}
     snapshot-topic: ${D3_BATTLE_SNAPSHOT_TOPIC:d3:battle:snapshot:committed:v2}
+    snapshot-retry-delay: ${D3_BATTLE_SNAPSHOT_RETRY_DELAY:250ms}
     connection:
       maximum-attempts: ${D3_BATTLE_CONNECTION_MAXIMUM_ATTEMPTS:3}
       retry-delay: ${D3_BATTLE_CONNECTION_RETRY_DELAY:50ms}
