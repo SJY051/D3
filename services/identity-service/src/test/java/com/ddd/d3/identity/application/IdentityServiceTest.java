@@ -102,4 +102,11 @@ class IdentityServiceTest {
 
         assertThrows(RefreshTokenRejectedException.class, () -> service.refresh(token.refreshToken()));
     }
+
+    @Test
+    void d3Id001UpdatesTheAuthenticatedProfile() {
+        UUID userId = service.register("dev@d3.dev", "dev", "Dev", "correct horse");
+
+        assertEquals("Dev Updated", service.updateProfile(userId, "Dev Updated").displayName());
+    }
 }

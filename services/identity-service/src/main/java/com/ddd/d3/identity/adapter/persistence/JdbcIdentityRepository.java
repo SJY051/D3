@@ -74,6 +74,24 @@ public final class JdbcIdentityRepository implements IdentityRepository {
     }
 
     @Override
+    public Optional<Account> updateDisplayName(UUID id, String displayName, Instant updatedAt) {
+        int updated = jdbcClient.sql("""
+                        update user_account
+                        set display_name = :displayName, updated_at = :updatedAt
+                        where id = :id and status = :status
+                        """)
+                .param("displayName", displayName)
+                .param("updatedAt", Timestamp.from(updatedAt))
+                .param("id", id)
+                .param("status", Account.ACTIVE)
+                .update();
+        if (updated == 0) {
+            return Optional.empty();
+        }
+        return findAccountById(id);
+    }
+
+    @Override
     public void saveSession(RefreshSession session) {
         insertSession(session);
     }

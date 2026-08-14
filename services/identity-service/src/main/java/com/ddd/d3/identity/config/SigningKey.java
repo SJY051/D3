@@ -11,6 +11,7 @@ import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.text.ParseException;
 import java.util.Map;
 import java.util.UUID;
 
@@ -39,6 +40,18 @@ public final class SigningKey {
             return new SigningKey(rsaKey);
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("RSA key generation is unavailable", exception);
+        }
+    }
+
+    public static SigningKey fromJwk(String jwkJson) {
+        try {
+            RSAKey rsaKey = RSAKey.parse(jwkJson);
+            if (rsaKey.toPrivateKey() == null) {
+                throw new IllegalArgumentException("D3_JWT_SIGNING_JWK must include the RSA private key");
+            }
+            return new SigningKey(rsaKey);
+        } catch (JOSEException | ParseException exception) {
+            throw new IllegalArgumentException("D3_JWT_SIGNING_JWK is not a valid RSA JWK", exception);
         }
     }
 

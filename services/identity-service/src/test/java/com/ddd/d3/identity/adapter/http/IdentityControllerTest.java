@@ -5,7 +5,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,6 +19,7 @@ import com.ddd.d3.identity.application.SessionToken;
 import com.ddd.d3.identity.config.IdentityJwtConfiguration;
 import com.ddd.d3.identity.config.IdentitySecurityConfiguration;
 import com.ddd.d3.identity.domain.Account;
+import jakarta.servlet.http.Cookie;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,7 +33,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(IdentityController.class)
+@WebMvcTest(value = IdentityController.class, properties = "D3_REFRESH_COOKIE_SECURE=true")
 @Import({
     IdentityJwtConfiguration.class,
     IdentitySecurityConfiguration.class,
@@ -86,7 +89,35 @@ class IdentityControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(USER_ID.toString()))
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").value("refresh-secret-1"));
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("D3_REFRESH_TOKEN=refresh-secret-1")))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("HttpOnly")))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Secure")))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("SameSite=Lax")));
+    }
+
+    @Test
+    void d3Id001RefreshRotatesTheHttpOnlyCookie() throws Exception {
+        when(identityService.refresh("refresh-secret-1")).thenReturn(new SessionToken(USER_ID, "refresh-secret-2"));
+
+        mockMvc.perform(post("/v1/auth/refresh")
+                        .cookie(new Cookie("D3_REFRESH_TOKEN", "refresh-secret-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("D3_REFRESH_TOKEN=refresh-secret-2")));
+    }
+
+    @Test
+    void d3Id001LogoutRevokesOnlyTheCookieSession() throws Exception {
+        mockMvc.perform(post("/v1/auth/logout")
+                        .cookie(new Cookie("D3_REFRESH_TOKEN", "refresh-secret-1")))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("D3_REFRESH_TOKEN=")))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")));
+
+        verify(identityService).revoke("refresh-secret-1");
     }
 
     @Test
@@ -104,7 +135,7 @@ class IdentityControllerTest {
 
     @Test
     void d3Sec001ProfileRequiresAuthenticationAtTheServiceBoundary() throws Exception {
-        mockMvc.perform(get("/v1/profile/me"))
+        mockMvc.perform(get("/v1/users/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
@@ -113,7 +144,7 @@ class IdentityControllerTest {
     void d3Id001ProfileReturnsTheAuthenticatedAccount() throws Exception {
         when(identityRepository.findAccountById(USER_ID)).thenReturn(Optional.of(account(Account.ACTIVE)));
 
-        mockMvc.perform(get("/v1/profile/me").with(profileToken()))
+        mockMvc.perform(get("/v1/users/me").with(profileToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(USER_ID.toString()))
                 .andExpect(jsonPath("$.handle").value("dev"))
@@ -121,8 +152,24 @@ class IdentityControllerTest {
     }
 
     @Test
+    void d3Id001ProfileCanUpdateDisplayName() throws Exception {
+        Account updated = new Account(
+                USER_ID, "dev", "dev@d3.dev", "hash", "Dev Updated", Account.ACTIVE, Instant.parse("2026-08-14T00:00:00Z"));
+        when(identityService.updateProfile(USER_ID, "Dev Updated")).thenReturn(updated);
+
+        mockMvc.perform(patch("/v1/users/me")
+                        .with(profileToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"displayName":"Dev Updated"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Dev Updated"));
+    }
+
+    @Test
     void d3Sec001RejectsAProfileTokenWithoutTheProfileScope() throws Exception {
-        mockMvc.perform(get("/v1/profile/me")
+        mockMvc.perform(get("/v1/users/me")
                         .with(jwt().jwt(token -> token.subject(USER_ID.toString()))
                                 .authorities(new SimpleGrantedAuthority("SCOPE_other"))))
                 .andExpect(status().isForbidden())
@@ -133,7 +180,7 @@ class IdentityControllerTest {
     void d3Sec001DoesNotServeADisabledAccount() throws Exception {
         when(identityRepository.findAccountById(USER_ID)).thenReturn(Optional.of(account("DISABLED")));
 
-        mockMvc.perform(get("/v1/profile/me").with(profileToken()))
+        mockMvc.perform(get("/v1/users/me").with(profileToken()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_FOUND"));
     }

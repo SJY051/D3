@@ -92,6 +92,13 @@ public final class IdentityService {
                 .ifPresent(session -> repository.revokeSession(session.id(), clock.instant()));
     }
 
+    public Account updateProfile(UUID userId, String displayName) {
+        requireText(displayName, "displayName");
+        return repository.updateDisplayName(userId, displayName, clock.instant())
+                .filter(Account::isActive)
+                .orElseThrow(AccountNotFoundException::new);
+    }
+
     private RefreshSession buildSession(UUID userId, String rawToken, UUID rotatedFromId) {
         return new RefreshSession(
                 uuidSupplier.get(),

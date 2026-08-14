@@ -15,6 +15,8 @@ public interface IdentityRepository {
 
     Optional<Account> findAccountById(UUID id);
 
+    Optional<Account> updateDisplayName(UUID id, String displayName, Instant updatedAt);
+
     void saveSession(RefreshSession session);
 
     Optional<RefreshSession> findSessionByTokenHash(String tokenHash);

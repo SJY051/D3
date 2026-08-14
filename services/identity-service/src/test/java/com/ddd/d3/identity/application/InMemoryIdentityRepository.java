@@ -46,6 +46,25 @@ final class InMemoryIdentityRepository implements IdentityRepository {
     }
 
     @Override
+    public Optional<Account> updateDisplayName(UUID id, String displayName, Instant updatedAt) {
+        Account account = accountsById.get(id);
+        if (account == null || !account.isActive()) {
+            return Optional.empty();
+        }
+        Account updated = new Account(
+                account.id(),
+                account.handle(),
+                account.email(),
+                account.passwordHash(),
+                displayName,
+                account.status(),
+                account.createdAt());
+        accountsById.put(id, updated);
+        accountsByEmail.put(updated.email(), updated);
+        return Optional.of(updated);
+    }
+
+    @Override
     public void saveSession(RefreshSession session) {
         sessionsById.put(session.id(), session);
         sessionIdByTokenHash.put(session.tokenHash(), session.id());

@@ -5,7 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ddd.d3.identity.config.SigningKey;
+import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
+import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Clock;
 import java.util.List;
@@ -65,6 +68,19 @@ class AccessTokenIssuerTest {
         assertThrows(JwtException.class, () -> decoder.decode(wrongAudience));
     }
 
+    @Test
+    void d3Sec001LoadsAStableSigningKeyFromSecretJwk() throws Exception {
+        RSAKey secretJwk = secretJwk();
+        SigningKey loaded = SigningKey.fromJwk(secretJwk.toJSONString());
+        AccessTokenIssuer issuer = new AccessTokenIssuer(
+                new NimbusJwtEncoder(loaded.jwkSource()), "http://localhost:8081", "d3-user", CLOCK);
+
+        String token = issuer.issue(UUID.fromString("00000000-0000-4000-8000-000000000004"));
+
+        Jwt decoded = decoderFromPublicJwk(secretJwk).decode(token);
+        assertEquals("00000000-0000-4000-8000-000000000004", decoded.getSubject());
+    }
+
     /** Mirrors IdentitySecurityConfiguration: signature plus issuer, timestamp, and audience validation. */
     private static NimbusJwtDecoder validatingDecoder(SigningKey signingKey, String issuer, String audience) {
         NimbusJwtDecoder decoder = decoderFromPublishedJwks(signingKey);
@@ -85,6 +101,25 @@ class AccessTokenIssuerTest {
             return NimbusJwtDecoder.withPublicKey(publicKey).build();
         } catch (Exception exception) {
             throw new IllegalStateException("could not build a decoder from the published JWKS", exception);
+        }
+    }
+
+    private static RSAKey secretJwk() throws Exception {
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+        generator.initialize(2048);
+        var keyPair = generator.generateKeyPair();
+        return new RSAKey.Builder((RSAPublicKey) keyPair.getPublic())
+                .privateKey(keyPair.getPrivate())
+                .keyID("stable-test-key")
+                .algorithm(JWSAlgorithm.RS256)
+                .build();
+    }
+
+    private static NimbusJwtDecoder decoderFromPublicJwk(RSAKey rsaKey) {
+        try {
+            return NimbusJwtDecoder.withPublicKey(rsaKey.toRSAPublicKey()).build();
+        } catch (Exception exception) {
+            throw new IllegalStateException("could not build a decoder from the public JWK", exception);
         }
     }
 }

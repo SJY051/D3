@@ -36,6 +36,9 @@
         "responses": {
           "200": {
             "description": "Access token and rotating refresh token",
+            "headers": {
+              "Set-Cookie": {"schema": {"type": "string"}, "description": "HttpOnly SameSite=Lax D3_REFRESH_TOKEN cookie"}
+            },
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TokenResponse"}}}
           },
           "400": {"$ref": "#/components/responses/Error"},
@@ -46,16 +49,15 @@
     "/v1/auth/refresh": {
       "post": {
         "summary": "Rotate the refresh session and mint a new access token",
-        "requestBody": {
-          "required": true,
-          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RefreshRequest"}}}
-        },
+        "parameters": [{"$ref": "#/components/parameters/RefreshCookie"}],
         "responses": {
           "200": {
             "description": "New access token and rotated refresh token",
+            "headers": {
+              "Set-Cookie": {"schema": {"type": "string"}, "description": "Rotated HttpOnly SameSite=Lax D3_REFRESH_TOKEN cookie"}
+            },
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TokenResponse"}}}
           },
-          "400": {"$ref": "#/components/responses/Error"},
           "401": {"$ref": "#/components/responses/Error"}
         }
       }
@@ -63,17 +65,18 @@
     "/v1/auth/logout": {
       "post": {
         "summary": "Revoke a refresh session",
-        "requestBody": {
-          "required": true,
-          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RefreshRequest"}}}
-        },
+        "parameters": [{"name": "D3_REFRESH_TOKEN", "in": "cookie", "required": false, "schema": {"type": "string"}}],
         "responses": {
-          "204": {"description": "Session revoked"},
-          "400": {"$ref": "#/components/responses/Error"}
+          "204": {
+            "description": "Session revoked when present",
+            "headers": {
+              "Set-Cookie": {"schema": {"type": "string"}, "description": "Expired D3_REFRESH_TOKEN cookie"}
+            }
+          }
         }
       }
     },
-    "/v1/profile/me": {
+    "/v1/users/me": {
       "get": {
         "summary": "The authenticated caller's public profile",
         "security": [{"bearerAuth": []}],
@@ -82,6 +85,23 @@
             "description": "Profile",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProfileResponse"}}}
           },
+          "401": {"$ref": "#/components/responses/Error"},
+          "404": {"$ref": "#/components/responses/Error"}
+        }
+      },
+      "patch": {
+        "summary": "Update the authenticated caller's public profile",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UpdateProfileRequest"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Updated profile",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProfileResponse"}}}
+          },
+          "400": {"$ref": "#/components/responses/Error"},
           "401": {"$ref": "#/components/responses/Error"},
           "404": {"$ref": "#/components/responses/Error"}
         }
@@ -102,6 +122,14 @@
   "components": {
     "securitySchemes": {
       "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+    },
+    "parameters": {
+      "RefreshCookie": {
+        "name": "D3_REFRESH_TOKEN",
+        "in": "cookie",
+        "required": true,
+        "schema": {"type": "string"}
+      }
     },
     "responses": {
       "Error": {
@@ -128,11 +156,6 @@
           "password": {"type": "string"}
         }
       },
-      "RefreshRequest": {
-        "type": "object",
-        "required": ["refreshToken"],
-        "properties": {"refreshToken": {"type": "string"}}
-      },
       "RegisterResponse": {
         "type": "object",
         "required": ["userId"],
@@ -140,11 +163,10 @@
       },
       "TokenResponse": {
         "type": "object",
-        "required": ["userId", "accessToken", "refreshToken"],
+        "required": ["userId", "accessToken"],
         "properties": {
           "userId": {"type": "string", "format": "uuid"},
-          "accessToken": {"type": "string"},
-          "refreshToken": {"type": "string"}
+          "accessToken": {"type": "string"}
         }
       },
       "ProfileResponse": {
@@ -155,6 +177,13 @@
           "handle": {"type": "string"},
           "email": {"type": "string", "format": "email"},
           "displayName": {"type": "string"}
+        }
+      },
+      "UpdateProfileRequest": {
+        "type": "object",
+        "required": ["displayName"],
+        "properties": {
+          "displayName": {"type": "string", "maxLength": 80}
         }
       },
       "ErrorResponse": {

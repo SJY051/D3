@@ -4,6 +4,8 @@ import com.ddd.d3.identity.adapter.http.IdentityErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -11,8 +13,6 @@ import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -53,7 +53,7 @@ public class IdentitySecurityConfiguration {
                         .requestMatchers(HttpMethod.POST,
                                 "/v1/auth/register", "/v1/auth/login", "/v1/auth/refresh", "/v1/auth/logout")
                         .permitAll()
-                        .requestMatchers("/v1/profile/**").hasAuthority("SCOPE_identity.profile")
+                        .requestMatchers("/v1/users/**").hasAuthority("SCOPE_identity.profile")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(Customizer.withDefaults())

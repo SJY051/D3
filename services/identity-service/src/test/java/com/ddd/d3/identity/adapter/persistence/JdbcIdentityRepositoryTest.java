@@ -10,6 +10,7 @@ import com.ddd.d3.identity.application.IdentityService;
 import com.ddd.d3.identity.application.RefreshTokenRejectedException;
 import com.ddd.d3.identity.application.SessionToken;
 import com.ddd.d3.identity.domain.Account;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -143,6 +144,35 @@ class JdbcIdentityRepositoryTest {
                 .query(Long.class)
                 .single();
         assertEquals(0, rawTokenRows);
+    }
+
+    @Test
+    void d3Id001UpdatesDisplayName() {
+        Account account = account("dev@d3.dev", "dev");
+        repository.saveAccount(account);
+
+        Account updated = repository.updateDisplayName(
+                        account.id(), "Dev Updated", CLOCK.instant().plusSeconds(60))
+                .orElseThrow();
+
+        assertEquals("Dev Updated", updated.displayName());
+        assertEquals(
+                CLOCK.instant().plusSeconds(60),
+                jdbc.sql("select updated_at from user_account where id = :id")
+                        .param("id", account.id())
+                        .query(Timestamp.class)
+                        .single()
+                        .toInstant());
+    }
+
+    @Test
+    void d3Sec001DoesNotUpdateDisabledAccountDisplayName() {
+        Account disabled = new Account(
+                UUID.randomUUID(), "disabled", "disabled@d3.dev", "hash", "Disabled", "DISABLED", CLOCK.instant());
+        repository.saveAccount(disabled);
+
+        assertTrue(repository.updateDisplayName(disabled.id(), "Changed", CLOCK.instant().plusSeconds(60)).isEmpty());
+        assertEquals("Disabled", repository.findAccountById(disabled.id()).orElseThrow().displayName());
     }
 
     private static Account account(String email, String handle) {

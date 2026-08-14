@@ -116,16 +116,6 @@ Table identity_db.refresh_session {
   }
 }
 
-Table identity_db.refresh_session_legacy_normalization {
-  session_id uuid [pk, note: 'Original refresh-session row retained in refresh_session after safe normalization']
-  user_id uuid [not null]
-  rotated_from_id uuid
-  revoked_at timestamptz
-  canonical_child_session_id uuid
-  normalization_reasons text [not null, note: 'PostgreSQL text[] audit of self, cross-user, duplicate-child, or chronology repair']
-  archived_at timestamptz [not null]
-}
-
 Table identity_db.outbox_event {
   id uuid [pk]
   aggregate_id uuid [not null]

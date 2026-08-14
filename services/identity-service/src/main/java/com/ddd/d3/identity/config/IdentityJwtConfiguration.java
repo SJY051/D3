@@ -12,8 +12,10 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 public class IdentityJwtConfiguration {
 
     @Bean
-    SigningKey signingKey() {
-        return SigningKey.generate();
+    SigningKey signingKey(@Value("${D3_JWT_SIGNING_JWK:}") String signingJwk) {
+        return signingJwk == null || signingJwk.isBlank()
+                ? SigningKey.generate()
+                : SigningKey.fromJwk(signingJwk);
     }
 
     @Bean
