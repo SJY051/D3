@@ -34,7 +34,13 @@ create table match (
     constraint match_deadline_after_start check (
         deadline_at is null or (server_started_at is not null and deadline_at > server_started_at)
     ),
-    constraint match_finish_after_creation check (finished_at is null or finished_at >= created_at),
+    constraint match_finish_after_creation check (
+        finished_at is null
+        or (
+            finished_at >= created_at
+            and (server_started_at is null or finished_at >= server_started_at)
+        )
+    ),
     constraint match_void_reason_consistent check (
         (result is not distinct from 'VOIDED' and nullif(btrim(void_reason), '') is not null)
         or (result is distinct from 'VOIDED' and void_reason is null)
