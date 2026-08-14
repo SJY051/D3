@@ -18,8 +18,10 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Configuration
 public class IdentityConfiguration {
@@ -37,13 +39,18 @@ public class IdentityConfiguration {
     }
 
     @Bean
+    TransactionTemplate identityTransactionTemplate(DataSource dataSource) {
+        return new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+    }
+
+    @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
-    IdentityRepository identityRepository(JdbcClient jdbcClient) {
-        return new JdbcIdentityRepository(jdbcClient);
+    IdentityRepository identityRepository(JdbcClient jdbcClient, TransactionTemplate transactionTemplate) {
+        return new JdbcIdentityRepository(jdbcClient, transactionTemplate);
     }
 
     @Bean

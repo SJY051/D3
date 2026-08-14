@@ -42,9 +42,6 @@ public final class IdentityService {
         requireText(handle, "handle");
         requireText(displayName, "displayName");
         requireText(rawPassword, "password");
-        if (repository.existsByEmailOrHandle(email, handle)) {
-            throw new DuplicateAccountException();
-        }
         Account account = new Account(
                 uuidSupplier.get(),
                 handle,
@@ -53,6 +50,7 @@ public final class IdentityService {
                 displayName,
                 Account.ACTIVE,
                 clock.instant());
+        // The email/handle unique constraint is the single duplicate boundary (saveAccount maps the conflict).
         repository.saveAccount(account);
         return account.id();
     }
@@ -64,7 +62,9 @@ public final class IdentityService {
                 .filter(candidate -> passwordEncoder.matches(rawPassword, candidate.passwordHash()))
                 .filter(Account::isActive)
                 .orElseThrow(InvalidCredentialsException::new);
-        return issueSession(account.id(), null);
+        String rawToken = refreshTokenSupplier.get();
+        repository.saveSession(buildSession(account.id(), rawToken, null));
+        return new SessionToken(account.id(), rawToken);
     }
 
     public SessionToken refresh(String rawRefreshToken) {
@@ -76,11 +76,13 @@ public final class IdentityService {
             repository.revokeAllSessions(current.userId(), clock.instant());
             throw new RefreshTokenRejectedException();
         }
-        if (!repository.revokeSession(current.id(), clock.instant())) {
+        String rawToken = refreshTokenSupplier.get();
+        RefreshSession replacement = buildSession(current.userId(), rawToken, current.id());
+        if (!repository.rotateSession(current.id(), replacement, clock.instant())) {
             // Lost a concurrent rotation of the same token: exactly one caller may consume it, so reject this one.
             throw new RefreshTokenRejectedException();
         }
-        return issueSession(current.userId(), current.id());
+        return new SessionToken(current.userId(), rawToken);
     }
 
     public void revoke(String rawRefreshToken) {
@@ -89,9 +91,8 @@ public final class IdentityService {
                 .ifPresent(session -> repository.revokeSession(session.id(), clock.instant()));
     }
 
-    private SessionToken issueSession(UUID userId, UUID rotatedFromId) {
-        String rawToken = refreshTokenSupplier.get();
-        RefreshSession session = new RefreshSession(
+    private RefreshSession buildSession(UUID userId, String rawToken, UUID rotatedFromId) {
+        return new RefreshSession(
                 uuidSupplier.get(),
                 userId,
                 hash(rawToken),
@@ -99,8 +100,6 @@ public final class IdentityService {
                 rotatedFromId,
                 null,
                 clock.instant());
-        repository.saveSession(session);
-        return new SessionToken(userId, rawToken);
     }
 
     private static void requireText(String value, String field) {

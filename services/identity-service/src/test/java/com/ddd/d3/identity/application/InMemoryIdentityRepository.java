@@ -26,12 +26,10 @@ final class InMemoryIdentityRepository implements IdentityRepository {
     }
 
     @Override
-    public boolean existsByEmailOrHandle(String email, String handle) {
-        return accountsByEmail.containsKey(email) || handles.containsKey(handle);
-    }
-
-    @Override
     public void saveAccount(Account account) {
+        if (accountsByEmail.containsKey(account.email()) || handles.containsKey(account.handle())) {
+            throw new DuplicateAccountException();
+        }
         accountsByEmail.put(account.email(), account);
         accountsById.put(account.id(), account);
         handles.put(account.handle(), account.email());
@@ -59,13 +57,22 @@ final class InMemoryIdentityRepository implements IdentityRepository {
     }
 
     @Override
-    public boolean revokeSession(UUID sessionId, Instant revokedAt) {
-        RefreshSession current = sessionsById.get(sessionId);
+    public boolean rotateSession(UUID currentSessionId, RefreshSession replacement, Instant revokedAt) {
+        RefreshSession current = sessionsById.get(currentSessionId);
         if (current == null || current.revokedAt() != null) {
             return false;
         }
-        sessionsById.put(sessionId, revoked(current, revokedAt));
+        sessionsById.put(currentSessionId, revoked(current, revokedAt));
+        saveSession(replacement);
         return true;
+    }
+
+    @Override
+    public void revokeSession(UUID sessionId, Instant revokedAt) {
+        RefreshSession current = sessionsById.get(sessionId);
+        if (current != null && current.revokedAt() == null) {
+            sessionsById.put(sessionId, revoked(current, revokedAt));
+        }
     }
 
     @Override

@@ -13,23 +13,16 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.support.TransactionTemplate;
 
 public final class JdbcIdentityRepository implements IdentityRepository {
 
     private final JdbcClient jdbcClient;
+    private final TransactionTemplate transactionTemplate;
 
-    public JdbcIdentityRepository(JdbcClient jdbcClient) {
+    public JdbcIdentityRepository(JdbcClient jdbcClient, TransactionTemplate transactionTemplate) {
         this.jdbcClient = Objects.requireNonNull(jdbcClient, "jdbcClient");
-    }
-
-    @Override
-    public boolean existsByEmailOrHandle(String email, String handle) {
-        return Boolean.TRUE.equals(jdbcClient
-                .sql("select exists(select 1 from user_account where email = :email or handle = :handle)")
-                .param("email", email)
-                .param("handle", handle)
-                .query(Boolean.class)
-                .single());
+        this.transactionTemplate = Objects.requireNonNull(transactionTemplate, "transactionTemplate");
     }
 
     @Override
@@ -82,6 +75,10 @@ public final class JdbcIdentityRepository implements IdentityRepository {
 
     @Override
     public void saveSession(RefreshSession session) {
+        insertSession(session);
+    }
+
+    private void insertSession(RefreshSession session) {
         jdbcClient.sql("""
                         insert into refresh_session (
                             id, user_id, token_hash, expires_at, rotated_from_id, revoked_at, created_at
@@ -111,14 +108,31 @@ public final class JdbcIdentityRepository implements IdentityRepository {
     }
 
     @Override
-    public boolean revokeSession(UUID sessionId, Instant revokedAt) {
+    public boolean rotateSession(UUID currentSessionId, RefreshSession replacement, Instant revokedAt) {
+        return Boolean.TRUE.equals(transactionTemplate.execute(status -> {
+            int revoked = revokeIfActive(currentSessionId, revokedAt);
+            if (revoked != 1) {
+                // Another concurrent rotation already consumed this token; store no replacement.
+                return false;
+            }
+            insertSession(replacement);
+            return true;
+        }));
+    }
+
+    @Override
+    public void revokeSession(UUID sessionId, Instant revokedAt) {
+        revokeIfActive(sessionId, revokedAt);
+    }
+
+    private int revokeIfActive(UUID sessionId, Instant revokedAt) {
         return jdbcClient.sql("""
                         update refresh_session set revoked_at = :revokedAt
                         where id = :id and revoked_at is null
                         """)
                 .param("revokedAt", Timestamp.from(revokedAt))
                 .param("id", sessionId)
-                .update() == 1;
+                .update();
     }
 
     @Override

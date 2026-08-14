@@ -8,8 +8,7 @@ import java.util.UUID;
 
 public interface IdentityRepository {
 
-    boolean existsByEmailOrHandle(String email, String handle);
-
+    /** @throws DuplicateAccountException if the email or handle is already taken (the single duplicate boundary). */
     void saveAccount(Account account);
 
     Optional<Account> findAccountByEmail(String email);
@@ -20,8 +19,15 @@ public interface IdentityRepository {
 
     Optional<RefreshSession> findSessionByTokenHash(String tokenHash);
 
-    /** @return true if this call revoked a still-active session; false if it was already revoked (lost the race). */
-    boolean revokeSession(UUID sessionId, Instant revokedAt);
+    /**
+     * Atomically revoke the current session and persist its replacement in one transaction.
+     *
+     * @return true if this call revoked a still-active session and stored the replacement; false if the
+     *     current session was already revoked (lost a concurrent rotation), in which case nothing is stored.
+     */
+    boolean rotateSession(UUID currentSessionId, RefreshSession replacement, Instant revokedAt);
+
+    void revokeSession(UUID sessionId, Instant revokedAt);
 
     void revokeAllSessions(UUID userId, Instant revokedAt);
 }
