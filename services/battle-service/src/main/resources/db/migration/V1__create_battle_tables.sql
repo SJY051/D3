@@ -33,12 +33,8 @@ create table match (
     constraint match_terminal_finish_time_consistent check ((status = 'FINISHED') = (finished_at is not null)),
     constraint match_clock_state_consistent check (
         (status in ('LOBBY', 'READY') and server_started_at is null and deadline_at is null)
-        or (status in ('RUNNING', 'JUDGING') and server_started_at is not null and deadline_at is not null)
-        or (
-            status = 'FINISHED'
-            and ((server_started_at is null and deadline_at is null)
-                or (server_started_at is not null and deadline_at is not null))
-        )
+        or (status in ('RUNNING', 'JUDGING', 'FINISHED')
+            and server_started_at is not null and deadline_at is not null)
     ),
     constraint match_start_after_creation check (
         server_started_at is null or server_started_at >= created_at
@@ -84,6 +80,9 @@ create table match_player (
     constraint match_player_language_not_blank check (btrim(language_key) <> ''),
     constraint match_player_connection_state_supported
         check (connection_state in ('CONNECTED', 'DISCONNECTED')),
+    constraint match_player_reconnect_deadline_consistent check (
+        (connection_state = 'DISCONNECTED') = (reconnect_deadline_at is not null)
+    ),
     constraint match_player_attempts_non_negative check (attempts >= 0)
 );
 
@@ -100,6 +99,8 @@ create table judge_job_reference (
     evidence_version text,
     accepted_at timestamptz not null,
     last_result_at timestamptz,
+    constraint judge_job_reference_player_fk
+        foreign key (match_id, player_user_id) references match_player(match_id, user_id),
     constraint judge_job_reference_mode_supported check (mode in ('RUN', 'SUBMIT')),
     constraint judge_job_reference_attempt_non_negative check (attempt_number >= 0),
     constraint judge_job_reference_status_supported check (

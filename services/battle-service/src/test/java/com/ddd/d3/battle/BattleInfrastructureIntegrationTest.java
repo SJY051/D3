@@ -82,8 +82,13 @@ class BattleInfrastructureIntegrationTest {
 
         assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
                         insert into match (
-                            id, problem_id, ranked, status, result, created_at
-                        ) values (:id, :problemId, true, 'FINISHED', 'DRAW', now())
+                            id, problem_id, ranked, status, result,
+                            server_started_at, deadline_at, created_at
+                        ) values (
+                            :id, :problemId, true, 'FINISHED', 'DRAW',
+                            now() - interval '1 minute', now() + interval '1 minute',
+                            now() - interval '2 minutes'
+                        )
                         """)
                 .param("id", UUID.randomUUID())
                 .param("problemId", problemId)
@@ -128,10 +133,12 @@ class BattleInfrastructureIntegrationTest {
 
         assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
                         insert into match (
-                            id, problem_id, ranked, status, result, server_started_at, finished_at, created_at
+                            id, problem_id, ranked, status, result,
+                            server_started_at, deadline_at, finished_at, created_at
                         ) values (
                             :id, :problemId, true, 'FINISHED', 'DRAW',
-                            now(), now() - interval '1 minute', now() - interval '2 minutes'
+                            now(), now() + interval '1 minute',
+                            now() - interval '1 minute', now() - interval '2 minutes'
                         )
                         """)
                 .param("id", UUID.randomUUID())
@@ -140,8 +147,13 @@ class BattleInfrastructureIntegrationTest {
 
         assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
                         insert into match (
-                            id, problem_id, ranked, status, result, void_reason, finished_at, created_at
-                        ) values (:id, :problemId, true, 'FINISHED', 'VOIDED', null, now(), now())
+                            id, problem_id, ranked, status, result, void_reason,
+                            server_started_at, deadline_at, finished_at, created_at
+                        ) values (
+                            :id, :problemId, true, 'FINISHED', 'VOIDED', null,
+                            now() - interval '2 minutes', now() + interval '1 minute',
+                            now(), now() - interval '3 minutes'
+                        )
                         """)
                 .param("id", UUID.randomUUID())
                 .param("problemId", problemId)
@@ -149,8 +161,13 @@ class BattleInfrastructureIntegrationTest {
 
         assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
                         insert into match (
-                            id, problem_id, ranked, status, result, void_reason, finished_at, created_at
-                        ) values (:id, :problemId, true, 'FINISHED', 'VOIDED', '   ', now(), now())
+                            id, problem_id, ranked, status, result, void_reason,
+                            server_started_at, deadline_at, finished_at, created_at
+                        ) values (
+                            :id, :problemId, true, 'FINISHED', 'VOIDED', '   ',
+                            now() - interval '2 minutes', now() + interval '1 minute',
+                            now(), now() - interval '3 minutes'
+                        )
                         """)
                 .param("id", UUID.randomUUID())
                 .param("problemId", problemId)
@@ -158,11 +175,89 @@ class BattleInfrastructureIntegrationTest {
 
         assertEquals(1, jdbc.sql("""
                         insert into match (
-                            id, problem_id, ranked, status, result, void_reason, finished_at, created_at
-                        ) values (:id, :problemId, true, 'FINISHED', 'VOIDED', 'judge incident', now(), now())
+                            id, problem_id, ranked, status, result, void_reason,
+                            server_started_at, deadline_at, finished_at, created_at
+                        ) values (
+                            :id, :problemId, true, 'FINISHED', 'VOIDED', 'judge incident',
+                            now() - interval '2 minutes', now() + interval '1 minute',
+                            now(), now() - interval '3 minutes'
+                        )
                         """)
                 .param("id", UUID.randomUUID())
                 .param("problemId", problemId)
+                .update());
+
+        UUID matchId = UUID.randomUUID();
+        assertEquals(1, jdbc.sql("""
+                        insert into match (
+                            id, problem_id, ranked, status, result,
+                            server_started_at, deadline_at, created_at
+                        ) values (
+                            :id, :problemId, true, 'RUNNING', null,
+                            now() - interval '1 minute', now() + interval '1 minute',
+                            now() - interval '2 minutes'
+                        )
+                        """)
+                .param("id", matchId)
+                .param("problemId", problemId)
+                .update());
+
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
+                        insert into match_player (
+                            match_id, user_id, seat, language_key, connection_state
+                        ) values (:matchId, :userId, 1, 'java', 'DISCONNECTED')
+                        """)
+                .param("matchId", matchId)
+                .param("userId", UUID.randomUUID())
+                .update());
+
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
+                        insert into match_player (
+                            match_id, user_id, seat, language_key, connection_state, reconnect_deadline_at
+                        ) values (:matchId, :userId, 1, 'java', 'CONNECTED', now())
+                        """)
+                .param("matchId", matchId)
+                .param("userId", UUID.randomUUID())
+                .update());
+
+        UUID playerId = UUID.randomUUID();
+        assertEquals(1, jdbc.sql("""
+                        insert into match_player (
+                            match_id, user_id, seat, language_key, connection_state
+                        ) values (:matchId, :userId, 1, 'java', 'CONNECTED')
+                        """)
+                .param("matchId", matchId)
+                .param("userId", playerId)
+                .update());
+
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
+                        insert into judge_job_reference (
+                            submission_id, match_id, player_user_id, mode, command_id,
+                            attempt_number, last_judge_status, accepted_at
+                        ) values (
+                            :submissionId, :matchId, :playerId, 'RUN', :commandId,
+                            0, 'QUEUED', now()
+                        )
+                        """)
+                .param("submissionId", UUID.randomUUID())
+                .param("matchId", matchId)
+                .param("playerId", UUID.randomUUID())
+                .param("commandId", UUID.randomUUID())
+                .update());
+
+        assertEquals(1, jdbc.sql("""
+                        insert into judge_job_reference (
+                            submission_id, match_id, player_user_id, mode, command_id,
+                            attempt_number, last_judge_status, accepted_at
+                        ) values (
+                            :submissionId, :matchId, :playerId, 'RUN', :commandId,
+                            0, 'QUEUED', now()
+                        )
+                        """)
+                .param("submissionId", UUID.randomUUID())
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .param("commandId", UUID.randomUUID())
                 .update());
 
         RedisClient redis = RedisClient.create(
