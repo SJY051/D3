@@ -309,20 +309,34 @@ class JdbcJudgeSubmissionRepositoryTest {
                 .query(Long.class)
                 .single());
         assertEquals(1, jdbc.sql("""
-                        select count(*)
+                        select attempt_number
                         from submission
-                        where id = :id and attempt_number is null
+                        where id = :id
                         """)
                 .param("id", legacyNullAttemptSubmissionId)
                 .query(Integer.class)
                 .single());
-        assertEquals(false, jdbc.sql("""
+        assertEquals(1, jdbc.sql("""
+                        select normalized_attempt_number
+                        from submission_legacy_attempt_normalization
+                        where submission_id = :id and legacy_attempt_number is null
+                        """)
+                .param("id", legacyNullAttemptSubmissionId)
+                .query(Integer.class)
+                .single());
+        assertEquals(true, jdbc.sql("""
                         select convalidated
                         from pg_constraint
                         where conname = 'submission_attempt_mode'
                         """)
                 .query(Boolean.class)
                 .single());
+        assertEquals(
+                1,
+                repository.findById(legacyNullAttemptSubmissionId)
+                        .orElseThrow()
+                        .command()
+                        .attemptNumber());
     }
 
     private int insertRawSubmission(String mode, Integer attemptNumber) {

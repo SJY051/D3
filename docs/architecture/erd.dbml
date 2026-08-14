@@ -360,6 +360,13 @@ Table judge_db.submission {
   }
 }
 
+Table judge_db.submission_legacy_attempt_normalization {
+  submission_id uuid [pk]
+  legacy_attempt_number int [note: 'Null value preserved from the V1-valid legacy row']
+  normalized_attempt_number int [not null, note: 'Deterministic positive attempt used by the active evaluation queue']
+  normalized_at timestamptz [not null]
+}
+
 Table judge_db.judge_run {
   id uuid [pk]
   submission_id uuid [not null]
@@ -414,6 +421,7 @@ Table judge_db.outbox_event {
 }
 
 Ref: judge_db.judge_run.submission_id > judge_db.submission.id
+Ref: judge_db.submission_legacy_attempt_normalization.submission_id > judge_db.submission.id
 Ref: judge_db.evaluation_evidence.judge_run_id > judge_db.judge_run.id
 Ref: judge_db.evaluation_evidence_legacy_duplicate.judge_run_id > judge_db.judge_run.id
 Ref: judge_db.evaluation_evidence_legacy_duplicate.canonical_evidence_id > judge_db.evaluation_evidence.id
