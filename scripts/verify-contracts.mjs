@@ -15,6 +15,10 @@ function collectJson(directory) {
   });
 }
 
+function isHttpContract(label) {
+  return label.replaceAll("\\", "/").includes("/http/");
+}
+
 const files = collectJson(contractsRoot);
 if (files.length !== 10) {
   throw new Error(`Expected 10 contract documents, found ${files.length}`);
@@ -31,7 +35,7 @@ for (const file of files) {
     throw new Error(`${label} is not valid JSON: ${error.message}`);
   }
 
-  if (label.includes("/http/")) {
+  if (isHttpContract(label)) {
     if (contract.openapi !== "3.1.0") throw new Error(`${label} must use OpenAPI 3.1.0`);
     if (!contract.info?.version) throw new Error(`${label} must declare info.version`);
     if (!contract.paths || typeof contract.paths !== "object") throw new Error(`${label} must declare paths`);
@@ -64,7 +68,7 @@ const ajv = new Ajv2020({ allErrors: true, strict: true });
 addFormats(ajv);
 ajv.addKeyword("x-requirements");
 
-for (const { contract, label } of parsedContracts.filter(({ label }) => !label.includes("/http/"))) {
+for (const { contract, label } of parsedContracts.filter(({ label }) => !isHttpContract(label))) {
   try {
     ajv.addSchema(contract);
   } catch (error) {
@@ -72,7 +76,7 @@ for (const { contract, label } of parsedContracts.filter(({ label }) => !label.i
   }
 }
 
-for (const { contract, label } of parsedContracts.filter(({ label }) => !label.includes("/http/"))) {
+for (const { contract, label } of parsedContracts.filter(({ label }) => !isHttpContract(label))) {
   try {
     if (!ajv.getSchema(contract.$id)) throw new Error("compiled validator was not created");
   } catch (error) {
@@ -104,7 +108,7 @@ if (matchFinished({ ...matchEvent, data: { ...matchEvent.data, sourceCode: "priv
   throw new Error("match.finished accepted private source outside its public contract");
 }
 
-const judgeContract = parsedContracts.find(({ label }) => label === "contracts/http/judge.openapi.json")?.contract;
+const judgeContract = parsedContracts.find(({ label }) => label.replaceAll("\\", "/") === "contracts/http/judge.openapi.json")?.contract;
 const acceptJudgeSubmission = judgeContract?.paths?.["/internal/v1/judge/submissions"]?.post;
 const readJudgeEvidence = judgeContract?.paths?.["/internal/v1/judge/submissions/{submissionId}/evidence"]?.get;
 if (!acceptJudgeSubmission || !readJudgeEvidence) {
