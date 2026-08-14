@@ -192,14 +192,16 @@ public final class Judge0ExecutionAdapter implements JudgeExecutionAdapter {
     }
 
     private JudgeStatus normalize(Judge0Result result) {
+        if (result.statusDescription().startsWith("Runtime Error (")) {
+            return result.memoryKib() >= MEMORY_LIMIT_KIB
+                    ? JudgeStatus.MEMORY_LIMIT
+                    : JudgeStatus.RUNTIME_ERROR;
+        }
         return switch (result.statusDescription()) {
             case "Accepted" -> JudgeStatus.ACCEPTED;
             case "Wrong Answer" -> JudgeStatus.WRONG_ANSWER;
             case "Compilation Error" -> JudgeStatus.COMPILATION_ERROR;
             case "Time Limit Exceeded" -> JudgeStatus.TIME_LIMIT;
-            case "Runtime Error (NZEC)", "Runtime Error (SIGSEGV)", "Runtime Error (SIGXFSZ)",
-                    "Runtime Error (SIGFPE)", "Runtime Error (SIGABRT)" ->
-                result.memoryKib() >= MEMORY_LIMIT_KIB ? JudgeStatus.MEMORY_LIMIT : JudgeStatus.RUNTIME_ERROR;
             default -> JudgeStatus.PLATFORM_FAILURE;
         };
     }

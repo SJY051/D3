@@ -21,6 +21,9 @@ spring:
           jwk-set-uri: ${D3_JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
   kafka:
     bootstrap-servers: ${D3_KAFKA_HOST:localhost}:${D3_KAFKA_PORT:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 d3:
   security:

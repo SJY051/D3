@@ -95,6 +95,8 @@ class Judge0ExecutionAdapterTest {
         assertEquals(JudgeStatus.COMPILATION_ERROR, adapter.execute(command("bad")).status());
         client.next = new Judge0Result("Runtime Error (NZEC)", 1, 262_144, "Python 3.8.1");
         assertEquals(JudgeStatus.MEMORY_LIMIT, adapter.execute(command("memory")).status());
+        client.next = new Judge0Result("Runtime Error (Other)", 1, 1024, "Python 3.8.1");
+        assertEquals(JudgeStatus.RUNTIME_ERROR, adapter.execute(command("runtime")).status());
         client.failure = new IllegalStateException("private provider diagnostic");
         var platformFailure = adapter.execute(command("private source"));
         assertEquals(JudgeStatus.PLATFORM_FAILURE, platformFailure.status());

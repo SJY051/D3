@@ -177,6 +177,45 @@ class JudgeSubmissionControllerTest {
                 .andExpect(jsonPath("$.diagnostics").doesNotExist());
     }
 
+    @Test
+    void d3Jdg001NormalizesBindingAndDeserializationFailuresToTheV1ErrorContract() throws Exception {
+        mockMvc.perform(post("/internal/v1/judge/submissions")
+                        .with(serviceJwt("SCOPE_judge.submit"))
+                        .header("Idempotency-Key", "not-a-uuid")
+                        .header("X-Correlation-Id", "corr-invalid-header")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson("print(1)")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.correlationId").value("corr-invalid-header"));
+
+        mockMvc.perform(post("/internal/v1/judge/submissions")
+                        .with(serviceJwt("SCOPE_judge.submit"))
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson("print(1)")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.correlationId").value("unavailable"));
+
+        mockMvc.perform(post("/internal/v1/judge/submissions")
+                        .with(serviceJwt("SCOPE_judge.submit"))
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Correlation-Id", "corr-broken-json")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{broken"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.correlationId").value("corr-broken-json"));
+
+        mockMvc.perform(get("/internal/v1/judge/submissions/not-a-uuid/evidence")
+                        .with(serviceJwt("SCOPE_judge.read"))
+                        .header("X-Correlation-Id", "corr-invalid-path"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.correlationId").value("corr-invalid-path"));
+    }
+
     private static org.springframework.test.web.servlet.request.RequestPostProcessor serviceJwt(String authority) {
         return jwt().jwt(token -> token.claim("client_id", "battle-service"))
                 .authorities(new SimpleGrantedAuthority(authority));

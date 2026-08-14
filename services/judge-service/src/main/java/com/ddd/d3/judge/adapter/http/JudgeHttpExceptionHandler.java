@@ -8,9 +8,12 @@ import com.ddd.d3.judge.domain.PrivatePayloadTooLargeException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public final class JudgeHttpExceptionHandler {
@@ -45,7 +48,13 @@ public final class JudgeHttpExceptionHandler {
         return error(HttpStatus.SERVICE_UNAVAILABLE, "RUNTIME_UNAVAILABLE", exception.getMessage(), request);
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, MethodArgumentNotValidException.class})
+    @ExceptionHandler({
+        IllegalArgumentException.class,
+        MethodArgumentNotValidException.class,
+        MissingRequestHeaderException.class,
+        MethodArgumentTypeMismatchException.class,
+        HttpMessageNotReadableException.class
+    })
     ResponseEntity<JudgeErrorResponse> badRequest(Exception exception, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "judge request is invalid", request);
     }
