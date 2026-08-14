@@ -83,13 +83,64 @@ class BattleMatchCommandServiceTest {
         assertEquals(0, receipts.receipts.size());
     }
 
+    @Test
+    void d3Btl002PublishesOnlyAfterTheAuthoritativeTransactionReturns() {
+        FakeMatches matches = new FakeMatches(initialSnapshot());
+        FakeReceipts receipts = new FakeReceipts();
+        List<String> order = new ArrayList<>();
+        TransactionOperations transactions = new TransactionOperations() {
+            @Override
+            public <T> T execute(TransactionCallback<T> action) {
+                order.add("transaction-start");
+                T result = action.doInTransaction(null);
+                order.add("transaction-return");
+                return result;
+            }
+        };
+        BattleMatchCommandService service = new BattleMatchCommandService(
+                matches,
+                receipts,
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                Duration.ofMinutes(10),
+                transactions,
+                matchId -> order.add("publish-" + matchId));
+
+        service.handle(MATCH_ID, COMMAND_ONE, PLAYER_ONE, new BattleMatch.Ready(PLAYER_ONE.toString()));
+
+        assertEquals(
+                List.of("transaction-start", "transaction-return", "publish-" + MATCH_ID),
+                order);
+    }
+
+    @Test
+    void d3Btl002DoesNotReportACommittedCommandAsFailedWhenFanoutIsUnavailable() {
+        FakeMatches matches = new FakeMatches(initialSnapshot());
+        FakeReceipts receipts = new FakeReceipts();
+        BattleMatchCommandService service = new BattleMatchCommandService(
+                matches,
+                receipts,
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                Duration.ofMinutes(10),
+                DirectTransactions.INSTANCE,
+                matchId -> {
+                    throw new IllegalStateException("transport unavailable");
+                });
+
+        BattleMatch.Snapshot committed = service.handle(
+                MATCH_ID, COMMAND_ONE, PLAYER_ONE, new BattleMatch.Ready(PLAYER_ONE.toString()));
+
+        assertEquals(1, committed.aggregateVersion());
+        assertEquals(1, receipts.receipts.size());
+    }
+
     private static BattleMatchCommandService service(FakeMatches matches, FakeReceipts receipts) {
         return new BattleMatchCommandService(
                 matches,
                 receipts,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ofMinutes(10),
-                DirectTransactions.INSTANCE);
+                DirectTransactions.INSTANCE,
+                matchId -> {});
     }
 
     private static BattleMatch.Snapshot initialSnapshot() {

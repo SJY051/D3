@@ -1,10 +1,11 @@
 package com.ddd.d3.battle;
 
-import com.ddd.d3.battle.application.PublicRatingReader;
 import com.ddd.d3.battle.application.BattleCommandReceiptStore;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.BattleMatchRepository;
 import com.ddd.d3.battle.application.BattleMatchViewService;
+import com.ddd.d3.battle.application.BattleSnapshotPublisher;
+import com.ddd.d3.battle.application.PublicRatingReader;
 import com.ddd.d3.battle.application.RankedMatchStore;
 import com.ddd.d3.battle.application.RankedMatchmakingCoordinator;
 import com.ddd.d3.battle.application.RankedQueueStore;
@@ -54,9 +55,15 @@ class BattleServiceConfiguration {
             BattleCommandReceiptStore receipts,
             Clock clock,
             @Value("${d3.battle.match-duration:10m}") Duration matchDuration,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            BattleSnapshotPublisher snapshots) {
         return new BattleMatchCommandService(
-                matches, receipts, clock, matchDuration, new TransactionTemplate(transactionManager));
+                matches,
+                receipts,
+                clock,
+                matchDuration,
+                new TransactionTemplate(transactionManager),
+                snapshots);
     }
 
     @Bean

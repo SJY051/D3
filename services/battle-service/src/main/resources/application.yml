@@ -49,6 +49,7 @@ management:
         include: health,info,prometheus
 
 d3:
+  web-origin: ${D3_WEB_ORIGIN:http://localhost:5173}
   security:
     jwk-set-uri: ${D3_JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
     issuer: ${D3_JWT_ISSUER:http://localhost:8081}

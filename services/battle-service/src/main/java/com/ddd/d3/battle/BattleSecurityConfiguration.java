@@ -55,6 +55,8 @@ public class BattleSecurityConfiguration {
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/battle/ranked/queue")
                         .hasAuthority("SCOPE_battle.play")
+                        .requestMatchers(HttpMethod.GET, "/ws/v1/battle/matches/*")
+                        .hasAuthority("SCOPE_battle.play")
                         .anyRequest()
                         .denyAll())
                 .oauth2ResourceServer(oauth2 -> oauth2

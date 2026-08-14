@@ -342,7 +342,8 @@ class BattleInfrastructureIntegrationTest {
                 new JdbcBattleCommandReceiptStore(dataSource),
                 Clock.fixed(Instant.parse("2026-08-14T00:00:01Z"), ZoneOffset.UTC),
                 Duration.ofMinutes(10),
-                new TransactionTemplate(transactionManager));
+                new TransactionTemplate(transactionManager),
+                matchId -> {});
         UUID firstCommand = UUID.randomUUID();
         UUID secondCommand = UUID.randomUUID();
 
