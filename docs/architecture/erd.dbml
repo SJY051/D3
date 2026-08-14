@@ -289,6 +289,7 @@ Table judge_db.submission {
   status judge_run_status [not null]
   evaluation_claim_id uuid [note: 'Opaque fencing token; present only while one worker owns a RUNNING evaluation']
   claim_started_at timestamptz [note: 'Supports bounded recovery of an abandoned RUNNING claim']
+  evaluation_started_at timestamptz [note: 'Durable no-replay fence set before any Judge0 provider request']
   accepted_at timestamptz [not null]
   created_at timestamptz [not null]
 

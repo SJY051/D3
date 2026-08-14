@@ -26,7 +26,7 @@ public final class JdbcJudgeSubmissionRepository implements JudgeSubmissionRepos
     private static final String SUBMISSION_COLUMNS = """
             id, idempotency_key, user_id, match_id, problem_id, problem_version, mode,
             language_key, source_code, attempt_number, correlation_id, request_fingerprint,
-            status, accepted_at, evaluation_claim_id
+            status, accepted_at, evaluation_claim_id, evaluation_started_at
             """;
 
     private final JdbcClient jdbcClient;
@@ -122,6 +122,23 @@ public final class JdbcJudgeSubmissionRepository implements JudgeSubmissionRepos
     }
 
     @Override
+    public JudgeSubmission markEvaluationStarted(UUID submissionId, UUID evaluationClaimId) {
+        return Objects.requireNonNull(transactionTemplate.execute(status -> jdbcClient.sql("""
+                        update submission
+                        set evaluation_started_at = now()
+                        where id = :submissionId and status = 'RUNNING'
+                          and evaluation_claim_id = :evaluationClaimId
+                          and evaluation_started_at is null
+                        returning %s
+                        """.formatted(SUBMISSION_COLUMNS))
+                .param("submissionId", submissionId)
+                .param("evaluationClaimId", Objects.requireNonNull(evaluationClaimId, "evaluationClaimId"))
+                .query(this::mapSubmission)
+                .optional()
+                .orElseThrow(() -> new IllegalStateException("submission provider execution cannot be started"))));
+    }
+
+    @Override
     public JudgeSubmission completeEvaluation(JudgeSubmission submission) {
         Objects.requireNonNull(submission, "submission");
         SafeEvaluationEvidence evidence = Objects.requireNonNull(submission.evidence(), "submission.evidence");
@@ -132,6 +149,7 @@ public final class JdbcJudgeSubmissionRepository implements JudgeSubmissionRepos
                                 evaluation_claim_id = null
                             where id = :submissionId and status = 'RUNNING'
                               and evaluation_claim_id = :evaluationClaimId
+                              and evaluation_started_at is not null
                             """)
                     .param("completedStatus", evidence.status().name())
                     .param("submissionId", submission.id())
@@ -210,6 +228,7 @@ public final class JdbcJudgeSubmissionRepository implements JudgeSubmissionRepos
                         set status = 'QUEUED', claim_started_at = null, evaluation_claim_id = null
                         where id = :submissionId and status = 'RUNNING'
                           and evaluation_claim_id = :evaluationClaimId
+                          and evaluation_started_at is null
                         """)
                 .param("submissionId", submissionId)
                 .param("evaluationClaimId", Objects.requireNonNull(evaluationClaimId, "evaluationClaimId"))
@@ -245,7 +264,10 @@ public final class JdbcJudgeSubmissionRepository implements JudgeSubmissionRepos
                 JudgeStatus.valueOf(resultSet.getString("status")),
                 resultSet.getTimestamp("accepted_at").toInstant(),
                 null,
-                resultSet.getObject("evaluation_claim_id", UUID.class));
+                resultSet.getObject("evaluation_claim_id", UUID.class),
+                resultSet.getTimestamp("evaluation_started_at") == null
+                        ? null
+                        : resultSet.getTimestamp("evaluation_started_at").toInstant());
     }
 
     private JudgeSubmission attachEvidence(JudgeSubmission submission) {
@@ -301,7 +323,8 @@ public final class JdbcJudgeSubmissionRepository implements JudgeSubmissionRepos
                 submission.status(),
                 submission.acceptedAt(),
                 evidence,
-                null);
+                null,
+                submission.evaluationStartedAt());
     }
 
     private String eventPayload(UUID eventId, JudgeSubmission submission, SafeEvaluationEvidence evidence) {

@@ -21,9 +21,12 @@ public interface JudgeSubmissionRepository {
     /** Atomically transitions QUEUED to RUNNING and returns the claim only to its winner. */
     Optional<JudgeSubmission> claimForEvaluation(UUID submissionId);
 
+    /** Durably records that provider execution may have started before making the provider call. */
+    JudgeSubmission markEvaluationStarted(UUID submissionId, UUID evaluationClaimId);
+
     /** Completes a submission only while its evaluation claim is held. */
     JudgeSubmission completeEvaluation(JudgeSubmission submission);
 
-    /** Returns a failed worker claim to QUEUED so a transport retry can resume it. */
+    /** Returns a failed pre-execution claim to QUEUED; started provider work must never be replayed. */
     void releaseEvaluationClaim(UUID submissionId, UUID evaluationClaimId);
 }

@@ -1,7 +1,8 @@
 import { createConnection } from "node:net";
-import { resolveJudgeAdapter } from "./demo-preflight-targets.mjs";
+import { resolveJudge0Request, resolveJudgeAdapter } from "./demo-preflight-targets.mjs";
 
 const judgeAdapter = resolveJudgeAdapter();
+const judge0Request = judgeAdapter.judge0Required ? resolveJudge0Request() : null;
 
 const httpTargets = [
   ["web", process.env.D3_WEB_URL ?? "http://localhost:5173", true],
@@ -12,8 +13,8 @@ const httpTargets = [
   ["battle", process.env.D3_BATTLE_HEALTH_URL ?? "http://localhost:8082/actuator/health", true],
   ["judge-service", process.env.D3_JUDGE_SERVICE_HEALTH_URL ?? "http://localhost:8083/actuator/health", true],
   ["community", process.env.D3_COMMUNITY_HEALTH_URL ?? "http://localhost:8084/actuator/health", true],
-  ...(judgeAdapter.judge0Required
-    ? [["judge0", process.env.JUDGE0_HEALTH_URL ?? "http://localhost:2358/about", true]]
+  ...(judgeAdapter.judge0Required && judge0Request.configured
+    ? [["judge0", judge0Request.url, true, judge0Request.requestInit]]
     : []),
 ];
 
@@ -47,9 +48,9 @@ function checkTcp(name, host, port, required) {
 }
 
 const httpResults = await Promise.all(
-  httpTargets.map(async ([name, url, required]) => {
+  httpTargets.map(async ([name, url, required, requestInit = {}]) => {
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(1500) });
+      const response = await fetch(url, { ...requestInit, signal: AbortSignal.timeout(1500) });
       return { name, target: url, required, kind: "http", ok: response.ok, status: response.status };
     } catch (error) {
       return { name, target: url, required, kind: "http", ok: false, error: error.cause?.code ?? error.name };
@@ -67,6 +68,16 @@ const results = [
     ok: judgeAdapter.supported,
     ...(judgeAdapter.supported ? {} : { error: "UNSUPPORTED_ADAPTER" }),
   },
+  ...(judgeAdapter.judge0Required && !judge0Request.configured
+    ? [{
+        name: "judge0-auth",
+        target: judge0Request.target,
+        required: true,
+        kind: "configuration",
+        ok: false,
+        error: judge0Request.error,
+      }]
+    : []),
   ...httpResults,
   ...tcpResults,
 ];

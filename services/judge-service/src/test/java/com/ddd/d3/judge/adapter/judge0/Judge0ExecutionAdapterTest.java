@@ -97,8 +97,10 @@ class Judge0ExecutionAdapterTest {
         assertEquals(JudgeStatus.MEMORY_LIMIT, adapter.execute(command("memory")).status());
         client.next = new Judge0Result("Runtime Error (Other)", 1, 1024, "Python 3.8.1");
         assertEquals(JudgeStatus.RUNTIME_ERROR, adapter.execute(command("runtime")).status());
-        client.failure = new IllegalStateException("private provider diagnostic");
-        assertThrows(IllegalStateException.class, () -> adapter.execute(command("private source")));
+        client.failure = new Judge0ClientException("private provider diagnostic");
+        var platformFailure = adapter.execute(command("private source"));
+        assertEquals(JudgeStatus.PLATFORM_FAILURE, platformFailure.status());
+        assertTrue(platformFailure.runtimeMeasurements().isEmpty());
     }
 
     @Test
@@ -116,6 +118,23 @@ class Judge0ExecutionAdapterTest {
         assertEquals(0, result.passedCount());
         assertEquals(2, result.totalCount());
         assertEquals(2, client.requests.size());
+    }
+
+    @Test
+    void d3Jdg001DoesNotReplayCompletedCasesAfterAProviderFailure() {
+        RecordingClient client = new RecordingClient(Set.of(71));
+        client.failOnRequest = 2;
+        JudgeProblem problem = new JudgeProblem(
+                List.of(oneCase("public", "ok\n")),
+                List.of(oneCase("hidden-1", "ok\n"), oneCase("hidden-2", "ok\n")),
+                List.of());
+
+        var result = adapter(client, problem).execute(command("print('ok')"));
+
+        assertEquals(JudgeStatus.PLATFORM_FAILURE, result.status());
+        assertEquals(2, client.requests.size());
+        assertEquals(0, result.passedCount());
+        assertTrue(result.runtimeMeasurements().isEmpty());
     }
 
     private static Judge0ExecutionAdapter adapter(RecordingClient client, JudgeProblem problem) {
@@ -168,6 +187,7 @@ class Judge0ExecutionAdapterTest {
         private final List<Judge0Request> requests = new ArrayList<>();
         private Judge0Result next = new Judge0Result("Accepted", 1_000, 1024, "Python 3.8.1");
         private RuntimeException failure;
+        private int failOnRequest = -1;
 
         private RecordingClient(Set<Integer> languageIds) {
             this.languageIds = languageIds;
@@ -181,7 +201,10 @@ class Judge0ExecutionAdapterTest {
         @Override
         public Judge0Result execute(Judge0Request request) {
             requests.add(request);
-            if (failure != null) {
+            if (failure != null || requests.size() == failOnRequest) {
+                if (failure == null) {
+                    throw new Judge0TransportException("temporary polling failure");
+                }
                 throw failure;
             }
             return next;

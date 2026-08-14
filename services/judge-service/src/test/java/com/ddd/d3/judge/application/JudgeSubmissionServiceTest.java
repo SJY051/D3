@@ -5,6 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.ddd.d3.judge.domain.JudgeExecutionResult;
 import com.ddd.d3.judge.domain.JudgeLanguage;
@@ -199,31 +204,62 @@ class JudgeSubmissionServiceTest {
     }
 
     @Test
-    void d3Jdg001CommitsPlatformFailureOnlyThroughTheExplicitExhaustionPath() {
-        InMemoryRepository repository = new InMemoryRepository();
+    void d3Jdg001RetriesOnlyTheSameEvidenceWhenDatabaseCompletionIsTransient() {
+        JudgeSubmissionRepository repository = mock(JudgeSubmissionRepository.class);
+        JudgeExecutionAdapter adapter = mock(JudgeExecutionAdapter.class);
+        JudgeSubmission queued = new JudgeSubmission(
+                SUBMISSION_ID,
+                submitCommand("private-source"),
+                "fingerprint",
+                JudgeStatus.QUEUED,
+                ACCEPTED_AT);
+        JudgeSubmission claimed = queued.startEvaluation(UUID.fromString("66666666-6666-4666-8666-666666666666"));
+        JudgeSubmission started = claimed.markEvaluationStarted(ACCEPTED_AT);
+        JudgeExecutionResult result = new JudgeExecutionResult(
+                JudgeStatus.ACCEPTED, 1, 1, List.of(), "fake-v1", "fake-python3-v1", ACCEPTED_AT);
+        SafeEvaluationEvidence evidence = SafeEvaluationEvidence.from(started, result);
+        when(repository.findById(SUBMISSION_ID)).thenReturn(Optional.of(queued));
+        when(repository.claimForEvaluation(SUBMISSION_ID)).thenReturn(Optional.of(claimed));
+        when(repository.markEvaluationStarted(SUBMISSION_ID, claimed.evaluationClaimId())).thenReturn(started);
+        when(adapter.execute(started.command())).thenReturn(result);
+        when(repository.completeEvaluation(started.complete(evidence)))
+                .thenThrow(new IllegalStateException("temporary database failure"))
+                .thenThrow(new IllegalStateException("temporary database failure"))
+                .thenReturn(started.complete(evidence));
         JudgeSubmissionService service = new JudgeSubmissionService(
-                repository,
-                new JudgeExecutionAdapter() {
-                    @Override
-                    public boolean isAvailable(JudgeLanguage language) {
-                        return true;
-                    }
+                repository, adapter, Clock.fixed(ACCEPTED_AT, ZoneOffset.UTC), () -> SUBMISSION_ID);
 
-                    @Override
-                    public JudgeExecutionResult execute(SubmissionCommand command) {
-                        throw new IllegalStateException("temporary transport failure");
-                    }
-                },
-                Clock.fixed(ACCEPTED_AT, ZoneOffset.UTC),
-                () -> SUBMISSION_ID);
-        service.accept(submitCommand("private-source"));
+        assertEquals(evidence, service.evaluate(SUBMISSION_ID));
+        verify(adapter).execute(started.command());
+        verify(repository, times(3)).completeEvaluation(started.complete(evidence));
+        verify(repository, never()).releaseEvaluationClaim(SUBMISSION_ID, claimed.evaluationClaimId());
+    }
 
-        assertThrows(IllegalStateException.class, () -> service.evaluate(SUBMISSION_ID));
-        assertEquals(JudgeStatus.QUEUED, repository.findById(SUBMISSION_ID).orElseThrow().status());
+    @Test
+    void d3Jdg001ConvertsARecoveredStartedClaimWithoutReplayingTheProvider() {
+        JudgeSubmissionRepository repository = mock(JudgeSubmissionRepository.class);
+        JudgeExecutionAdapter adapter = mock(JudgeExecutionAdapter.class);
+        JudgeSubmission queued = new JudgeSubmission(
+                SUBMISSION_ID,
+                submitCommand("private-source"),
+                "fingerprint",
+                JudgeStatus.QUEUED,
+                ACCEPTED_AT);
+        UUID recoveredClaimId = UUID.fromString("77777777-7777-4777-8777-777777777777");
+        JudgeSubmission recovered = new JudgeSubmission(
+                queued.id(), queued.command(), queued.requestFingerprint(), JudgeStatus.RUNNING,
+                queued.acceptedAt(), null, recoveredClaimId, ACCEPTED_AT.minusSeconds(600));
+        when(repository.findById(SUBMISSION_ID)).thenReturn(Optional.of(recovered));
+        when(repository.claimForEvaluation(SUBMISSION_ID)).thenReturn(Optional.of(recovered));
+        when(repository.completeEvaluation(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> invocation.getArgument(0));
+        JudgeSubmissionService service = new JudgeSubmissionService(
+                repository, adapter, Clock.fixed(ACCEPTED_AT, ZoneOffset.UTC), () -> SUBMISSION_ID);
 
-        SafeEvaluationEvidence evidence = service.completePlatformFailure(SUBMISSION_ID);
+        SafeEvaluationEvidence evidence = service.evaluate(SUBMISSION_ID);
+
         assertEquals(JudgeStatus.PLATFORM_FAILURE, evidence.status());
-        assertEquals(evidence, repository.findById(SUBMISSION_ID).orElseThrow().evidence());
+        assertTrue(evidence.runtimeMeasurements().isEmpty());
+        verify(adapter, never()).execute(org.mockito.ArgumentMatchers.any());
     }
 
     private static JudgeSubmissionService service(boolean available) {
@@ -294,6 +330,25 @@ class JudgeSubmissionServiceTest {
         }
 
         @Override
+        public JudgeSubmission markEvaluationStarted(UUID submissionId, UUID evaluationClaimId) {
+            var started = new AtomicReference<JudgeSubmission>();
+            submissions.computeIfPresent(submissionId, (ignored, current) -> {
+                if (current.status() == JudgeStatus.RUNNING
+                        && Objects.equals(current.evaluationClaimId(), evaluationClaimId)
+                        && current.evaluationStartedAt() == null) {
+                    JudgeSubmission marked = current.markEvaluationStarted(ACCEPTED_AT);
+                    started.set(marked);
+                    return marked;
+                }
+                return current;
+            });
+            if (started.get() == null) {
+                throw new IllegalStateException("submission provider execution cannot be started");
+            }
+            return started.get();
+        }
+
+        @Override
         public JudgeSubmission completeEvaluation(JudgeSubmission submission) {
             submissions.compute(submission.id(), (ignored, current) -> {
                 if (current == null
@@ -312,6 +367,7 @@ class JudgeSubmissionServiceTest {
             submissions.computeIfPresent(submissionId, (ignored, current) ->
                     current.status() == JudgeStatus.RUNNING
                                     && Objects.equals(current.evaluationClaimId(), evaluationClaimId)
+                                    && current.evaluationStartedAt() == null
                             ? current.requeueEvaluation()
                             : current);
         }

@@ -27,6 +27,7 @@ import tools.jackson.databind.ObjectMapper;
 public final class HttpJudge0Client implements Judge0Client {
 
     private static final int MAX_PROVIDER_RESPONSE_BYTES = 1_048_576;
+    private static final int MAX_POLL_TRANSPORT_FAILURES = 3;
     private static final ExecutorService BODY_READER =
             Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("judge0-body-reader-", 0).factory());
 
@@ -75,15 +76,31 @@ public final class HttpJudge0Client implements Judge0Client {
             throw new Judge0ClientException("Judge0 returned an invalid submission token");
         }
 
+        return poll(token, request.languageId());
+    }
+
+    private Judge0Result poll(String token, int languageId) {
         long deadline = System.nanoTime() + settings.pollTimeout().toNanos();
+        int consecutiveTransportFailures = 0;
         while (System.nanoTime() < deadline) {
-            JsonNode response = send(
-                    request(
-                            "GET",
-                            "/submissions/" + token
-                                    + "?base64_encoded=false&fields=status%2Ctime%2Cmemory",
-                            null),
-                    200);
+            JsonNode response;
+            try {
+                response = send(
+                        request(
+                                "GET",
+                                "/submissions/" + token
+                                        + "?base64_encoded=false&fields=status%2Ctime%2Cmemory",
+                                null,
+                                remainingRequestTimeout(deadline)),
+                        200);
+                consecutiveTransportFailures = 0;
+            } catch (Judge0TransportException exception) {
+                consecutiveTransportFailures++;
+                if (consecutiveTransportFailures >= MAX_POLL_TRANSPORT_FAILURES || !sleepBeforeDeadline(deadline)) {
+                    throw exception;
+                }
+                continue;
+            }
             String status = response.path("status").path("description").asText();
             if (!("In Queue".equals(status) || "Processing".equals(status))) {
                 if (status.isBlank()) {
@@ -96,9 +113,11 @@ public final class HttpJudge0Client implements Judge0Client {
                         status,
                         cpuTimeMicros,
                         response.path("memory").asLong(0),
-                        "judge0-language-" + request.languageId());
+                        "judge0-language-" + languageId);
             }
-            sleep(settings.pollInterval());
+            if (!sleepBeforeDeadline(deadline)) {
+                break;
+            }
         }
         throw new Judge0ClientException("Judge0 submission polling exceeded its deadline");
     }
@@ -120,9 +139,13 @@ public final class HttpJudge0Client implements Judge0Client {
     }
 
     private HttpRequest request(String method, String pathAndQuery, String body) {
+        return request(method, pathAndQuery, body, settings.requestTimeout());
+    }
+
+    private HttpRequest request(String method, String pathAndQuery, String body, Duration timeout) {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + pathAndQuery))
-                .timeout(settings.requestTimeout())
+                .timeout(timeout)
                 .header(settings.authenticationHeader(), settings.authenticationToken());
         if (body == null) {
             return builder.method(method, HttpRequest.BodyPublishers.noBody()).build();
@@ -133,45 +156,56 @@ public final class HttpJudge0Client implements Judge0Client {
     }
 
     private JsonNode send(HttpRequest request, int expectedStatus) {
-        long deadline = System.nanoTime() + settings.requestTimeout().toNanos();
+        long deadline = System.nanoTime() + request.timeout().orElse(settings.requestTimeout()).toNanos();
+        HttpResponse<InputStream> response;
         try {
-            HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            byte[] bytes;
-            try (InputStream input = response.body()) {
-                long remainingNanos = deadline - System.nanoTime();
-                if (remainingNanos <= 0) {
-                    throw new Judge0ClientException("Judge0 response body exceeded its deadline");
-                }
-                Future<byte[]> bodyRead = BODY_READER.submit(() ->
-                        input.readNBytes(MAX_PROVIDER_RESPONSE_BYTES + 1));
-                try {
-                    bytes = bodyRead.get(remainingNanos, TimeUnit.NANOSECONDS);
-                } catch (TimeoutException exception) {
-                    bodyRead.cancel(true);
-                    throw new Judge0ClientException("Judge0 response body exceeded its deadline", exception);
-                } catch (ExecutionException exception) {
-                    Throwable cause = exception.getCause();
-                    if (cause instanceof IOException ioException) {
-                        throw ioException;
-                    }
-                    throw new Judge0ClientException("Judge0 response body could not be read", cause);
-                }
-            }
-            if (bytes.length > MAX_PROVIDER_RESPONSE_BYTES) {
-                throw new Judge0ClientException("Judge0 response exceeded its size limit");
-            }
-            if (response.statusCode() != expectedStatus) {
-                throw new Judge0ClientException("Judge0 returned HTTP " + response.statusCode());
-            }
-            return objectMapper.readTree(bytes);
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new Judge0ClientException("Judge0 request was interrupted", exception);
-        } catch (IOException | RuntimeException exception) {
-            if (exception instanceof Judge0ClientException clientException) {
-                throw clientException;
+        } catch (IOException exception) {
+            throw new Judge0TransportException("Judge0 request transport failed", exception);
+        }
+
+        byte[] bytes;
+        try (InputStream input = response.body()) {
+            long remainingNanos = deadline - System.nanoTime();
+            if (remainingNanos <= 0) {
+                throw new Judge0TransportException("Judge0 response body exceeded its deadline");
             }
-            throw new Judge0ClientException("Judge0 request failed", exception);
+            Future<byte[]> bodyRead = BODY_READER.submit(() -> input.readNBytes(MAX_PROVIDER_RESPONSE_BYTES + 1));
+            try {
+                bytes = bodyRead.get(remainingNanos, TimeUnit.NANOSECONDS);
+            } catch (InterruptedException exception) {
+                bodyRead.cancel(true);
+                Thread.currentThread().interrupt();
+                throw new Judge0ClientException("Judge0 response body read was interrupted", exception);
+            } catch (TimeoutException exception) {
+                bodyRead.cancel(true);
+                throw new Judge0TransportException("Judge0 response body exceeded its deadline", exception);
+            } catch (ExecutionException exception) {
+                Throwable cause = exception.getCause();
+                if (cause instanceof IOException ioException) {
+                    throw new Judge0TransportException("Judge0 response body could not be read", ioException);
+                }
+                throw new Judge0ClientException("Judge0 response body could not be read", cause);
+            }
+        } catch (IOException exception) {
+            throw new Judge0TransportException("Judge0 response body could not be read", exception);
+        }
+        if (bytes.length > MAX_PROVIDER_RESPONSE_BYTES) {
+            throw new Judge0ClientException("Judge0 response exceeded its size limit");
+        }
+        if (response.statusCode() != expectedStatus) {
+            if (response.statusCode() >= 500) {
+                throw new Judge0TransportException("Judge0 returned HTTP " + response.statusCode());
+            }
+            throw new Judge0ClientException("Judge0 returned HTTP " + response.statusCode());
+        }
+        try {
+            return objectMapper.readTree(bytes);
+        } catch (RuntimeException exception) {
+            throw new Judge0ClientException("Judge0 returned invalid JSON", exception);
         }
     }
 
@@ -198,9 +232,22 @@ public final class HttpJudge0Client implements Judge0Client {
         }
     }
 
-    private static void sleep(Duration duration) {
+    private Duration remainingRequestTimeout(long deadline) {
+        long remainingNanos = Math.max(1, deadline - System.nanoTime());
+        Duration remaining = Duration.ofNanos(remainingNanos);
+        return settings.requestTimeout().compareTo(remaining) <= 0 ? settings.requestTimeout() : remaining;
+    }
+
+    private boolean sleepBeforeDeadline(long deadline) {
+        long remainingNanos = deadline - System.nanoTime();
+        if (remainingNanos <= 0) {
+            return false;
+        }
+        Duration remaining = Duration.ofNanos(remainingNanos);
+        Duration duration = settings.pollInterval().compareTo(remaining) <= 0 ? settings.pollInterval() : remaining;
         try {
             Thread.sleep(duration);
+            return System.nanoTime() < deadline;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new Judge0ClientException("Judge0 polling was interrupted", exception);

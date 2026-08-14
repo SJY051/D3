@@ -44,6 +44,7 @@ class QueuedSubmissionDispatcherTest {
         @Override public Optional<JudgeSubmission> findById(UUID submissionId) { return Optional.empty(); }
         @Override public JudgeSubmission insertOrGet(JudgeSubmission submission) { throw new UnsupportedOperationException(); }
         @Override public Optional<JudgeSubmission> claimForEvaluation(UUID submissionId) { return Optional.empty(); }
+        @Override public JudgeSubmission markEvaluationStarted(UUID submissionId, UUID evaluationClaimId) { throw new UnsupportedOperationException(); }
         @Override public JudgeSubmission completeEvaluation(JudgeSubmission submission) { throw new UnsupportedOperationException(); }
         @Override public void releaseEvaluationClaim(UUID submissionId, UUID evaluationClaimId) {}
     }

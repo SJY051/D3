@@ -68,6 +68,8 @@ class JdbcJudgeSubmissionRepositoryTest {
         assertEquals(queued, repository.insertOrGet(queued));
         JudgeSubmission running = repository.claimForEvaluation(SUBMISSION_ID).orElseThrow();
         assertTrue(repository.claimForEvaluation(SUBMISSION_ID).isEmpty());
+        running = repository.markEvaluationStarted(SUBMISSION_ID, running.evaluationClaimId());
+        assertTrue(running.evaluationStartedAt() != null);
 
         SafeEvaluationEvidence evidence = evidence();
         JudgeSubmission completed = repository.completeEvaluation(running.complete(evidence));
@@ -150,9 +152,30 @@ class JdbcJudgeSubmissionRepositoryTest {
         repository.releaseEvaluationClaim(SUBMISSION_ID, staleClaim.evaluationClaimId());
         assertEquals(JudgeStatus.RUNNING, repository.findById(SUBMISSION_ID).orElseThrow().status());
 
+        activeClaim = repository.markEvaluationStarted(SUBMISSION_ID, activeClaim.evaluationClaimId());
         JudgeSubmission completed = repository.completeEvaluation(activeClaim.complete(evidence()));
         assertEquals(JudgeStatus.ACCEPTED, completed.status());
         assertTrue(repository.claimForEvaluation(SUBMISSION_ID).isEmpty());
+    }
+
+    @Test
+    void d3Jdg001PreservesTheNoReplayFenceAcrossAStaleClaimRecovery() {
+        repository.insertOrGet(queuedSubmission());
+        JudgeSubmission staleClaim = repository.claimForEvaluation(SUBMISSION_ID).orElseThrow();
+        repository.markEvaluationStarted(SUBMISSION_ID, staleClaim.evaluationClaimId());
+        repository.releaseEvaluationClaim(SUBMISSION_ID, staleClaim.evaluationClaimId());
+        assertEquals(JudgeStatus.RUNNING, repository.findById(SUBMISSION_ID).orElseThrow().status());
+
+        jdbc.sql("""
+                        update submission
+                        set claim_started_at = now() - interval '11 minutes'
+                        where id = :submissionId
+                        """)
+                .param("submissionId", SUBMISSION_ID)
+                .update();
+
+        JudgeSubmission recovered = repository.claimForEvaluation(SUBMISSION_ID).orElseThrow();
+        assertTrue(recovered.evaluationStartedAt() != null);
     }
 
     private static JudgeSubmission queuedSubmission() {

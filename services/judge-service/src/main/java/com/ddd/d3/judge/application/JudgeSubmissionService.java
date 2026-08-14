@@ -19,6 +19,8 @@ import java.util.function.Supplier;
 
 public final class JudgeSubmissionService {
 
+    private static final int MAX_COMPLETION_ATTEMPTS = 3;
+
     private final JudgeSubmissionRepository repository;
     private final JudgeExecutionAdapter executionAdapter;
     private final Clock clock;
@@ -84,14 +86,20 @@ public final class JudgeSubmissionService {
             return claimed.evidence();
         }
 
+        if (claimed.evaluationStartedAt() != null) {
+            return completeWithRetry(claimed, platformFailure(claimed));
+        }
+
         try {
-            var result = executionAdapter.execute(claimed.command());
-            SafeEvaluationEvidence evidence = SafeEvaluationEvidence.from(claimed, result);
-            return repository.completeEvaluation(claimed.complete(evidence)).evidence();
+            claimed = repository.markEvaluationStarted(submissionId, claimed.evaluationClaimId());
         } catch (RuntimeException exception) {
             repository.releaseEvaluationClaim(submissionId, claimed.evaluationClaimId());
             throw exception;
         }
+
+        var result = executionAdapter.execute(claimed.command());
+        SafeEvaluationEvidence evidence = SafeEvaluationEvidence.from(claimed, result);
+        return completeWithRetry(claimed, evidence);
     }
 
     public SafeEvaluationEvidence readEvidence(UUID submissionId) {
@@ -104,41 +112,27 @@ public final class JudgeSubmissionService {
         return submission.evidence();
     }
 
-    public SafeEvaluationEvidence completePlatformFailure(UUID submissionId) {
-        Objects.requireNonNull(submissionId, "submissionId");
-        JudgeSubmission current = repository.findById(submissionId)
-                .orElseThrow(() -> new SubmissionNotFoundException(submissionId));
-        if (current.evidence() != null) {
-            return current.evidence();
-        }
-
-        JudgeSubmission claimed = repository.claimForEvaluation(submissionId).orElseGet(() -> {
-            JudgeSubmission latest = repository.findById(submissionId)
-                    .orElseThrow(() -> new SubmissionNotFoundException(submissionId));
-            if (latest.evidence() != null) {
-                return latest;
+    private SafeEvaluationEvidence completeWithRetry(JudgeSubmission claimed, SafeEvaluationEvidence evidence) {
+        RuntimeException lastFailure = null;
+        for (int attempt = 1; attempt <= MAX_COMPLETION_ATTEMPTS; attempt++) {
+            try {
+                return repository.completeEvaluation(claimed.complete(evidence)).evidence();
+            } catch (RuntimeException exception) {
+                lastFailure = exception;
             }
-            throw new EvaluationInProgressException(submissionId);
-        });
-        if (claimed.evidence() != null) {
-            return claimed.evidence();
         }
+        throw Objects.requireNonNull(lastFailure);
+    }
 
-        try {
-            JudgeExecutionResult failure = new JudgeExecutionResult(
-                    JudgeStatus.PLATFORM_FAILURE,
-                    0,
-                    0,
-                    List.of(),
-                    "judge-platform-v1",
-                    "unavailable",
-                    clock.instant());
-            SafeEvaluationEvidence evidence = SafeEvaluationEvidence.from(claimed, failure);
-            return repository.completeEvaluation(claimed.complete(evidence)).evidence();
-        } catch (RuntimeException exception) {
-            repository.releaseEvaluationClaim(submissionId, claimed.evaluationClaimId());
-            throw exception;
-        }
+    private SafeEvaluationEvidence platformFailure(JudgeSubmission claimed) {
+        return SafeEvaluationEvidence.from(claimed, new JudgeExecutionResult(
+                JudgeStatus.PLATFORM_FAILURE,
+                0,
+                0,
+                List.of(),
+                "judge-platform-v1",
+                "unavailable",
+                clock.instant()));
     }
 
     private static String fingerprint(SubmissionCommand command) {

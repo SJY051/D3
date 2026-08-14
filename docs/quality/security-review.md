@@ -43,6 +43,8 @@ Last verified: 2026-08-14 against issue #13 implementation, issue #14 and the bo
 | Public response and event privacy | PASS in serialization tests | Safe evidence and `submission.judged.v1` omit source, hidden cases, compiler commands, provider credentials and raw diagnostics |
 | Real judge-service to AWS Judge0 call | NOT RUN | The real adapter path exists, but its intended source-security-group-only route is not bound; retain issue #14 host smoke as separate evidence |
 
+Judge0 submission POSTs are never retried because CE 1.13.1 exposes no idempotency key for that operation. Judge durably marks a claim before the first provider request. After a token is received, transient polling failures retry only the same token within the original absolute deadline; an ambiguous POST result or exhausted polling becomes one privacy-safe `PLATFORM_FAILURE` without replaying completed cases. Database completion retries reuse the same in-memory evidence, and stale recovery of a marked claim emits `PLATFORM_FAILURE` without calling Judge0 again. Provider token and per-case evidence are not persisted in this MVP, so a judge-service process loss can still leave an orphan provider job or discard a completed provider result, but it cannot replay marked provider work; durable continuation remains outside the current live-path claim.
+
 Host activation does not waive application review. The private route and deployment egress control remain PENDING and block a claim of real Judge service integration. Complete a final targeted diff review before issue #13 merge; unresolved Critical or High findings block merge.
 
 Unresolved Critical or High findings block merge. Record an inapplicable result with evidence rather than suppressing the scanner or weakening a test.

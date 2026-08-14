@@ -77,63 +77,67 @@ public final class Judge0ExecutionAdapter implements JudgeExecutionAdapter {
         int passedCount = 0;
         boolean wrongAnswerObserved = false;
         String runtimeVersion = "unavailable";
-        for (JudgeCase judgeCase : correctnessCases) {
-            Judge0Result result = client.execute(request(command, judgeCase));
-            runtimeVersion = RUNTIMES.get(command.language()).runtimeVersion();
-            JudgeStatus status = normalize(result);
-            if (status == JudgeStatus.ACCEPTED) {
-                passedCount++;
-                continue;
-            }
-            if (status == JudgeStatus.WRONG_ANSWER) {
-                wrongAnswerObserved = true;
-                continue;
-            }
-            return result(
-                    status,
-                    passedCount,
-                    correctnessCases.size(),
-                    List.of(),
-                    runtimeVersion);
-        }
-
-        if (wrongAnswerObserved) {
-            return result(
-                    JudgeStatus.WRONG_ANSWER,
-                    passedCount,
-                    correctnessCases.size(),
-                    List.of(),
-                    runtimeVersion);
-        }
-
-        List<RuntimeMeasurement> measurements = new ArrayList<>();
-        if (command.mode() == SubmissionMode.SUBMIT) {
-            for (JudgeCase judgeCase : problem.performanceCases()) {
-                List<Long> samples = new ArrayList<>();
-                for (int sample = 0; sample < PERFORMANCE_SAMPLE_COUNT; sample++) {
-                    Judge0Result result = client.execute(request(command, judgeCase));
-                    runtimeVersion = RUNTIMES.get(command.language()).runtimeVersion();
-                    JudgeStatus status = normalize(result);
-                    if (status != JudgeStatus.ACCEPTED) {
-                        return result(status, passedCount, correctnessCases.size(), measurements, runtimeVersion);
-                    }
-                    samples.add(result.cpuTimeMicros());
+        try {
+            for (JudgeCase judgeCase : correctnessCases) {
+                Judge0Result result = client.execute(request(command, judgeCase));
+                runtimeVersion = RUNTIMES.get(command.language()).runtimeVersion();
+                JudgeStatus status = normalize(result);
+                if (status == JudgeStatus.ACCEPTED) {
+                    passedCount++;
+                    continue;
                 }
-                samples.sort(Comparator.naturalOrder());
-                measurements.add(new RuntimeMeasurement(
-                        judgeCase.tier(),
-                        judgeCase.inputSize(),
-                        PERFORMANCE_SAMPLE_COUNT,
-                        samples.get(PERFORMANCE_SAMPLE_COUNT / 2)));
+                if (status == JudgeStatus.WRONG_ANSWER) {
+                    wrongAnswerObserved = true;
+                    continue;
+                }
+                return result(
+                        status,
+                        passedCount,
+                        correctnessCases.size(),
+                        List.of(),
+                        runtimeVersion);
             }
-        }
 
-        return result(
-                JudgeStatus.ACCEPTED,
-                passedCount,
-                correctnessCases.size(),
-                measurements,
-                runtimeVersion);
+            if (wrongAnswerObserved) {
+                return result(
+                        JudgeStatus.WRONG_ANSWER,
+                        passedCount,
+                        correctnessCases.size(),
+                        List.of(),
+                        runtimeVersion);
+            }
+
+            List<RuntimeMeasurement> measurements = new ArrayList<>();
+            if (command.mode() == SubmissionMode.SUBMIT) {
+                for (JudgeCase judgeCase : problem.performanceCases()) {
+                    List<Long> samples = new ArrayList<>();
+                    for (int sample = 0; sample < PERFORMANCE_SAMPLE_COUNT; sample++) {
+                        Judge0Result result = client.execute(request(command, judgeCase));
+                        runtimeVersion = RUNTIMES.get(command.language()).runtimeVersion();
+                        JudgeStatus status = normalize(result);
+                        if (status != JudgeStatus.ACCEPTED) {
+                            return result(status, passedCount, correctnessCases.size(), measurements, runtimeVersion);
+                        }
+                        samples.add(result.cpuTimeMicros());
+                    }
+                    samples.sort(Comparator.naturalOrder());
+                    measurements.add(new RuntimeMeasurement(
+                            judgeCase.tier(),
+                            judgeCase.inputSize(),
+                            PERFORMANCE_SAMPLE_COUNT,
+                            samples.get(PERFORMANCE_SAMPLE_COUNT / 2)));
+                }
+            }
+
+            return result(
+                    JudgeStatus.ACCEPTED,
+                    passedCount,
+                    correctnessCases.size(),
+                    measurements,
+                    runtimeVersion);
+        } catch (Judge0ClientException exception) {
+            return platformFailure(command, correctnessCases.size());
+        }
     }
 
     private static void validatePayloads(

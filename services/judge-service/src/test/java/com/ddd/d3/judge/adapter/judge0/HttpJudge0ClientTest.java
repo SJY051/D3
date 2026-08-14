@@ -135,6 +135,67 @@ class HttpJudge0ClientTest {
         assertThrows(Judge0ClientException.class, () -> client.execute(request()));
     }
 
+    @Test
+    void d3Jdg001RetriesPollingWithTheSameTokenWithoutSubmittingAgain() {
+        AtomicInteger posts = new AtomicInteger();
+        AtomicInteger gets = new AtomicInteger();
+        server.removeContext("/submissions");
+        server.createContext("/submissions", exchange -> {
+            if ("POST".equals(exchange.getRequestMethod())) {
+                posts.incrementAndGet();
+                respond(exchange, 201, "{\"token\":\"11111111-1111-4111-8111-111111111111\"}");
+                return;
+            }
+            if (gets.incrementAndGet() == 1) {
+                respond(exchange, 503, "temporary outage");
+                return;
+            }
+            assertEquals(
+                    "/submissions/11111111-1111-4111-8111-111111111111",
+                    exchange.getRequestURI().getPath());
+            respond(exchange, 200, "{\"status\":{\"description\":\"Accepted\"},\"time\":\"0.0125\",\"memory\":2048}");
+        });
+
+        Judge0Result result = client.execute(request());
+
+        assertEquals("Accepted", result.statusDescription());
+        assertEquals(1, posts.get());
+        assertEquals(2, gets.get());
+    }
+
+    @Test
+    void d3Jdg001BoundsPollingRetriesWithoutRepeatingThePost() {
+        AtomicInteger posts = new AtomicInteger();
+        AtomicInteger gets = new AtomicInteger();
+        server.removeContext("/submissions");
+        server.createContext("/submissions", exchange -> {
+            if ("POST".equals(exchange.getRequestMethod())) {
+                posts.incrementAndGet();
+                respond(exchange, 201, "{\"token\":\"11111111-1111-4111-8111-111111111111\"}");
+                return;
+            }
+            gets.incrementAndGet();
+            respond(exchange, 503, "temporary outage");
+        });
+
+        assertThrows(Judge0ClientException.class, () -> client.execute(request()));
+        assertEquals(1, posts.get());
+        assertEquals(3, gets.get());
+    }
+
+    @Test
+    void d3Jdg001NeverRepeatsAPostWhenItsResponseIsLost() {
+        AtomicInteger posts = new AtomicInteger();
+        server.removeContext("/submissions");
+        server.createContext("/submissions", exchange -> {
+            posts.incrementAndGet();
+            exchange.close();
+        });
+
+        assertThrows(Judge0ClientException.class, () -> client.execute(request()));
+        assertEquals(1, posts.get());
+    }
+
     private HttpJudge0Client client(Duration pollTimeout) {
         URI baseUri = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
         return new HttpJudge0Client(
