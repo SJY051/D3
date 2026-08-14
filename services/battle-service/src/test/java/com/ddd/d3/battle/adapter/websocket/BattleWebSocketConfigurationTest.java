@@ -1,11 +1,13 @@
 package com.ddd.d3.battle.adapter.websocket;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistration;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 
@@ -41,5 +43,22 @@ class BattleWebSocketConfigurationTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> new BattleWebSocketConfiguration(handler, interceptor, "https://example.com/path"));
+    }
+
+    @Test
+    void d3Btl002BoundsAsynchronousCrossInstanceFanoutWork() {
+        BattleWebSocketConfiguration configuration = new BattleWebSocketConfiguration(
+                mock(BattleWebSocketHandler.class),
+                mock(BattleWebSocketHandshakeInterceptor.class),
+                "http://localhost:5173");
+        ThreadPoolTaskExecutor executor = configuration.battleSnapshotFanoutExecutor();
+        executor.initialize();
+        try {
+            assertEquals(2, executor.getCorePoolSize());
+            assertEquals(4, executor.getMaxPoolSize());
+            assertEquals(256, executor.getThreadPoolExecutor().getQueue().remainingCapacity());
+        } finally {
+            executor.shutdown();
+        }
     }
 }

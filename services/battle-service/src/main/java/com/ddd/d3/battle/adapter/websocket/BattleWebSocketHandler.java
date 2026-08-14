@@ -1,7 +1,6 @@
 package com.ddd.d3.battle.adapter.websocket;
 
 import com.ddd.d3.battle.application.BattleMatchViewService;
-import com.ddd.d3.battle.application.BattleSnapshotPublisher;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -19,8 +18,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-final class BattleWebSocketHandler extends TextWebSocketHandler
-        implements SubProtocolCapable, BattleSnapshotPublisher {
+final class BattleWebSocketHandler extends TextWebSocketHandler implements SubProtocolCapable {
 
     static final String APPLICATION_PROTOCOL = "d3.battle.v2";
     private static final Logger LOGGER = LoggerFactory.getLogger(BattleWebSocketHandler.class);
@@ -55,8 +53,7 @@ final class BattleWebSocketHandler extends TextWebSocketHandler
         }
     }
 
-    @Override
-    public void publish(UUID matchId) {
+    void publishLocal(UUID matchId) {
         Objects.requireNonNull(matchId, "matchId must not be null");
         sessions.values().stream()
                 .filter(registration -> registration.matchId.equals(matchId))

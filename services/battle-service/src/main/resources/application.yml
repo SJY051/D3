@@ -56,6 +56,7 @@ d3:
     audience: ${D3_JWT_USER_AUDIENCE:d3-user}
   battle:
     match-duration: ${D3_BATTLE_MATCH_DURATION:10m}
+    snapshot-topic: ${D3_BATTLE_SNAPSHOT_TOPIC:d3:battle:snapshot:committed:v2}
     ranked-matchmaking:
       initial-rating: ${D3_RANKED_INITIAL_RATING:1500}
       initial-window: ${D3_RANKED_INITIAL_WINDOW:100}

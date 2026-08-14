@@ -18,6 +18,7 @@ import com.ddd.d3.battle.infrastructure.persistence.JdbcBattleMatchRepository;
 import com.ddd.d3.battle.infrastructure.persistence.JdbcBattleCommandReceiptStore;
 import com.ddd.d3.battle.infrastructure.persistence.JdbcRankedMatchStore;
 import com.ddd.d3.battle.infrastructure.persistence.JdbcPublicRatingReader;
+import com.ddd.d3.battle.infrastructure.redis.RedisBattleSnapshotChannel;
 import com.ddd.d3.battle.infrastructure.redis.RedisRankedQueueStore;
 import io.lettuce.core.RedisClient;
 import java.lang.reflect.InvocationTargetException;
@@ -47,6 +48,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -123,6 +126,55 @@ class BattleInfrastructureIntegrationTest {
         try (AdminClient admin = AdminClient.create(Map.of(
                 AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers()))) {
             assertFalse(admin.describeCluster().clusterId().get().isBlank());
+        }
+    }
+
+    @Test
+    void d3Btl002BroadcastsCommittedSnapshotsAcrossBattleInstances() throws Exception {
+        String topic = "d3:test:battle:snapshot:" + UUID.randomUUID();
+        UUID matchId = UUID.randomUUID();
+        CountDownLatch firstDelivered = new CountDownLatch(1);
+        CountDownLatch secondDelivered = new CountDownLatch(1);
+        ExecutorService firstExecutor = Executors.newSingleThreadExecutor();
+        ExecutorService secondExecutor = Executors.newSingleThreadExecutor();
+        LettuceConnectionFactory firstConnection =
+                new LettuceConnectionFactory(REDIS.getHost(), REDIS.getMappedPort(6379));
+        LettuceConnectionFactory secondConnection =
+                new LettuceConnectionFactory(REDIS.getHost(), REDIS.getMappedPort(6379));
+        RedisMessageListenerContainer firstContainer = new RedisMessageListenerContainer();
+        RedisMessageListenerContainer secondContainer = new RedisMessageListenerContainer();
+        try {
+            firstConnection.afterPropertiesSet();
+            secondConnection.afterPropertiesSet();
+            StringRedisTemplate firstRedis = new StringRedisTemplate(firstConnection);
+            StringRedisTemplate secondRedis = new StringRedisTemplate(secondConnection);
+            RedisBattleSnapshotChannel first = new RedisBattleSnapshotChannel(
+                    firstRedis, ignored -> firstDelivered.countDown(), Runnable::run, topic);
+            RedisBattleSnapshotChannel second = new RedisBattleSnapshotChannel(
+                    secondRedis, ignored -> secondDelivered.countDown(), Runnable::run, topic);
+
+            firstContainer.setConnectionFactory(firstConnection);
+            firstContainer.setTaskExecutor(firstExecutor);
+            firstContainer.addMessageListener(first, new ChannelTopic(topic));
+            firstContainer.afterPropertiesSet();
+            firstContainer.start();
+            secondContainer.setConnectionFactory(secondConnection);
+            secondContainer.setTaskExecutor(secondExecutor);
+            secondContainer.addMessageListener(second, new ChannelTopic(topic));
+            secondContainer.afterPropertiesSet();
+            secondContainer.start();
+
+            first.publish(matchId);
+
+            assertTrue(firstDelivered.await(5, TimeUnit.SECONDS));
+            assertTrue(secondDelivered.await(5, TimeUnit.SECONDS));
+        } finally {
+            firstContainer.destroy();
+            secondContainer.destroy();
+            firstExecutor.shutdownNow();
+            secondExecutor.shutdownNow();
+            firstConnection.destroy();
+            secondConnection.destroy();
         }
     }
 

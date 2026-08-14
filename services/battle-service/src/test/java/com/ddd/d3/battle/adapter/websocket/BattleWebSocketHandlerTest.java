@@ -45,8 +45,8 @@ class BattleWebSocketHandlerTest {
         WebSocketSession session = session("one", PLAYER_ONE);
 
         handler.afterConnectionEstablished(session);
-        handler.publish(MATCH_ID);
-        handler.publish(MATCH_ID);
+        handler.publishLocal(MATCH_ID);
+        handler.publishLocal(MATCH_ID);
 
         ArgumentCaptor<TextMessage> messages = ArgumentCaptor.forClass(TextMessage.class);
         verify(session, times(2)).sendMessage(messages.capture());
@@ -122,7 +122,7 @@ class BattleWebSocketHandlerTest {
 
         handler.afterConnectionEstablished(failed);
         handler.afterConnectionEstablished(healthy);
-        handler.publish(MATCH_ID);
+        handler.publishLocal(MATCH_ID);
 
         verify(failed).close(CloseStatus.SERVER_ERROR);
         verify(healthy, times(2)).sendMessage(any(TextMessage.class));
