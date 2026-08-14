@@ -2,7 +2,7 @@
 
 - Owner: 윤서진 (development lead)
 - Status: Active operating baseline
-- Last verified: 2026-08-14 against `origin/main` at `2f71323` and live GitHub issue and pull-request state
+- Last verified: 2026-08-14 against `origin/main` at `2f71323`, live GitHub state and AWS schedule group `d3-judge0-20260814-16`
 - Scope: M-01 through M-10 and D3-QLT-001
 - Target: freeze a demonstrable release candidate on 2026-08-19 and present it on 2026-08-20
 
@@ -70,7 +70,7 @@ local sign-in
 | F2 Cross-service auth and contracts | [#27](https://github.com/SJY051/D3/issues/27) / D3-SEC-001 | **윤서진** | 임수혁 지원 | 즉시 | Battle service token 발급·검증, canonical route, browser session transport, negative authorization evidence | 이슈 준비 완료, 미구현 |
 | B1 Ranked realtime lifecycle | [#15](https://github.com/SJY051/D3/issues/15), PR #33 / M-02, M-03 | **윤서진** | 임수혁 backend 지원 | 기반 PR review 중 | 두 client 매칭, server clock, reconnect, surrender, incident void, authenticated WS, Judge correlation | **P1 x2 차단**: legacy finished restore, duplicate active match; 기존 Battle 69 PASS, scaffold 7 SKIP, CI 5/5 |
 | B2 Outcome, rating and attack | [#16](https://github.com/SJY051/D3/issues/16) / M-05, M-06, M-07 | **윤서진** | 최정민 acceptance example 검토 | 계산식 테스트는 즉시 | versioned scoring, exactly-once rating/RP, reversible attack, result outbox, repeatable examples | 미구현 |
-| J0 Judge boundary | [#13](https://github.com/SJY051/D3/issues/13), [#14](https://github.com/SJY051/D3/issues/14) / M-04 | **윤서진** | 팀원 smoke 지원 | 완료 | app-to-host private-path smoke는 배포 통합 시 별도 증거로 남김 | 기반 완료; AWS host healthy, app/Judge0 smoke와 stop schedule 대기 |
+| J0 Judge boundary | [#13](https://github.com/SJY051/D3/issues/13), [#14](https://github.com/SJY051/D3/issues/14) / M-04 | **윤서진** | 팀원 smoke 지원 | 완료 | app-to-host private-path smoke는 배포 통합 시 별도 증거로 남김 | 기반 완료; AWS host healthy, power schedule 5개 enabled, app/Judge0 smoke 대기 |
 | C1 Community and projections | [#17](https://github.com/SJY051/D3/issues/17) / M-08, M-09 | **임수혁** | 윤서진 event/privacy 리뷰 | #26 review-ready 후 주 담당 전환 | Markdown/privacy, public feed, idempotent user/match/rating projections, replay evidence | 미구현, GitHub assignee 미지정 |
 | W1 Web golden path | [#18](https://github.com/SJY051/D3/issues/18), PR #28 / D3-UX-001, D3-UX-002 | **박주형** (`david3123123`) | 최정민 wireframe, 윤서진 API 리뷰 | 해당 wireframe 승인 후 | 최신 main rebase, 실제 API adapter, 접근 가능한 상태 UI, 두 세션 흐름, P1 mock 미노출 | 임시 UI PR 열림, rebase 필요 |
 | Q1 QA and rehearsal | [#19](https://github.com/SJY051/D3/issues/19) / M-10, D3-QLT-001 | **박주형** (`david3123123`, 현재 assignee) | 최정민 발표·acceptance 주도, 전원 evidence 제공 | acceptance matrix는 즉시 | frozen SHA, preflight, full scenario, pass/fail/skip/not-run 기록, 녹화와 fallback | 준비 단계; 역할·assignee 정합화 필요 |
@@ -211,9 +211,11 @@ Battle은 사용자 access token을 Judge로 전달하지 않는다. Identity가
 - 승인 창은 2026-08-14 18:00~24:00, 8월 15일과 16일 각각 09:00~24:00이며 최대 compute는 36시간이다.
 - 허용 대상은 서울 리전의 Judge0 전용 `t3.large` 1대와 gp3 40 GiB, SSM, Judge0 token Secret 1개, 기본 CloudWatch다. 애플리케이션, PostgreSQL, Redis, Kafka는 로컬에 유지한다.
 - 2026-08-14 18:05 확인 기준 host와 SSM은 healthy였지만 실제 Judge0 컨테이너와 6개 runtime smoke는 NOT RUN이다.
-- 인스턴스는 2026-08-14 01:45부터 중단 없이 실행된 이력이 있다. 36시간이 전체 기간 상한인지 야간·주말 추가분 상한인지 담당자 확인 전에는 비용 상한 충족을 단정하지 않는다.
-- 시간 자동화는 EventBridge Scheduler의 일회성 `at(...)` schedule과 전용 최소권한 실행 역할을 사용한다. `Asia/Seoul`, flexible window OFF, 완료 후 schedule 삭제, 해당 instance의 Start/Stop만 허용한다.
-- 승인 경계를 넘기지 않도록 자동 정지는 23:55로 잡고 새 Judge 제출을 먼저 drain한다. schedule 작성 전 별도 AWS 변경 권한을 확인하고, 정지 후 실제 `stopped` 상태를 수동 검증한다.
+- 인스턴스는 2026-08-14 01:45부터 실행됐지만 공지 전 사용은 승인된 야간·주말 36시간 집계와 분리해 기록한다.
+- EventBridge Scheduler group `d3-judge0-20260814-16`에 일회성 일정 5개를 enabled 상태로 구성했다. 8월 14일 23:55 정지, 15일과 16일 각각 09:00 시작·23:55 정지이며 모두 `Asia/Seoul`, flexible window OFF, 완료 후 자동 삭제다.
+- 실행 역할 `d3-Scheduler-Judge0-20260814-16`은 `i-0981ab438329d3e62`의 Start/Stop만 허용하고 다른 인스턴스는 암묵적으로 거부한다. trust policy는 전용 schedule group ARN과 계정으로 제한한다.
+- 각 일정은 최대 event age 240초와 재시도 2회를 사용한다. 자동 정지 전에 새 Judge 제출을 drain하고, 실행 후 실제 `stopped` 또는 `running` 상태를 수동 검증한다.
+- 일회성 schedule은 실행 후 자동 삭제되지만 schedule group과 IAM role은 남는다. 8월 16일 최종 정지와 schedule 0개를 확인한 뒤 두 리소스를 수동 정리한다.
 - 이 시간 고정 운영 게이트는 9절 점수와 무관하게 해당 마감 전에 우선 처리한다.
 
 ## 8. Team operating rules
@@ -260,7 +262,7 @@ priority score = 3G + 2D + 2E + R - C
 ## 10. Immediate assignment queue
 
 1. **임수혁 (`GledoubleN`):** PR #26을 `2f71323` 이후 최신 `main`에 rebase하고 V1을 다시 쓰지 않은 채 migration/security 충돌을 해결한다. 재검증 전 기존 CI 성공을 현재 통과 증거로 재사용하지 않는다.
-2. **윤서진:** AWS 36시간의 집계 기준을 확인한다. 별도 승인을 받은 뒤에만 7.1의 최소권한 start/stop schedule을 생성하고, Judge0 6-runtime smoke를 별도 증거로 남긴다.
+2. **윤서진:** 매일 23:55 정지와 다음 운영일 09:00 시작 결과를 확인하고, Judge0 6-runtime smoke를 별도 증거로 남긴다.
 3. **윤서진:** #27에서 canonical Identity ingress, browser refresh transport, Battle-to-Judge service-token claim과 negative test 계약을 고정한다.
 4. **윤서진:** PR #33의 legacy `FINISHED` restore와 duplicate active match P1을 각각 회귀 테스트로 해결하고 재리뷰한다. WebSocket transport/auth/fan-out은 #27 계약에 맞춘 후속 commit으로 제한한다.
 5. **박주형 (`david3123123`):** PR #28을 최신 main에 rebase하고 공통 API adapter, 상태 UI, P1 mock 비노출을 확인한다. #18 전체 완료가 아니라 부분 구현으로 증거를 남긴다.
