@@ -1,4 +1,7 @@
 import { createConnection } from "node:net";
+import { resolveJudgeAdapter } from "./demo-preflight-targets.mjs";
+
+const judgeAdapter = resolveJudgeAdapter();
 
 const httpTargets = [
   ["web", process.env.D3_WEB_URL ?? "http://localhost:5173", true],
@@ -9,7 +12,9 @@ const httpTargets = [
   ["battle", process.env.D3_BATTLE_HEALTH_URL ?? "http://localhost:8082/actuator/health", true],
   ["judge-service", process.env.D3_JUDGE_SERVICE_HEALTH_URL ?? "http://localhost:8083/actuator/health", true],
   ["community", process.env.D3_COMMUNITY_HEALTH_URL ?? "http://localhost:8084/actuator/health", true],
-  ["judge0", process.env.JUDGE0_HEALTH_URL ?? "http://localhost:2358/about", true],
+  ...(judgeAdapter.judge0Required
+    ? [["judge0", process.env.JUDGE0_HEALTH_URL ?? "http://localhost:2358/about", true]]
+    : []),
 ];
 
 const tcpTargets = [
@@ -53,7 +58,18 @@ const httpResults = await Promise.all(
 );
 
 const tcpResults = await Promise.all(tcpTargets.map((target) => checkTcp(...target)));
-const results = [...httpResults, ...tcpResults];
+const results = [
+  {
+    name: "judge-adapter",
+    target: judgeAdapter.name,
+    required: true,
+    kind: "selection",
+    ok: judgeAdapter.supported,
+    ...(judgeAdapter.supported ? {} : { error: "UNSUPPORTED_ADAPTER" }),
+  },
+  ...httpResults,
+  ...tcpResults,
+];
 
 for (const result of results) console.log(JSON.stringify(result));
 
