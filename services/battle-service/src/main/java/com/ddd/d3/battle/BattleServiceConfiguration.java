@@ -4,6 +4,7 @@ import com.ddd.d3.battle.application.PublicRatingReader;
 import com.ddd.d3.battle.application.BattleCommandReceiptStore;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.BattleMatchRepository;
+import com.ddd.d3.battle.application.BattleMatchViewService;
 import com.ddd.d3.battle.application.RankedMatchStore;
 import com.ddd.d3.battle.application.RankedMatchmakingCoordinator;
 import com.ddd.d3.battle.application.RankedQueueStore;
@@ -56,5 +57,10 @@ class BattleServiceConfiguration {
             PlatformTransactionManager transactionManager) {
         return new BattleMatchCommandService(
                 matches, receipts, clock, matchDuration, new TransactionTemplate(transactionManager));
+    }
+
+    @Bean
+    BattleMatchViewService battleMatchViewService(BattleMatchRepository matches, Clock clock) {
+        return new BattleMatchViewService(matches, clock);
     }
 }

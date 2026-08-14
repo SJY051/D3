@@ -140,4 +140,52 @@ if (!joinRequest || joinRequest.additionalProperties !== false || Object.hasOwn(
   throw new Error("battle ranked queue request must be closed and derive player identity from JWT");
 }
 
+const battleSnapshot = ajv.getSchema("https://d3.local/contracts/websocket/battle-event.v1.schema.json");
+if (!battleSnapshot) throw new Error("battle snapshot validator was not created");
+const battleSnapshotEvent = {
+  type: "MATCH_SNAPSHOT",
+  version: 1,
+  matchId: "11111111-1111-4111-8111-111111111111",
+  sequence: 4,
+  serverTime: "2026-08-14T00:00:00Z",
+  payload: {
+    state: "RUNNING",
+    startedAt: "2026-08-14T00:00:00Z",
+    matchDeadline: "2026-08-14T00:10:00Z",
+    self: {
+      playerId: "22222222-2222-4222-8222-222222222222",
+      ready: true,
+      connectionState: "CONNECTED",
+      reconnectDeadline: null,
+    },
+    opponent: {
+      playerId: "33333333-3333-4333-8333-333333333333",
+      ready: true,
+      connectionState: "DISCONNECTED",
+      reconnectDeadline: "2026-08-14T00:00:30Z",
+    },
+    result: null,
+  },
+};
+if (!battleSnapshot(battleSnapshotEvent)) {
+  throw new Error(`battle snapshot valid sample was rejected: ${ajv.errorsText(battleSnapshot.errors)}`);
+}
+for (const privateField of ["activeConnectionGeneration", "incidentReference", "sourceCode"]) {
+  const unsafe = structuredClone(battleSnapshotEvent);
+  unsafe.payload.opponent[privateField] = "private";
+  if (battleSnapshot(unsafe)) {
+    throw new Error(`battle snapshot accepted private field: ${privateField}`);
+  }
+}
+const missingReconnectDeadline = structuredClone(battleSnapshotEvent);
+missingReconnectDeadline.payload.opponent.reconnectDeadline = null;
+if (battleSnapshot(missingReconnectDeadline)) {
+  throw new Error("battle snapshot accepted a disconnected player without a reconnect deadline");
+}
+const clientOwnedClock = structuredClone(battleSnapshotEvent);
+clientOwnedClock.payload.matchDeadline = null;
+if (battleSnapshot(clientOwnedClock)) {
+  throw new Error("battle snapshot accepted a running match without its server deadline");
+}
+
 console.log(`contracts: PASS (${files.length} JSON documents, 6 compiled JSON Schemas, privacy, Judge v1, and Battle v1 samples)`);
