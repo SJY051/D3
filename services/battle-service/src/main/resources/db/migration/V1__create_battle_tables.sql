@@ -131,6 +131,10 @@ create table attack_event (
     resolution text not null,
     energy_cost integer not null,
     occurred_at timestamptz not null,
+    constraint attack_event_actor_fk
+        foreign key (match_id, actor_user_id) references match_player(match_id, user_id),
+    constraint attack_event_target_fk
+        foreign key (match_id, target_user_id) references match_player(match_id, user_id),
     constraint attack_event_sequence_unique unique (match_id, sequence),
     constraint attack_event_sequence_positive check (sequence > 0),
     constraint attack_event_distinct_players check (actor_user_id <> target_user_id),

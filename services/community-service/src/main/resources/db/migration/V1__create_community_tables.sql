@@ -56,7 +56,14 @@ create table match_projection (
     source_version bigint not null,
     projected_at timestamptz not null,
     constraint match_projection_players_are_two_seats
-        check (jsonb_typeof(player_ids) = 'array' and jsonb_array_length(player_ids) = 2),
+        check (
+            jsonb_typeof(player_ids) = 'array'
+            and jsonb_array_length(player_ids) = 2
+            and jsonb_typeof(player_ids -> 0) = 'string'
+            and jsonb_typeof(player_ids -> 1) = 'string'
+            and (player_ids ->> 0) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            and (player_ids ->> 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        ),
     constraint match_projection_result_supported
         check (result in ('PLAYER_ONE_WIN', 'PLAYER_TWO_WIN', 'DRAW', 'VOIDED')),
     constraint match_projection_source_version_non_negative check (source_version >= 0)

@@ -230,6 +230,16 @@ class BattleInfrastructureIntegrationTest {
                 .param("userId", playerId)
                 .update());
 
+        UUID opponentId = UUID.randomUUID();
+        assertEquals(1, jdbc.sql("""
+                        insert into match_player (
+                            match_id, user_id, seat, language_key, connection_state
+                        ) values (:matchId, :userId, 2, 'python3', 'CONNECTED')
+                        """)
+                .param("matchId", matchId)
+                .param("userId", opponentId)
+                .update());
+
         assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
                         insert into judge_job_reference (
                             submission_id, match_id, player_user_id, mode, command_id,
@@ -258,6 +268,51 @@ class BattleInfrastructureIntegrationTest {
                 .param("matchId", matchId)
                 .param("playerId", playerId)
                 .param("commandId", UUID.randomUUID())
+                .update());
+
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
+                        insert into attack_event (
+                            id, match_id, sequence, actor_user_id, target_user_id,
+                            attack_type, resolution, energy_cost, occurred_at
+                        ) values (
+                            :id, :matchId, 1, :actorId, :targetId,
+                            'CAESAR', 'APPLIED', 1, now()
+                        )
+                        """)
+                .param("id", UUID.randomUUID())
+                .param("matchId", matchId)
+                .param("actorId", UUID.randomUUID())
+                .param("targetId", opponentId)
+                .update());
+
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
+                        insert into attack_event (
+                            id, match_id, sequence, actor_user_id, target_user_id,
+                            attack_type, resolution, energy_cost, occurred_at
+                        ) values (
+                            :id, :matchId, 1, :actorId, :targetId,
+                            'CAESAR', 'APPLIED', 1, now()
+                        )
+                        """)
+                .param("id", UUID.randomUUID())
+                .param("matchId", matchId)
+                .param("actorId", playerId)
+                .param("targetId", UUID.randomUUID())
+                .update());
+
+        assertEquals(1, jdbc.sql("""
+                        insert into attack_event (
+                            id, match_id, sequence, actor_user_id, target_user_id,
+                            attack_type, resolution, energy_cost, occurred_at
+                        ) values (
+                            :id, :matchId, 1, :actorId, :targetId,
+                            'CAESAR', 'APPLIED', 1, now()
+                        )
+                        """)
+                .param("id", UUID.randomUUID())
+                .param("matchId", matchId)
+                .param("actorId", playerId)
+                .param("targetId", opponentId)
                 .update());
 
         RedisClient redis = RedisClient.create(
