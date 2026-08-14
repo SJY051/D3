@@ -1,6 +1,5 @@
 package com.ddd.d3.battle.adapter.websocket;
 
-import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchViewService;
 import java.io.IOException;
 import java.util.Map;
@@ -20,16 +19,16 @@ final class BattleWebSocketSessionRegistry {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(BattleWebSocketSessionRegistry.class);
     private final BattleMatchViewService views;
-    private final BattleConnectionService connections;
+    private final BattleDisconnectRetryQueue disconnects;
     private final ObjectMapper objectMapper;
     private final Map<String, Registration> sessions = new ConcurrentHashMap<>();
 
     BattleWebSocketSessionRegistry(
             BattleMatchViewService views,
-            BattleConnectionService connections,
+            BattleDisconnectRetryQueue disconnects,
             ObjectMapper objectMapper) {
         this.views = Objects.requireNonNull(views, "views must not be null");
-        this.connections = Objects.requireNonNull(connections, "connections must not be null");
+        this.disconnects = Objects.requireNonNull(disconnects, "disconnects must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
     }
 
@@ -134,7 +133,7 @@ final class BattleWebSocketSessionRegistry {
 
     private void disconnectQuietly(Registration registration) {
         try {
-            connections.disconnected(
+            disconnects.disconnect(
                     registration.matchId,
                     registration.viewerId,
                     registration.generation);

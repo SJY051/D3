@@ -57,6 +57,9 @@ d3:
   battle:
     match-duration: ${D3_BATTLE_MATCH_DURATION:10m}
     snapshot-topic: ${D3_BATTLE_SNAPSHOT_TOPIC:d3:battle:snapshot:committed:v2}
+    connection:
+      maximum-attempts: ${D3_BATTLE_CONNECTION_MAXIMUM_ATTEMPTS:3}
+      retry-delay: ${D3_BATTLE_CONNECTION_RETRY_DELAY:50ms}
     ranked-matchmaking:
       initial-rating: ${D3_RANKED_INITIAL_RATING:1500}
       initial-window: ${D3_RANKED_INITIAL_WINDOW:100}

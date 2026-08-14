@@ -18,10 +18,12 @@ import com.ddd.d3.battle.application.BattleMatchView;
 import com.ddd.d3.battle.application.BattleMatchViewService;
 import com.ddd.d3.battle.domain.BattleMatch;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ScheduledExecutorService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.socket.CloseStatus;
@@ -329,7 +331,13 @@ class BattleWebSocketHandlerTest {
             BattleMatchCommandService commands,
             BattleConnectionService connections) {
         return new BattleWebSocketHandler(
-                new BattleWebSocketSessionRegistry(views, connections, objectMapper),
+                new BattleWebSocketSessionRegistry(
+                        views,
+                        new BattleDisconnectRetryQueue(
+                                connections,
+                                mock(ScheduledExecutorService.class),
+                                Duration.ofMillis(1)),
+                        objectMapper),
                 connections,
                 commands,
                 objectMapper);
