@@ -42,6 +42,11 @@ const applications = [
     process.env.D3_GATEWAY_HEALTH_URL ?? "http://localhost:8080/actuator/health"],
 ].map(([name, jar, health]) => ({ name, jar, health, env: environment }));
 
+const web = {
+  name: "web",
+  health: process.env.D3_WEB_URL ?? "http://localhost:5173",
+};
+
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: process.cwd(), env: environment, stdio: "inherit" });
   if (result.error) throw result.error;
@@ -114,8 +119,8 @@ try {
   await Promise.all(platform.map((target) => waitForHealth(target)));
 
   applications.forEach(startJava);
-  start("web", pnpm, ["--filter", "@d3/web", "dev", "--host", "127.0.0.1", "--strictPort"]);
-  await Promise.all(applications.map((target) => waitForHealth(target)));
+  start(web.name, pnpm, ["--filter", "@d3/web", "dev", "--host", "127.0.0.1", "--strictPort"]);
+  await Promise.all([...applications, web].map((target) => waitForHealth(target)));
 
   run(process.execPath, ["scripts/demo-preflight.mjs"]);
   console.log("local-start: READY; press Ctrl+C to stop applications (infrastructure remains running)");

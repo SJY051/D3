@@ -34,7 +34,9 @@ create table match (
         deadline_at is null or (server_started_at is not null and deadline_at > server_started_at)
     ),
     constraint match_finish_after_creation check (finished_at is null or finished_at >= created_at),
-    constraint match_void_reason_consistent check (result = 'VOIDED' or void_reason is null),
+    constraint match_void_reason_consistent check (
+        void_reason is null or result is not distinct from 'VOIDED'
+    ),
     constraint match_aggregate_version_non_negative check (aggregate_version >= 0)
 );
 
