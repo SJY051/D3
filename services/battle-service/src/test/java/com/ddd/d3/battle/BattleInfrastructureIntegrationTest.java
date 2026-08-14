@@ -711,7 +711,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(1, applied);
+        assertEquals(3, applied);
         assertEquals(1, jdbc.sql("select count(*) from match where id = :id")
                 .param("id", matchId)
                 .query(Integer.class)
