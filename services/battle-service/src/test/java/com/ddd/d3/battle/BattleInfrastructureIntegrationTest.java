@@ -8,11 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.ddd.d3.battle.application.RankedQueueConflictException;
 import com.ddd.d3.battle.application.RankedQueueStore;
 import com.ddd.d3.battle.application.OptimisticMatchConflictException;
+import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.RankedMatchStore;
 import com.ddd.d3.battle.application.RankedMatchmakingCoordinator;
 import com.ddd.d3.battle.domain.BattleMatch;
 import com.ddd.d3.battle.domain.RankedMatchmaker;
 import com.ddd.d3.battle.infrastructure.persistence.JdbcBattleMatchRepository;
+import com.ddd.d3.battle.infrastructure.persistence.JdbcBattleCommandReceiptStore;
 import com.ddd.d3.battle.infrastructure.persistence.JdbcRankedMatchStore;
 import com.ddd.d3.battle.infrastructure.persistence.JdbcPublicRatingReader;
 import com.ddd.d3.battle.infrastructure.redis.RedisRankedQueueStore;
@@ -38,6 +40,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -78,7 +81,7 @@ class BattleInfrastructureIntegrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(3, migrations);
+        assertEquals(4, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -89,6 +92,7 @@ class BattleInfrastructureIntegrationTest {
                         "judge_job_reference",
                         "judge_job_reference_legacy_duplicate",
                         "attack_event",
+                        "match_command_receipt",
                         "rating",
                         "season_rank",
                         "outbox_event",
@@ -191,6 +195,54 @@ class BattleInfrastructureIntegrationTest {
         assertEquals(BattleMatch.State.FINISHED, finished.state());
         assertEquals(second.playerId().toString(), finished.result().winnerId());
         assertEquals(BattleMatch.ResolutionReason.SURRENDER, finished.result().reason());
+    }
+
+    @Test
+    void d3Btl002CommitsAndReplaysPlayerCommandsInOnePostgresTransaction() {
+        createProblem();
+        RankedMatchmaker.Entry first = rankedEntry(1, 11, 1_000, 1);
+        RankedMatchmaker.Entry second = rankedEntry(2, 22, 1_050, 2);
+        DataSourceTransactionManager transactionManager = new DataSourceTransactionManager(dataSource);
+        JdbcRankedMatchStore matchmaking = new JdbcRankedMatchStore(dataSource, transactionManager);
+        RankedMatchStore.RankedMatch created = matchmaking.create(
+                new RankedMatchmaker.Pair(first, second), Instant.parse("2026-08-14T00:00:00Z"));
+        JdbcBattleMatchRepository matches = new JdbcBattleMatchRepository(dataSource, transactionManager);
+        BattleMatchCommandService commands = new BattleMatchCommandService(
+                matches,
+                new JdbcBattleCommandReceiptStore(dataSource),
+                Clock.fixed(Instant.parse("2026-08-14T00:00:01Z"), ZoneOffset.UTC),
+                Duration.ofMinutes(10),
+                new TransactionTemplate(transactionManager));
+        UUID firstCommand = UUID.randomUUID();
+        UUID secondCommand = UUID.randomUUID();
+
+        commands.handle(
+                created.matchId(),
+                firstCommand,
+                first.playerId(),
+                new BattleMatch.Ready(first.playerId().toString()));
+        BattleMatch.Snapshot running = commands.handle(
+                created.matchId(),
+                secondCommand,
+                second.playerId(),
+                new BattleMatch.Ready(second.playerId().toString()));
+        BattleMatch.Snapshot replayed = commands.handle(
+                created.matchId(),
+                secondCommand,
+                second.playerId(),
+                new BattleMatch.Ready(second.playerId().toString()));
+
+        assertEquals(BattleMatch.State.RUNNING, running.state());
+        assertEquals(3, running.aggregateVersion());
+        assertEquals(running, replayed);
+        assertEquals(2, jdbc.sql("select count(*) from match_command_receipt where match_id = :matchId")
+                .param("matchId", created.matchId())
+                .query(Integer.class)
+                .single());
+        assertEquals(3L, jdbc.sql("select aggregate_version from match where id = :matchId")
+                .param("matchId", created.matchId())
+                .query(Long.class)
+                .single());
     }
 
     @Test
@@ -515,7 +567,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(2, applied);
+        assertEquals(3, applied);
         assertEquals(1, jdbc.sql("""
                         select count(*)
                         from judge_job_reference

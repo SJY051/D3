@@ -277,6 +277,20 @@ Table battle_db.attack_event {
   }
 }
 
+Table battle_db.match_command_receipt {
+  command_id uuid [pk]
+  match_id uuid [not null]
+  player_user_id uuid [not null, note: 'Must be a participant in the named match']
+  command_type text [not null, note: 'READY, DISCONNECT, RECONNECT, or SURRENDER']
+  payload_fingerprint text [not null, note: 'Bounded non-secret command identity, never source code']
+  aggregate_version bigint [not null]
+  accepted_at timestamptz [not null]
+
+  Indexes {
+    (match_id, aggregate_version, command_id)
+  }
+}
+
 Table battle_db.rating {
   user_id uuid [pk, note: 'Logical identity contract reference']
   public_rating int [not null]
@@ -335,6 +349,7 @@ Ref: battle_db.judge_job_reference.(match_id, player_user_id) > battle_db.match_
 Ref: battle_db.attack_event.match_id > battle_db.match.id
 Ref: battle_db.attack_event.(match_id, actor_user_id) > battle_db.match_player.(match_id, user_id)
 Ref: battle_db.attack_event.(match_id, target_user_id) > battle_db.match_player.(match_id, user_id)
+Ref: battle_db.match_command_receipt.(match_id, player_user_id) > battle_db.match_player.(match_id, user_id)
 
 Table judge_db.submission {
   id uuid [pk]

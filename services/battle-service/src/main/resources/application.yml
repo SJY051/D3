@@ -54,6 +54,7 @@ d3:
     issuer: ${D3_JWT_ISSUER:http://localhost:8081}
     audience: ${D3_JWT_USER_AUDIENCE:d3-user}
   battle:
+    match-duration: ${D3_BATTLE_MATCH_DURATION:10m}
     ranked-matchmaking:
       initial-rating: ${D3_RANKED_INITIAL_RATING:1500}
       initial-window: ${D3_RANKED_INITIAL_WINDOW:100}

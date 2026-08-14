@@ -1,6 +1,9 @@
 package com.ddd.d3.battle;
 
 import com.ddd.d3.battle.application.PublicRatingReader;
+import com.ddd.d3.battle.application.BattleCommandReceiptStore;
+import com.ddd.d3.battle.application.BattleMatchCommandService;
+import com.ddd.d3.battle.application.BattleMatchRepository;
 import com.ddd.d3.battle.application.RankedMatchStore;
 import com.ddd.d3.battle.application.RankedMatchmakingCoordinator;
 import com.ddd.d3.battle.application.RankedQueueStore;
@@ -10,6 +13,8 @@ import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Configuration
 class BattleServiceConfiguration {
@@ -40,5 +45,16 @@ class BattleServiceConfiguration {
             @Value("${d3.battle.ranked-matchmaking.lease-ttl:5s}") Duration leaseTtl) {
         return new RankedMatchmakingCoordinator(
                 matchmaker, queue, matches, ratings, clock, entryTtl, leaseTtl);
+    }
+
+    @Bean
+    BattleMatchCommandService battleMatchCommandService(
+            BattleMatchRepository matches,
+            BattleCommandReceiptStore receipts,
+            Clock clock,
+            @Value("${d3.battle.match-duration:10m}") Duration matchDuration,
+            PlatformTransactionManager transactionManager) {
+        return new BattleMatchCommandService(
+                matches, receipts, clock, matchDuration, new TransactionTemplate(transactionManager));
     }
 }
