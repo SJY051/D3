@@ -91,8 +91,36 @@ class BattleInfrastructureIntegrationTest {
 
         assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
                         insert into match (
-                            id, problem_id, ranked, status, result, finished_at, created_at
-                        ) values (:id, :problemId, true, 'RUNNING', null, now(), now())
+                            id, problem_id, ranked, status, result,
+                            server_started_at, deadline_at, finished_at, created_at
+                        ) values (
+                            :id, :problemId, true, 'RUNNING', null,
+                            now() - interval '1 minute', now() + interval '1 minute', now(),
+                            now() - interval '2 minutes'
+                        )
+                        """)
+                .param("id", UUID.randomUUID())
+                .param("problemId", problemId)
+                .update());
+
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
+                        insert into match (
+                            id, problem_id, ranked, status, result, created_at
+                        ) values (:id, :problemId, true, 'RUNNING', null, now())
+                        """)
+                .param("id", UUID.randomUUID())
+                .param("problemId", problemId)
+                .update());
+
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
+                        insert into match (
+                            id, problem_id, ranked, status, result,
+                            server_started_at, deadline_at, created_at
+                        ) values (
+                            :id, :problemId, true, 'RUNNING', null,
+                            now() - interval '2 minutes', now() + interval '1 minute',
+                            now() - interval '1 minute'
+                        )
                         """)
                 .param("id", UUID.randomUUID())
                 .param("problemId", problemId)

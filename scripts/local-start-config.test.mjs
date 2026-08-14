@@ -41,6 +41,11 @@ test("local runtime aligns health, Config, Eureka, and JWT URLs with an explicit
 
 test("local runtime formats IPv6 service URLs and rejects wildcard bind addresses", () => {
   assert.equal(resolveLocalServiceHost("::1"), "[::1]");
+  const environment = resolveLocalEnvironment({ SERVER_ADDRESS: "::1" });
+  assert.equal(environment.SERVER_ADDRESS, "::1");
+  assert.equal(environment.D3_EUREKA_INSTANCE_HOSTNAME, "[::1]");
+  assert.equal(environment.D3_EUREKA_INSTANCE_IP_ADDRESS, "::1");
+  assert.equal(environment.EUREKA_URL, "http://[::1]:8761/eureka/");
   assert.throws(
     () => resolveLocalEnvironment({ SERVER_ADDRESS: "0.0.0.0" }),
     /must be a concrete local interface address/,

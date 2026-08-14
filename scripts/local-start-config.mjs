@@ -16,7 +16,7 @@ export function resolveLocalEnvironment(source = process.env) {
     D3_WEB_ORIGIN: web.health,
     CONFIG_SERVER_URL: `http://${serviceHost}:8888`,
     EUREKA_URL: `http://${serviceHost}:8761/eureka/`,
-    D3_EUREKA_INSTANCE_HOSTNAME: serverAddress,
+    D3_EUREKA_INSTANCE_HOSTNAME: serviceHost,
     D3_EUREKA_INSTANCE_IP_ADDRESS: serverAddress,
     D3_CONFIG_HEALTH_URL: `http://${serviceHost}:8888/actuator/health`,
     D3_DISCOVERY_HEALTH_URL: `http://${serviceHost}:8761/actuator/health`,
