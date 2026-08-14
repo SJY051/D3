@@ -13,6 +13,7 @@ import {
   isChildSpawnFailure,
   mergeRequestedExitCode,
   StartupCancelledError,
+  terminateChild,
 } from "./local-start-lifecycle.mjs";
 
 const windows = process.platform === "win32";
@@ -152,17 +153,14 @@ async function shutdown(exitCode = 0) {
   shuttingDown = true;
   startupAbort.abort();
   shutdownTask = (async () => {
-    for (const child of children.toReversed()) {
-      if (!childCompletion.hasCompleted(child)) child.kill("SIGTERM");
+    const terminationResults = await Promise.allSettled(
+      children.toReversed().map((child) => terminateChild(child, childCompletion)),
+    );
+    for (const result of terminationResults) {
+      if (result.status !== "rejected") continue;
+      requestedExitCode = mergeRequestedExitCode(requestedExitCode, 1);
+      console.error(`local-start: cleanup failed: ${result.reason.message}`);
     }
-    await Promise.all(children.map((child) => new Promise((resolve) => {
-      if (childCompletion.hasCompleted(child)) return resolve();
-      child.once("exit", resolve);
-      setTimeout(() => {
-        if (!childCompletion.hasCompleted(child)) child.kill("SIGKILL");
-        resolve();
-      }, 5_000).unref();
-    })));
     process.exitCode = requestedExitCode;
     finishRuntime();
   })();

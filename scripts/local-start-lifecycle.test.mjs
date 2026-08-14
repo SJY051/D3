@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import test from "node:test";
 
 import {
@@ -9,6 +10,7 @@ import {
   isChildSpawnFailure,
   mergeRequestedExitCode,
   StartupCancelledError,
+  terminateChild,
 } from "./local-start-lifecycle.mjs";
 
 test("local runtime preserves an application failure over a later operator signal", () => {
@@ -75,4 +77,49 @@ test("local runtime marks a spawn-error child complete without an exit event", (
 test("local runtime distinguishes spawn failure from an error on a running child", () => {
   assert.equal(isChildSpawnFailure({ pid: undefined }), true);
   assert.equal(isChildSpawnFailure({ pid: 42 }), false);
+});
+
+test("local runtime waits for exit after escalating a running child to SIGKILL", async () => {
+  const tracker = createChildCompletionTracker();
+  const child = Object.assign(new EventEmitter(), {
+    name: "fixture",
+    pid: 42,
+    exitCode: null,
+    signalCode: null,
+    signals: [],
+    kill(signal) {
+      this.signals.push(signal);
+      if (signal === "SIGKILL") {
+        setImmediate(() => {
+          this.signalCode = signal;
+          tracker.markCompleted(this);
+          this.emit("exit", null, signal);
+        });
+      }
+      return true;
+    },
+  });
+
+  await terminateChild(child, tracker, { gracefulMillis: 1, forcedMillis: 50 });
+
+  assert.deepEqual(child.signals, ["SIGTERM", "SIGKILL"]);
+  assert.equal(tracker.hasCompleted(child), true);
+});
+
+test("local runtime reports cleanup failure when a child never exits", async () => {
+  const tracker = createChildCompletionTracker();
+  const child = Object.assign(new EventEmitter(), {
+    name: "fixture",
+    pid: 42,
+    exitCode: null,
+    signalCode: null,
+    kill() {
+      return false;
+    },
+  });
+
+  await assert.rejects(
+    terminateChild(child, tracker, { gracefulMillis: 1, forcedMillis: 1 }),
+    /fixture did not exit after SIGKILL/,
+  );
 });
