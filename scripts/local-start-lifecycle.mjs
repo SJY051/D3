@@ -45,6 +45,26 @@ export function isChildSpawnFailure(child) {
   return child.pid == null;
 }
 
+export function pipeChildOutput(child, stdout = process.stdout, stderr = process.stderr) {
+  child.stdout.pipe(stdout, { end: false });
+  child.stderr.pipe(stderr, { end: false });
+}
+
+function releaseChildResources(child) {
+  for (const stream of [child.stdout, child.stderr]) {
+    try {
+      stream?.destroy();
+    } catch {
+      // Continue releasing the remaining resources.
+    }
+  }
+  try {
+    child.unref();
+  } catch {
+    // The caller still reports cleanup failure.
+  }
+}
+
 export function terminateChild(
   child,
   completionTracker,
@@ -72,11 +92,7 @@ export function terminateChild(
       if (settled) return;
       settled = true;
       cleanup();
-      try {
-        child.unref();
-      } catch {
-        // Cleanup still fails closed even if the handle cannot be released.
-      }
+      releaseChildResources(child);
       reject(new Error(`${child.name ?? "child"} did not exit after SIGKILL`));
     };
     const handleExit = () => finish();

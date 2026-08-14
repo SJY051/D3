@@ -9,6 +9,7 @@ import {
   hasChildExited,
   isChildSpawnFailure,
   mergeRequestedExitCode,
+  pipeChildOutput,
   StartupCancelledError,
   terminateChild,
 } from "./local-start-lifecycle.mjs";
@@ -79,6 +80,23 @@ test("local runtime distinguishes spawn failure from an error on a running child
   assert.equal(isChildSpawnFailure({ pid: 42 }), false);
 });
 
+test("local runtime forwards output through parent-owned child pipes", () => {
+  const calls = [];
+  const child = {
+    stdout: { pipe: (target, options) => calls.push(["stdout", target, options]) },
+    stderr: { pipe: (target, options) => calls.push(["stderr", target, options]) },
+  };
+  const stdout = {};
+  const stderr = {};
+
+  pipeChildOutput(child, stdout, stderr);
+
+  assert.deepEqual(calls, [
+    ["stdout", stdout, { end: false }],
+    ["stderr", stderr, { end: false }],
+  ]);
+});
+
 test("local runtime waits for exit after escalating a running child to SIGKILL", async () => {
   const tracker = createChildCompletionTracker();
   const child = Object.assign(new EventEmitter(), {
@@ -114,6 +132,8 @@ test("local runtime reports cleanup failure when a child never exits", async () 
     exitCode: null,
     signalCode: null,
     unrefCalls: 0,
+    stdout: { destroyCalls: 0, destroy() { this.destroyCalls += 1; } },
+    stderr: { destroyCalls: 0, destroy() { this.destroyCalls += 1; } },
     kill() {
       return false;
     },
@@ -127,4 +147,6 @@ test("local runtime reports cleanup failure when a child never exits", async () 
     /fixture did not exit after SIGKILL/,
   );
   assert.equal(child.unrefCalls, 1);
+  assert.equal(child.stdout.destroyCalls, 1);
+  assert.equal(child.stderr.destroyCalls, 1);
 });

@@ -12,6 +12,7 @@ import {
   createChildFailureReporter,
   isChildSpawnFailure,
   mergeRequestedExitCode,
+  pipeChildOutput,
   StartupCancelledError,
   terminateChild,
 } from "./local-start-lifecycle.mjs";
@@ -67,7 +68,12 @@ function run(command, args) {
 
 function start(name, command, args, env = environment) {
   console.log(`local-start: starting ${name}`);
-  const child = spawn(command, args, { cwd: process.cwd(), env, stdio: "inherit" });
+  const child = spawn(command, args, {
+    cwd: process.cwd(),
+    env,
+    stdio: ["inherit", "pipe", "pipe"],
+  });
+  pipeChildOutput(child);
   child.name = name;
   children.push(child);
   const reportFailure = createChildFailureReporter(({ detail, defer }) => {
