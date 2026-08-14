@@ -28,6 +28,7 @@ test("the real adapter requires Judge0 and unknown adapters fail closed", () => 
 test("Judge0 preflight uses only the configured authentication header", () => {
   assert.deepEqual(
     resolveJudge0Request({
+      JUDGE0_BASE_URL: "http://judge0.internal:2358",
       JUDGE0_HEALTH_URL: "http://judge0.internal:2358/about",
       JUDGE0_ALLOWED_ORIGIN: "http://judge0.internal:2358",
       JUDGE0_AUTH_HEADER: "X-D3-Judge-Token",
@@ -40,6 +41,25 @@ test("Judge0 preflight uses only the configured authentication header", () => {
       requestInit: {
         redirect: "manual",
         headers: { "X-D3-Judge-Token": "test-only-token" },
+      },
+    },
+  );
+});
+
+test("Judge0 preflight derives its health endpoint from the application base URL", () => {
+  assert.deepEqual(
+    resolveJudge0Request({
+      JUDGE0_BASE_URL: "https://judge0.internal",
+      JUDGE0_ALLOWED_ORIGIN: "https://judge0.internal",
+      JUDGE0_AUTH_TOKEN: "test-only-token",
+    }),
+    {
+      configured: true,
+      url: "https://judge0.internal/about",
+      target: "https://judge0.internal/about",
+      requestInit: {
+        redirect: "manual",
+        headers: { "X-Auth-Token": "test-only-token" },
       },
     },
   );

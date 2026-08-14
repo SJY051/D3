@@ -11,27 +11,34 @@ export function resolveJudgeAdapter(environment = process.env) {
 }
 
 export function resolveJudge0Request(environment = process.env) {
-  const rawUrl = environment.JUDGE0_HEALTH_URL ?? "http://localhost:2358/about";
+  const rawBaseUrl = environment.JUDGE0_BASE_URL ?? "http://localhost:2358";
+  const rawUrl = environment.JUDGE0_HEALTH_URL;
   const rawAllowedOrigin = environment.JUDGE0_ALLOWED_ORIGIN ?? "http://localhost:2358";
   const authenticationHeader = environment.JUDGE0_AUTH_HEADER ?? "X-Auth-Token";
   const authenticationToken = environment.JUDGE0_AUTH_TOKEN;
   let url;
   try {
-    const healthUrl = new URL(rawUrl);
+    const baseUrl = new URL(rawBaseUrl);
+    const healthUrl = rawUrl === undefined ? new URL("/about", baseUrl) : new URL(rawUrl);
     const allowedOrigin = new URL(rawAllowedOrigin);
     const validProtocol = (value) => value.protocol === "http:" || value.protocol === "https:";
+    const validOrigin = (value) => (
+      validProtocol(value)
+      && value.username === ""
+      && value.password === ""
+      && value.search === ""
+      && value.hash === ""
+      && ["", "/"].includes(value.pathname)
+    );
     if (
       !validProtocol(healthUrl)
-      || !validProtocol(allowedOrigin)
+      || !validOrigin(baseUrl)
+      || !validOrigin(allowedOrigin)
       || healthUrl.username !== ""
       || healthUrl.password !== ""
       || healthUrl.search !== ""
       || healthUrl.hash !== ""
-      || allowedOrigin.username !== ""
-      || allowedOrigin.password !== ""
-      || allowedOrigin.search !== ""
-      || allowedOrigin.hash !== ""
-      || !["", "/"].includes(allowedOrigin.pathname)
+      || baseUrl.origin !== allowedOrigin.origin
       || healthUrl.origin !== allowedOrigin.origin
     ) {
       return { configured: false, target: "judge0", error: "INVALID_ORIGIN" };
