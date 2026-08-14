@@ -55,7 +55,7 @@ public final class RankedMatchmakingCoordinator {
         }
         Optional<UUID> activeMatch = matches.findActiveMatchIdByPlayer(playerId);
         if (activeMatch.isPresent()) {
-            return new JoinResult(Status.MATCHED, activeMatch.orElseThrow(), null);
+            throw new RankedQueueConflictException("player already belongs to an active ranked match");
         }
 
         Instant now = clock.instant();
@@ -81,7 +81,7 @@ public final class RankedMatchmakingCoordinator {
                     RankedMatchmaker.Entry staleEntry = entryFor(pair, conflict.playerId());
                     lease.remove(List.of(staleEntry));
                     if (conflict.playerId().equals(playerId)) {
-                        joinedMatchId = conflict.matchId();
+                        throw new RankedQueueConflictException("player already belongs to an active ranked match");
                     }
                 }
             }

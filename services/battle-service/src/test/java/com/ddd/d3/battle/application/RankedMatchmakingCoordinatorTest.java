@@ -49,19 +49,17 @@ class RankedMatchmakingCoordinatorTest {
     }
 
     @Test
-    void d3Btl001ReturnsTheActiveMatchForANewTicketFromAnAlreadyMatchedPlayer() {
+    void d3Btl001RejectsANewTicketFromAnAlreadyMatchedPlayer() {
         FakeQueue queue = new FakeQueue();
         FakeMatches matches = new FakeMatches();
         RankedMatchmakingCoordinator coordinator = coordinator(queue, matches);
         coordinator.join(TICKET_ONE, PLAYER_ONE, RankedMatchmaker.Language.JAVA);
-        RankedMatchmakingCoordinator.JoinResult matched =
-                coordinator.join(TICKET_TWO, PLAYER_TWO, RankedMatchmaker.Language.JAVA);
+        coordinator.join(TICKET_TWO, PLAYER_TWO, RankedMatchmaker.Language.JAVA);
 
-        RankedMatchmakingCoordinator.JoinResult rejoined =
-                coordinator.join(TICKET_THREE, PLAYER_ONE, RankedMatchmaker.Language.JAVA);
+        assertThrows(
+                RankedQueueConflictException.class,
+                () -> coordinator.join(TICKET_THREE, PLAYER_ONE, RankedMatchmaker.Language.JAVA));
 
-        assertEquals(RankedMatchmakingCoordinator.Status.MATCHED, rejoined.status());
-        assertEquals(matched.matchId(), rejoined.matchId());
         assertEquals(List.of(), queue.entries);
     }
 

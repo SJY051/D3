@@ -78,7 +78,7 @@ class BattleSnapshotMessageV2Test {
                 objectMapper.writeValueAsString(BattleSnapshotMessageV2.from(view)));
 
         assertEquals("VOIDED", message.path("payload").path("result").path("outcome").asText());
-        assertTrue(message.path("payload").path("result").path("winnerId").isNull());
+        assertTrue(message.path("payload").path("result").path("winner").isNull());
         assertFalse(message.path("payload").path("result").has("incidentReference"));
     }
 
@@ -107,7 +107,36 @@ class BattleSnapshotMessageV2Test {
                 .path("result");
 
         assertEquals("DRAW", result.path("outcome").asText());
-        assertTrue(result.path("winnerId").isNull());
+        assertTrue(result.path("winner").isNull());
         assertEquals("LEGACY_IMPORT", result.path("reason").asText());
+    }
+
+    @Test
+    void d3Sec001SerializesTheWinnerRelativeToTheViewer() throws Exception {
+        BattleMatchView view = new BattleMatchView(
+                MATCH_ID,
+                7,
+                NOW,
+                BattleMatchView.State.FINISHED,
+                NOW.minusSeconds(60),
+                NOW.plusSeconds(540),
+                new BattleMatchView.Participant(
+                        PLAYER_ONE, true, BattleMatchView.ConnectionState.CONNECTED, null),
+                new BattleMatchView.Participant(
+                        PLAYER_TWO, true, BattleMatchView.ConnectionState.CONNECTED, null),
+                new BattleMatchView.Result(
+                        BattleMatchView.Outcome.WIN,
+                        PLAYER_TWO,
+                        BattleMatchView.ResolutionReason.SURRENDER,
+                        NOW));
+
+        JsonNode result = objectMapper.readTree(
+                        objectMapper.writeValueAsString(BattleSnapshotMessageV2.from(view)))
+                .path("payload")
+                .path("result");
+
+        assertEquals("OPPONENT", result.path("winner").asText());
+        assertFalse(result.has("winnerId"));
+        assertFalse(result.toString().contains(PLAYER_TWO.toString()));
     }
 }

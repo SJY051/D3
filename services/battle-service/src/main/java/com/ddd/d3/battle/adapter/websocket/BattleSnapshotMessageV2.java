@@ -30,7 +30,7 @@ public record BattleSnapshotMessageV2(
                         view.matchDeadline(),
                         selfParticipant(view.self()),
                         opponentParticipant(view.opponent()),
-                        result(view.result())));
+                        result(view.result(), view.self().playerId(), view.opponent().playerId())));
     }
 
     private static SelfParticipant selfParticipant(BattleMatchView.Participant participant) {
@@ -46,13 +46,23 @@ public record BattleSnapshotMessageV2(
                 participant.ready(), participant.connectionState().name(), participant.reconnectDeadline());
     }
 
-    private static Result result(BattleMatchView.Result result) {
+    private static Result result(BattleMatchView.Result result, UUID selfId, UUID opponentId) {
         if (result == null) {
             return null;
         }
+        String winner = null;
+        if (result.winnerId() != null) {
+            if (result.winnerId().equals(selfId)) {
+                winner = "SELF";
+            } else if (result.winnerId().equals(opponentId)) {
+                winner = "OPPONENT";
+            } else {
+                throw new IllegalArgumentException("winner must be self or opponent");
+            }
+        }
         return new Result(
                 result.outcome().name(),
-                result.winnerId(),
+                winner,
                 result.reason().name(),
                 result.resolvedAt());
     }
@@ -78,7 +88,7 @@ public record BattleSnapshotMessageV2(
 
     public record Result(
             String outcome,
-            UUID winnerId,
+            String winner,
             String reason,
             Instant resolvedAt) {}
 }

@@ -148,12 +148,12 @@
     },
     "result": {
       "type": "object",
-      "required": ["outcome", "winnerId", "reason", "resolvedAt"],
+      "required": ["outcome", "winner", "reason", "resolvedAt"],
       "properties": {
         "outcome": { "enum": ["WIN", "DRAW", "VOIDED"] },
-        "winnerId": {
+        "winner": {
           "oneOf": [
-            { "type": "string", "format": "uuid" },
+            { "enum": ["SELF", "OPPONENT"] },
             { "type": "null" }
           ]
         },
@@ -169,7 +169,7 @@
           },
           "then": {
             "properties": {
-              "winnerId": { "type": "null" },
+              "winner": { "type": "null" },
               "reason": { "const": "PLATFORM_INCIDENT" }
             }
           },
@@ -180,13 +180,13 @@
             },
             "then": {
               "properties": {
-                "winnerId": { "type": "null" },
+                "winner": { "type": "null" },
                 "reason": { "const": "LEGACY_IMPORT" }
               }
             },
             "else": {
               "properties": {
-                "winnerId": { "type": "string", "format": "uuid" },
+                "winner": { "enum": ["SELF", "OPPONENT"] },
                 "reason": { "enum": ["SURRENDER", "DISCONNECT_TIMEOUT", "LEGACY_IMPORT"] }
               }
             }
