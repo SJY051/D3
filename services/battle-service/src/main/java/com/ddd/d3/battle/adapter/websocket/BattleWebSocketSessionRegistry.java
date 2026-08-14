@@ -1,5 +1,6 @@
 package com.ddd.d3.battle.adapter.websocket;
 
+import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchViewService;
 import java.io.IOException;
 import java.util.Map;
@@ -19,25 +20,30 @@ final class BattleWebSocketSessionRegistry {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(BattleWebSocketSessionRegistry.class);
     private final BattleMatchViewService views;
+    private final BattleConnectionService connections;
     private final ObjectMapper objectMapper;
     private final Map<String, Registration> sessions = new ConcurrentHashMap<>();
 
-    BattleWebSocketSessionRegistry(BattleMatchViewService views, ObjectMapper objectMapper) {
+    BattleWebSocketSessionRegistry(
+            BattleMatchViewService views,
+            BattleConnectionService connections,
+            ObjectMapper objectMapper) {
         this.views = Objects.requireNonNull(views, "views must not be null");
+        this.connections = Objects.requireNonNull(connections, "connections must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
     }
 
-    void register(WebSocketSession session) throws IOException {
+    void register(WebSocketSession session, long generation) throws IOException {
         UUID matchId = requiredAttribute(
                 session, BattleWebSocketHandshakeInterceptor.MATCH_ID_ATTRIBUTE, UUID.class);
         UUID viewerId = requiredAttribute(
                 session, BattleWebSocketHandshakeInterceptor.VIEWER_ID_ATTRIBUTE, UUID.class);
-        Registration registration = new Registration(session, matchId, viewerId);
+        Registration registration = new Registration(session, matchId, viewerId, generation);
         sessions.put(session.getId(), registration);
         try {
             sendLatest(registration);
         } catch (IOException | RuntimeException exception) {
-            sessions.remove(session.getId(), registration);
+            evict(registration);
             closeQuietly(session, CloseStatus.SERVER_ERROR);
             throw exception;
         }
@@ -52,20 +58,32 @@ final class BattleWebSocketSessionRegistry {
 
     void close(WebSocketSession session, CloseStatus status) {
         Registration registration = sessions.remove(session.getId());
+        closeQuietly(session, status);
         if (registration != null) {
-            closeQuietly(session, status);
+            disconnectQuietly(registration);
         }
     }
 
     void remove(WebSocketSession session) {
-        sessions.remove(session.getId());
+        Registration registration = sessions.remove(session.getId());
+        if (registration != null) {
+            disconnectQuietly(registration);
+        }
+    }
+
+    long requiredGeneration(WebSocketSession session) {
+        Registration registration = sessions.get(session.getId());
+        if (registration == null || registration.session != session) {
+            throw new IllegalStateException("WebSocket session is not registered");
+        }
+        return registration.generation;
     }
 
     private void sendLatestQuietly(Registration registration) {
         try {
             sendLatest(registration);
         } catch (IOException | RuntimeException exception) {
-            sessions.remove(registration.session.getId(), registration);
+            evict(registration);
             LOGGER.warn(
                     "Battle snapshot delivery failed; matchId={} sessionId={}",
                     registration.matchId,
@@ -77,7 +95,7 @@ final class BattleWebSocketSessionRegistry {
     private void sendLatest(Registration registration) throws IOException {
         synchronized (registration) {
             if (!registration.session.isOpen()) {
-                sessions.remove(registration.session.getId(), registration);
+                evict(registration);
                 return;
             }
             var view = views.read(registration.matchId, registration.viewerId);
@@ -108,16 +126,41 @@ final class BattleWebSocketSessionRegistry {
         }
     }
 
+    private void evict(Registration registration) {
+        if (sessions.remove(registration.session.getId(), registration)) {
+            disconnectQuietly(registration);
+        }
+    }
+
+    private void disconnectQuietly(Registration registration) {
+        try {
+            connections.disconnected(
+                    registration.matchId,
+                    registration.viewerId,
+                    registration.generation);
+        } catch (RuntimeException exception) {
+            LOGGER.warn(
+                    "Battle transport disconnect update failed; matchId={} sessionId={}",
+                    registration.matchId,
+                    registration.session.getId());
+        }
+    }
+
     private static final class Registration {
         private final WebSocketSession session;
         private final UUID matchId;
         private final UUID viewerId;
+        private final long generation;
         private long lastSequence = -1;
 
-        private Registration(WebSocketSession session, UUID matchId, UUID viewerId) {
+        private Registration(WebSocketSession session, UUID matchId, UUID viewerId, long generation) {
+            if (generation <= 0) {
+                throw new IllegalArgumentException("generation must be positive");
+            }
             this.session = session;
             this.matchId = matchId;
             this.viewerId = viewerId;
+            this.generation = generation;
         }
     }
 }

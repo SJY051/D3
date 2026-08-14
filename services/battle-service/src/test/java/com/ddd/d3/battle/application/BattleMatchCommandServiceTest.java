@@ -29,6 +29,8 @@ class BattleMatchCommandServiceTest {
     private static final UUID PLAYER_TWO = UUID.fromString("33333333-3333-4333-8333-333333333333");
     private static final UUID COMMAND_ONE = UUID.fromString("44444444-4444-4444-8444-444444444444");
     private static final UUID COMMAND_TWO = UUID.fromString("55555555-5555-4555-8555-555555555555");
+    private static final long PLAYER_ONE_GENERATION = 1;
+    private static final long PLAYER_TWO_GENERATION = 2;
 
     @Test
     void d3Btl002CommitsReadyAndRunningAsOrderedAuthoritativeVersions() {
@@ -37,21 +39,33 @@ class BattleMatchCommandServiceTest {
         BattleMatchCommandService service = service(matches, receipts);
 
         BattleMatch.Snapshot firstReady = service.handle(
-                MATCH_ID, COMMAND_ONE, PLAYER_ONE, new BattleMatch.Ready(PLAYER_ONE.toString()));
+                MATCH_ID,
+                COMMAND_ONE,
+                PLAYER_ONE,
+                PLAYER_ONE_GENERATION,
+                new BattleMatch.Ready(PLAYER_ONE.toString()));
         BattleMatch.Snapshot running = service.handle(
-                MATCH_ID, COMMAND_TWO, PLAYER_TWO, new BattleMatch.Ready(PLAYER_TWO.toString()));
+                MATCH_ID,
+                COMMAND_TWO,
+                PLAYER_TWO,
+                PLAYER_TWO_GENERATION,
+                new BattleMatch.Ready(PLAYER_TWO.toString()));
         BattleMatch.Snapshot replayed = service.handle(
-                MATCH_ID, COMMAND_TWO, PLAYER_TWO, new BattleMatch.Ready(PLAYER_TWO.toString()));
+                MATCH_ID,
+                COMMAND_TWO,
+                PLAYER_TWO,
+                PLAYER_TWO_GENERATION,
+                new BattleMatch.Ready(PLAYER_TWO.toString()));
 
         assertEquals(BattleMatch.State.LOBBY, firstReady.state());
         assertEquals(BattleMatch.State.RUNNING, running.state());
         assertEquals(NOW, running.startedAt());
         assertEquals(NOW.plus(Duration.ofMinutes(10)), running.matchDeadline());
-        assertEquals(3, running.aggregateVersion());
+        assertEquals(5, running.aggregateVersion());
         assertEquals(running, replayed);
-        assertEquals(List.of(0L, 1L, 2L), matches.expectedVersions);
+        assertEquals(List.of(2L, 3L, 4L), matches.expectedVersions);
         assertEquals(2, receipts.receipts.size());
-        assertEquals(3, receipts.receipts.get(COMMAND_TWO).aggregateVersion());
+        assertEquals(5, receipts.receipts.get(COMMAND_TWO).aggregateVersion());
     }
 
     @Test
@@ -59,7 +73,12 @@ class BattleMatchCommandServiceTest {
         FakeMatches matches = new FakeMatches(initialSnapshot());
         FakeReceipts receipts = new FakeReceipts();
         BattleMatchCommandService service = service(matches, receipts);
-        service.handle(MATCH_ID, COMMAND_ONE, PLAYER_ONE, new BattleMatch.Ready(PLAYER_ONE.toString()));
+        service.handle(
+                MATCH_ID,
+                COMMAND_ONE,
+                PLAYER_ONE,
+                PLAYER_ONE_GENERATION,
+                new BattleMatch.Ready(PLAYER_ONE.toString()));
 
         assertThrows(
                 CommandIdConflictException.class,
@@ -67,6 +86,7 @@ class BattleMatchCommandServiceTest {
                         MATCH_ID,
                         COMMAND_ONE,
                         PLAYER_ONE,
+                        PLAYER_ONE_GENERATION,
                         new BattleMatch.Disconnect(PLAYER_ONE.toString(), 1)));
     }
 
@@ -82,6 +102,7 @@ class BattleMatchCommandServiceTest {
                         MATCH_ID,
                         COMMAND_ONE,
                         PLAYER_ONE,
+                        PLAYER_ONE_GENERATION,
                         new BattleMatch.Ready(PLAYER_TWO.toString())));
         assertEquals(0, receipts.receipts.size());
     }
@@ -108,7 +129,12 @@ class BattleMatchCommandServiceTest {
                 transactions,
                 matchId -> order.add("publish-" + matchId));
 
-        service.handle(MATCH_ID, COMMAND_ONE, PLAYER_ONE, new BattleMatch.Ready(PLAYER_ONE.toString()));
+        service.handle(
+                MATCH_ID,
+                COMMAND_ONE,
+                PLAYER_ONE,
+                PLAYER_ONE_GENERATION,
+                new BattleMatch.Ready(PLAYER_ONE.toString()));
 
         assertEquals(
                 List.of("transaction-start", "transaction-return", "publish-" + MATCH_ID),
@@ -130,9 +156,13 @@ class BattleMatchCommandServiceTest {
                 });
 
         BattleMatch.Snapshot committed = service.handle(
-                MATCH_ID, COMMAND_ONE, PLAYER_ONE, new BattleMatch.Ready(PLAYER_ONE.toString()));
+                MATCH_ID,
+                COMMAND_ONE,
+                PLAYER_ONE,
+                PLAYER_ONE_GENERATION,
+                new BattleMatch.Ready(PLAYER_ONE.toString()));
 
-        assertEquals(1, committed.aggregateVersion());
+        assertEquals(3, committed.aggregateVersion());
         assertEquals(1, receipts.receipts.size());
     }
 
@@ -145,6 +175,7 @@ class BattleMatchCommandServiceTest {
                 MATCH_ID,
                 COMMAND_ONE,
                 PLAYER_ONE,
+                PLAYER_ONE_GENERATION,
                 new BattleMatch.Ready(PLAYER_ONE.toString()));
 
         assertThrows(
@@ -153,10 +184,11 @@ class BattleMatchCommandServiceTest {
                         MATCH_ID,
                         COMMAND_TWO,
                         PLAYER_ONE,
+                        PLAYER_ONE_GENERATION,
                         new BattleMatch.Ready(PLAYER_ONE.toString())));
 
         assertEquals(1, receipts.receipts.size());
-        assertEquals(1, matches.snapshot.aggregateVersion());
+        assertEquals(3, matches.snapshot.aggregateVersion());
     }
 
     @Test
@@ -178,12 +210,13 @@ class BattleMatchCommandServiceTest {
                         MATCH_ID,
                         COMMAND_ONE,
                         PLAYER_ONE,
+                        PLAYER_ONE_GENERATION,
                         new BattleMatch.Surrender(PLAYER_ONE.toString())));
 
         assertEquals(BattleMatch.State.JUDGING, matches.snapshot.state());
-        assertEquals(4, matches.snapshot.aggregateVersion());
+        assertEquals(6, matches.snapshot.aggregateVersion());
         assertNull(matches.snapshot.result());
-        assertEquals(List.of(3L), matches.expectedVersions);
+        assertEquals(List.of(5L), matches.expectedVersions);
         assertEquals(0, receipts.receipts.size());
         assertEquals(List.of(MATCH_ID), published);
     }
@@ -222,16 +255,70 @@ class BattleMatchCommandServiceTest {
                 MATCH_ID,
                 COMMAND_ONE,
                 PLAYER_ONE,
+                PLAYER_ONE_GENERATION,
                 new BattleMatch.Surrender(PLAYER_ONE.toString()));
 
         assertEquals(BattleMatch.State.FINISHED, surrendered.state());
         assertEquals(BattleMatch.ResolutionReason.SURRENDER, surrendered.result().reason());
         assertEquals(PLAYER_TWO.toString(), surrendered.result().winnerId());
         assertEquals(NOW.minusNanos(1), surrendered.result().resolvedAt());
-        assertEquals(4, surrendered.aggregateVersion());
+        assertEquals(6, surrendered.aggregateVersion());
         assertEquals(1, receipts.receipts.size());
         assertEquals(List.of(MATCH_ID), published);
         assertEquals(1, clockReads.get());
+    }
+
+    @Test
+    void d3Sec001RejectsACommandFromASupersededTransportGeneration() {
+        FakeMatches matches = new FakeMatches(runningSnapshotWithReplacementConnection());
+        FakeReceipts receipts = new FakeReceipts();
+        BattleMatchCommandService service = service(matches, receipts);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> service.handle(
+                        MATCH_ID,
+                        COMMAND_ONE,
+                        PLAYER_ONE,
+                        1,
+                        new BattleMatch.Surrender(PLAYER_ONE.toString())));
+
+        assertEquals(BattleMatch.State.RUNNING, matches.snapshot.state());
+        assertNull(matches.snapshot.result());
+        assertEquals(0, receipts.receipts.size());
+    }
+
+    @Test
+    void d3Sec001ChecksTheCurrentGenerationBeforeReplayingACommandReceipt() {
+        FakeMatches matches = new FakeMatches(initialSnapshot());
+        FakeReceipts receipts = new FakeReceipts();
+        BattleMatchCommandService service = service(matches, receipts);
+        service.handle(
+                MATCH_ID,
+                COMMAND_ONE,
+                PLAYER_ONE,
+                PLAYER_ONE_GENERATION,
+                new BattleMatch.Ready(PLAYER_ONE.toString()));
+        BattleMatch replacement = BattleMatch.restore(
+                matches.snapshot, Clock.fixed(NOW, ZoneOffset.UTC));
+        replacement.handle(new BattleMatch.Reconnect(PLAYER_ONE.toString(), 3));
+        matches.snapshot = replacement.snapshot();
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> service.handle(
+                        MATCH_ID,
+                        COMMAND_ONE,
+                        PLAYER_ONE,
+                        PLAYER_ONE_GENERATION,
+                        new BattleMatch.Ready(PLAYER_ONE.toString())));
+
+        assertEquals(1, receipts.receipts.size());
+        assertEquals(3L, matches.snapshot.players().stream()
+                .filter(player -> player.playerId().equals(PLAYER_ONE.toString()))
+                .findFirst()
+                .orElseThrow()
+                .completedConnectionGeneration());
     }
 
     private static BattleMatchCommandService service(FakeMatches matches, FakeReceipts receipts) {
@@ -245,9 +332,14 @@ class BattleMatchCommandServiceTest {
     }
 
     private static BattleMatch.Snapshot initialSnapshot() {
-        return new BattleMatch(MATCH_ID.toString(), PLAYER_ONE.toString(), PLAYER_TWO.toString(),
-                        Clock.fixed(NOW, ZoneOffset.UTC))
-                .snapshot();
+        BattleMatch match = new BattleMatch(
+                MATCH_ID.toString(),
+                PLAYER_ONE.toString(),
+                PLAYER_TWO.toString(),
+                Clock.fixed(NOW, ZoneOffset.UTC));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE.toString(), PLAYER_ONE_GENERATION));
+        match.handle(new BattleMatch.Reconnect(PLAYER_TWO.toString(), PLAYER_TWO_GENERATION));
+        return match.snapshot();
     }
 
     private static BattleMatch.Snapshot runningSnapshotAtDeadline() {
@@ -257,9 +349,26 @@ class BattleMatchCommandServiceTest {
                 PLAYER_ONE.toString(),
                 PLAYER_TWO.toString(),
                 Clock.fixed(startedAt, ZoneOffset.UTC));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE.toString(), PLAYER_ONE_GENERATION));
+        match.handle(new BattleMatch.Reconnect(PLAYER_TWO.toString(), PLAYER_TWO_GENERATION));
         match.handle(new BattleMatch.Ready(PLAYER_ONE.toString()));
         match.handle(new BattleMatch.Ready(PLAYER_TWO.toString()));
         match.handle(new BattleMatch.Start(Duration.ofMinutes(10)));
+        return match.snapshot();
+    }
+
+    private static BattleMatch.Snapshot runningSnapshotWithReplacementConnection() {
+        BattleMatch match = new BattleMatch(
+                MATCH_ID.toString(),
+                PLAYER_ONE.toString(),
+                PLAYER_TWO.toString(),
+                Clock.fixed(NOW, ZoneOffset.UTC));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE.toString(), 1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_TWO.toString(), 2));
+        match.handle(new BattleMatch.Ready(PLAYER_ONE.toString()));
+        match.handle(new BattleMatch.Ready(PLAYER_TWO.toString()));
+        match.handle(new BattleMatch.Start(Duration.ofMinutes(10)));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE.toString(), 3));
         return match.snapshot();
     }
 

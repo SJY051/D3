@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.ddd.d3.battle.application.BattleMatchCommandService;
+import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchView;
 import com.ddd.d3.battle.application.BattleMatchViewService;
 import com.ddd.d3.battle.domain.BattleMatch;
@@ -113,6 +114,27 @@ class BattleWebSocketHandlerTest {
     }
 
     @Test
+    void d3Btl002MapsSocketLifecycleToAServerOwnedGeneration() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED));
+        BattleConnectionService connections = mock(BattleConnectionService.class);
+        when(connections.connected(MATCH_ID, PLAYER_ONE))
+                .thenReturn(new BattleConnectionService.ConnectionLease(7));
+        BattleWebSocketHandler handler = handler(
+                views,
+                mock(BattleMatchCommandService.class),
+                connections);
+        WebSocketSession session = session("owned-generation", PLAYER_ONE);
+
+        handler.afterConnectionEstablished(session);
+        handler.afterConnectionClosed(session, CloseStatus.GOING_AWAY);
+
+        verify(connections).connected(MATCH_ID, PLAYER_ONE);
+        verify(connections).disconnected(MATCH_ID, PLAYER_ONE, 7);
+    }
+
+    @Test
     void d3Btl002IsolatesAFailedSessionFromTheOtherParticipant() throws Exception {
         BattleMatchViewService views = mock(BattleMatchViewService.class);
         when(views.read(MATCH_ID, PLAYER_ONE))
@@ -155,11 +177,13 @@ class BattleWebSocketHandlerTest {
                 MATCH_ID,
                 COMMAND_ONE,
                 PLAYER_ONE,
+                1,
                 new BattleMatch.Ready(PLAYER_ONE.toString()));
         verify(commands).handle(
                 MATCH_ID,
                 COMMAND_TWO,
                 PLAYER_ONE,
+                1,
                 new BattleMatch.Surrender(PLAYER_ONE.toString()));
         verify(session, never()).close(CloseStatus.BAD_DATA);
         verify(session, never()).close(CloseStatus.POLICY_VIOLATION);
@@ -245,6 +269,7 @@ class BattleWebSocketHandlerTest {
                         MATCH_ID,
                         COMMAND_ONE,
                         PLAYER_ONE,
+                        1,
                         new BattleMatch.Surrender(PLAYER_ONE.toString())))
                 .thenThrow(new IllegalStateException("internal domain state must stay private"));
         BattleWebSocketHandler handler = handler(views, commands);
@@ -293,8 +318,19 @@ class BattleWebSocketHandlerTest {
 
     private BattleWebSocketHandler handler(
             BattleMatchViewService views, BattleMatchCommandService commands) {
+        BattleConnectionService connections = mock(BattleConnectionService.class);
+        when(connections.connected(any(UUID.class), any(UUID.class)))
+                .thenReturn(new BattleConnectionService.ConnectionLease(1));
+        return handler(views, commands, connections);
+    }
+
+    private BattleWebSocketHandler handler(
+            BattleMatchViewService views,
+            BattleMatchCommandService commands,
+            BattleConnectionService connections) {
         return new BattleWebSocketHandler(
-                new BattleWebSocketSessionRegistry(views, objectMapper),
+                new BattleWebSocketSessionRegistry(views, connections, objectMapper),
+                connections,
                 commands,
                 objectMapper);
     }

@@ -36,13 +36,21 @@ public class BattleMatchCommandService {
     }
 
     public BattleMatch.Snapshot handle(
-            UUID matchId, UUID commandId, UUID actorId, BattleMatch.Command command) {
+            UUID matchId,
+            UUID commandId,
+            UUID actorId,
+            long connectionGeneration,
+            BattleMatch.Command command) {
         Objects.requireNonNull(matchId, "matchId must not be null");
         Objects.requireNonNull(commandId, "commandId must not be null");
         Objects.requireNonNull(actorId, "actorId must not be null");
+        if (connectionGeneration <= 0) {
+            throw new IllegalArgumentException("connectionGeneration must be positive");
+        }
         Objects.requireNonNull(command, "command must not be null");
         CommandExecution execution = Objects.requireNonNull(transactions.execute(
-                status -> handleInsideTransaction(matchId, commandId, actorId, command)));
+                status -> handleInsideTransaction(
+                        matchId, commandId, actorId, connectionGeneration, command)));
         try {
             snapshots.publish(matchId);
         } catch (RuntimeException exception) {
@@ -55,11 +63,19 @@ public class BattleMatchCommandService {
     }
 
     private CommandExecution handleInsideTransaction(
-            UUID matchId, UUID commandId, UUID actorId, BattleMatch.Command command) {
+            UUID matchId,
+            UUID commandId,
+            UUID actorId,
+            long connectionGeneration,
+            BattleMatch.Command command) {
         CommandDescriptor descriptor = descriptor(command);
         if (!descriptor.playerId().equals(actorId.toString())) {
             throw new IllegalArgumentException("command player must match authenticated actor");
         }
+
+        BattleMatch.Snapshot loaded = matches.findById(matchId)
+                .orElseThrow(BattleMatchNotFoundException::new);
+        requireAuthoritativeConnection(loaded, actorId, connectionGeneration);
 
         var existing = receipts.findByCommandId(commandId);
         if (existing.isPresent()) {
@@ -70,12 +86,9 @@ public class BattleMatchCommandService {
                     || !receipt.payloadFingerprint().equals(descriptor.fingerprint())) {
                 throw new CommandIdConflictException();
             }
-            return CommandExecution.accepted(
-                    matches.findById(matchId).orElseThrow(BattleMatchNotFoundException::new));
+            return CommandExecution.accepted(loaded);
         }
 
-        BattleMatch.Snapshot loaded = matches.findById(matchId)
-                .orElseThrow(BattleMatchNotFoundException::new);
         Instant acceptedAt = clock.instant();
         BattleMatch match = BattleMatch.restore(loaded, Clock.fixed(acceptedAt, clock.getZone()));
         long initialVersion = match.aggregateVersion();
@@ -110,6 +123,18 @@ public class BattleMatchCommandService {
                 committed.aggregateVersion(),
                 acceptedAt));
         return CommandExecution.accepted(committed);
+    }
+
+    private static void requireAuthoritativeConnection(
+            BattleMatch.Snapshot snapshot, UUID actorId, long connectionGeneration) {
+        BattleMatch.PlayerSnapshot player = snapshot.players().stream()
+                .filter(candidate -> candidate.playerId().equals(actorId.toString()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("actor is not a match participant"));
+        if (player.connectionState() != BattleMatch.ConnectionState.CONNECTED
+                || !Objects.equals(player.completedConnectionGeneration(), connectionGeneration)) {
+            throw new IllegalStateException("WebSocket connection is not authoritative");
+        }
     }
 
     private static CommandDescriptor descriptor(BattleMatch.Command command) {

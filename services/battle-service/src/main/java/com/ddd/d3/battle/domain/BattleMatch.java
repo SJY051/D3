@@ -305,54 +305,63 @@ public final class BattleMatch {
 
     private void disconnect(String playerId, long connectionGeneration) {
         requireParticipant(playerId);
+        long currentGeneration = currentConnectionGeneration(playerId);
+        if (connectionGeneration < currentGeneration) {
+            return;
+        }
+        if (connectionGeneration > currentGeneration) {
+            throw new IllegalStateException("Disconnect generation was not established");
+        }
         advanceTime();
         if (result != null) {
             return;
         }
+        if (connectionStates.get(playerId) == ConnectionState.DISCONNECTED) {
+            return;
+        }
+        if (state == State.LOBBY || state == State.READY) {
+            readyPlayers.remove(playerId);
+            state = State.LOBBY;
+            reconnectGenerations.remove(playerId);
+            reconnectDeadlines.remove(playerId);
+            successfullyReconnectedGenerations.put(playerId, connectionGeneration);
+            connectionStates.put(playerId, ConnectionState.CONNECTING);
+            return;
+        }
         requireState(State.RUNNING);
-        Long activeGeneration = reconnectGenerations.get(playerId);
-        if (activeGeneration != null) {
-            if (connectionGeneration <= activeGeneration) {
-                return;
-            }
-            successfullyReconnectedGenerations.merge(playerId, activeGeneration, Math::max);
-            reconnectGenerations.put(playerId, connectionGeneration);
-            reconnectDeadlines.put(playerId, clock.instant().plus(RECONNECT_GRACE_PERIOD));
-            connectionStates.put(playerId, ConnectionState.DISCONNECTED);
-            return;
-        }
-        Long completedGeneration = successfullyReconnectedGenerations.get(playerId);
-        if (completedGeneration != null && connectionGeneration <= completedGeneration) {
-            return;
-        }
         reconnectGenerations.put(playerId, connectionGeneration);
-        reconnectDeadlines.putIfAbsent(playerId, clock.instant().plus(RECONNECT_GRACE_PERIOD));
+        successfullyReconnectedGenerations.remove(playerId);
+        reconnectDeadlines.put(playerId, clock.instant().plus(RECONNECT_GRACE_PERIOD));
         connectionStates.put(playerId, ConnectionState.DISCONNECTED);
     }
 
     private void reconnect(String playerId, long connectionGeneration) {
         requireParticipant(playerId);
-        Long activeGeneration = reconnectGenerations.get(playerId);
-        if (activeGeneration == null) {
-            Long completedGeneration = successfullyReconnectedGenerations.get(playerId);
-            if (completedGeneration != null && connectionGeneration <= completedGeneration) {
-                return;
-            }
-            throw new IllegalStateException("Player is not disconnected");
-        }
-        if (connectionGeneration < activeGeneration) {
+        long currentGeneration = currentConnectionGeneration(playerId);
+        if (connectionGeneration <= currentGeneration) {
             return;
         }
-        if (connectionGeneration != activeGeneration) {
-            throw new IllegalStateException("Reconnect generation does not match active disconnect");
+        if (connectionStates.get(playerId) == ConnectionState.DISCONNECTED) {
+            advanceTime();
+            if (result != null) {
+                return;
+            }
         }
-        advanceTime();
-        if (result == null) {
-            reconnectDeadlines.remove(playerId);
-            reconnectGenerations.remove(playerId);
-            successfullyReconnectedGenerations.put(playerId, connectionGeneration);
-            connectionStates.put(playerId, ConnectionState.CONNECTED);
+        if (state == State.FINISHED) {
+            return;
         }
+        reconnectDeadlines.remove(playerId);
+        reconnectGenerations.remove(playerId);
+        successfullyReconnectedGenerations.put(playerId, connectionGeneration);
+        connectionStates.put(playerId, ConnectionState.CONNECTED);
+    }
+
+    private long currentConnectionGeneration(String playerId) {
+        Long activeGeneration = reconnectGenerations.get(playerId);
+        if (activeGeneration != null) {
+            return activeGeneration;
+        }
+        return successfullyReconnectedGenerations.getOrDefault(playerId, 0L);
     }
 
     private void surrender(String playerId) {

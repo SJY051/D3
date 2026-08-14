@@ -25,13 +25,14 @@ class BattleMatchViewServiceTest {
     @Test
     void d3Btl002ProjectsOneAuthoritativeParticipantScopedSnapshot() {
         BattleMatch match = runningMatch();
+        match.handle(new BattleMatch.Reconnect(PLAYER_TWO.toString(), 17));
         match.handle(new BattleMatch.Disconnect(PLAYER_TWO.toString(), 17));
         BattleMatchViewService service = service(match.snapshot());
 
         BattleMatchView view = service.read(MATCH_ID, PLAYER_ONE);
 
         assertEquals(MATCH_ID, view.matchId());
-        assertEquals(4, view.aggregateVersion());
+        assertEquals(5, view.aggregateVersion());
         assertEquals(NOW, view.serverTime());
         assertEquals(BattleMatchView.State.RUNNING, view.state());
         assertEquals(NOW, view.startedAt());

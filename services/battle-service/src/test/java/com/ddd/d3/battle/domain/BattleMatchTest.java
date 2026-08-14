@@ -115,16 +115,17 @@ class BattleMatchTest {
     void d3Btl002RestoresTheAuthoritativeSnapshotAndContinuesItsVersionSequence() {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
         match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         BattleMatch.Snapshot snapshot = match.snapshot();
 
         BattleMatch restored = BattleMatch.restore(snapshot, clock);
 
         assertEquals(snapshot, restored.snapshot());
-        assertEquals(4, restored.aggregateVersion());
+        assertEquals(5, restored.aggregateVersion());
         clock.advance(Duration.ofSeconds(30));
         restored.handle(new BattleMatch.AdvanceTime());
-        assertEquals(5, restored.aggregateVersion());
+        assertEquals(6, restored.aggregateVersion());
         assertEquals(PLAYER_TWO, restored.result().orElseThrow().winnerId());
     }
 
@@ -147,15 +148,64 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
         match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         assertTrue(match.isDisconnected(PLAYER_ONE));
         assertEquals(START.plusSeconds(30), match.reconnectDeadline(PLAYER_ONE).orElseThrow());
 
         clock.advance(Duration.ofMillis(29_999));
-        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 2));
 
         assertFalse(match.isDisconnected(PLAYER_ONE));
         assertEquals(BattleMatch.State.RUNNING, match.state());
+    }
+
+    @Test
+    void d3Btl002IgnoresCloseFromASupersededTransportGeneration() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 2));
+
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+
+        assertFalse(match.isDisconnected(PLAYER_ONE));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 2));
+        assertTrue(match.isDisconnected(PLAYER_ONE));
+        assertEquals(START.plusSeconds(30), match.reconnectDeadline(PLAYER_ONE).orElseThrow());
+    }
+
+    @Test
+    void d3Btl002ClearsReadinessWhenTheCurrentTransportClosesBeforeStart() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = new BattleMatch("match-1", PLAYER_ONE, PLAYER_TWO, clock);
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Ready(PLAYER_ONE));
+
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+
+        BattleMatch.PlayerSnapshot disconnected = match.snapshot().players().stream()
+                .filter(player -> player.playerId().equals(PLAYER_ONE))
+                .findFirst()
+                .orElseThrow();
+        assertFalse(disconnected.ready());
+        assertEquals(BattleMatch.ConnectionState.CONNECTING, disconnected.connectionState());
+        assertEquals(1L, disconnected.completedConnectionGeneration());
+        assertNull(disconnected.activeConnectionGeneration());
+        assertNull(disconnected.reconnectDeadline());
+
+        match.handle(new BattleMatch.Ready(PLAYER_TWO));
+        assertEquals(BattleMatch.State.LOBBY, match.state());
+
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 2));
+        BattleMatch.PlayerSnapshot reconnected = match.snapshot().players().stream()
+                .filter(player -> player.playerId().equals(PLAYER_ONE))
+                .findFirst()
+                .orElseThrow();
+        assertFalse(reconnected.ready());
+        assertEquals(BattleMatch.ConnectionState.CONNECTED, reconnected.connectionState());
+        assertEquals(2L, reconnected.completedConnectionGeneration());
     }
 
     @Test
@@ -163,11 +213,12 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
         match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         clock.advance(Duration.ofSeconds(1));
-        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 2));
 
-        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 2));
 
         assertFalse(match.isDisconnected(PLAYER_ONE));
         assertEquals(BattleMatch.State.RUNNING, match.state());
@@ -178,8 +229,9 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
-        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 2));
         match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 2));
 
         match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
@@ -191,17 +243,16 @@ class BattleMatchTest {
     }
 
     @Test
-    void d3Btl002AdvancesToANewerOutOfOrderDisconnectGeneration() {
+    void d3Btl002RejectsCloseFromAnUnestablishedFutureGeneration() {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
-        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
-        clock.advance(Duration.ofSeconds(10));
-        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 2));
         match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
 
-        assertTrue(match.isDisconnected(PLAYER_ONE));
-        assertEquals(START.plusSeconds(40), match.reconnectDeadline(PLAYER_ONE).orElseThrow());
+        assertThrows(
+                IllegalStateException.class,
+                () -> match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 2)));
+        assertFalse(match.isDisconnected(PLAYER_ONE));
     }
 
     @Test
@@ -209,11 +260,14 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
         match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         clock.advance(Duration.ofSeconds(5));
-        match.handle(new BattleMatch.Disconnect(PLAYER_TWO, 1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_TWO, 2));
+        match.handle(new BattleMatch.Disconnect(PLAYER_TWO, 2));
         clock.advance(Duration.ofSeconds(5));
-        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 2));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 3));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 3));
         clock.advance(Duration.ofSeconds(30));
 
         match.handle(new BattleMatch.AdvanceTime());
@@ -226,7 +280,9 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
         match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 3));
         match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 3));
 
         match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 2));
@@ -239,10 +295,11 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
-        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
-        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 2));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 2));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 2));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 3));
 
         match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
 
@@ -255,9 +312,10 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
         match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         clock.advance(Duration.ofSeconds(30));
-        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 2));
 
         BattleMatch.Result result = match.result().orElseThrow();
         assertEquals(BattleMatch.State.FINISHED, match.state());
@@ -272,6 +330,7 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
+        match.handle(new BattleMatch.Reconnect(PLAYER_TWO, 1));
         match.handle(new BattleMatch.Disconnect(PLAYER_TWO, 1));
         clock.advance(Duration.ofSeconds(30).plusNanos(1));
         match.handle(new BattleMatch.AdvanceTime());
@@ -287,6 +346,7 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
         match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         clock.advance(Duration.ofSeconds(30));
 
@@ -328,6 +388,7 @@ class BattleMatchTest {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
 
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
         match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
         clock.advance(Duration.ofSeconds(30));
 
