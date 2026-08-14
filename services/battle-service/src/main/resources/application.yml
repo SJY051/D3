@@ -23,6 +23,14 @@ spring:
       port: ${D3_REDIS_PORT:6379}
   kafka:
     bootstrap-servers: ${D3_KAFKA_HOST:localhost}:${D3_KAFKA_PORT:9092}
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${D3_JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
 
 eureka:
   client:
@@ -39,3 +47,18 @@ management:
     web:
       exposure:
         include: health,info,prometheus
+
+d3:
+  security:
+    jwk-set-uri: ${D3_JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+    issuer: ${D3_JWT_ISSUER:http://localhost:8081}
+    audience: ${D3_JWT_USER_AUDIENCE:d3-user}
+  battle:
+    ranked-matchmaking:
+      initial-rating: ${D3_RANKED_INITIAL_RATING:1500}
+      initial-window: ${D3_RANKED_INITIAL_WINDOW:100}
+      widening-step: ${D3_RANKED_WIDENING_STEP:50}
+      widening-interval: ${D3_RANKED_WIDENING_INTERVAL:10s}
+      maximum-window: ${D3_RANKED_MAXIMUM_WINDOW:300}
+      entry-ttl: ${D3_RANKED_ENTRY_TTL:2m}
+      lease-ttl: ${D3_RANKED_LEASE_TTL:5s}

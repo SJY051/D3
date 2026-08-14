@@ -2,10 +2,119 @@
   "openapi": "3.1.0",
   "info": {
     "title": "D3 Battle API",
-    "version": "0.0.0-scaffold",
-    "description": "No operations are implemented in the scaffold."
+    "version": "1.0.0",
+    "description": "Authenticated ranked matchmaking boundary. Realtime match commands remain inactive until the WebSocket identity contract is approved."
   },
-  "x-requirements": ["D3-BTL-001", "D3-BTL-002", "D3-BTL-003", "D3-BTL-004", "D3-BTL-005", "D3-SOLO-001", "D3-ADM-001"],
-  "paths": {}
+  "x-requirements": ["D3-BTL-001", "D3-BTL-002", "D3-SEC-001"],
+  "paths": {
+    "/api/v1/battle/ranked/queue": {
+      "post": {
+        "operationId": "joinRankedQueue",
+        "summary": "Join or replay an idempotent ranked queue ticket",
+        "security": [{ "bearerAuth": ["battle.play"] }],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "X-Correlation-Id",
+            "in": "header",
+            "required": false,
+            "schema": { "type": "string", "minLength": 1, "maxLength": 128 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RankedQueueJoinRequest" }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The ticket is queued or has converged on a committed match",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RankedQueueJoinResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Identity-issued d3-user token with battle.play scope"
+      }
+    },
+    "schemas": {
+      "RankedQueueJoinRequest": {
+        "type": "object",
+        "required": ["language"],
+        "properties": {
+          "language": {
+            "type": "string",
+            "enum": ["C", "CPP", "JAVA", "PYTHON3", "JAVASCRIPT", "TYPESCRIPT"]
+          }
+        },
+        "additionalProperties": false
+      },
+      "RankedQueueJoinResponse": {
+        "type": "object",
+        "required": ["status", "matchId", "enqueuedAt"],
+        "properties": {
+          "status": { "type": "string", "enum": ["QUEUED", "MATCHED"] },
+          "matchId": { "type": ["string", "null"], "format": "uuid" },
+          "enqueuedAt": { "type": ["string", "null"], "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["code", "message", "correlationId"],
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "correlationId": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Malformed request or idempotency key",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid access token",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "Forbidden": {
+        "description": "The token lacks battle.play authority",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "Conflict": {
+        "description": "The player already owns a different active queue ticket",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "Unavailable": {
+        "description": "Queue coordination or the active problem catalog is temporarily unavailable",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      }
+    }
+  }
 }
-

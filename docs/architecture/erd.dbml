@@ -167,6 +167,7 @@ Table battle_db.match {
   deadline_at timestamptz
   finished_at timestamptz
   void_reason text
+  resolution_reason text [note: 'SURRENDER, DISCONNECT_TIMEOUT, or PLATFORM_INCIDENT for currently implemented terminal paths']
   aggregate_version bigint [not null, default: 0]
   created_at timestamptz [not null]
 }
@@ -176,8 +177,11 @@ Table battle_db.match_player {
   user_id uuid [not null, note: 'Logical identity contract reference; no cross-database FK']
   seat smallint [not null, note: '1 is PLAYER_ONE and 2 is PLAYER_TWO']
   language_key text [not null]
-  connection_state text [not null]
+  connection_state text [not null, note: 'CONNECTING, CONNECTED, or DISCONNECTED']
   reconnect_deadline_at timestamptz
+  queue_ticket_id uuid [note: 'User-scoped HTTP idempotency ticket; null on legacy rows']
+  ready boolean [not null, default: false]
+  connection_generation bigint [not null, default: 0]
   attempts int [not null, default: 0]
   score numeric [note: 'Committed total; null before result calculation']
   speed_score_component numeric [note: 'Committed D3-BTL-003 speed component; null before result calculation']
@@ -193,10 +197,14 @@ Table battle_db.match_player {
     (match_id, user_id) [pk]
     (match_id, seat) [unique]
     (user_id, match_id)
+    (user_id, queue_ticket_id) [unique]
   }
 
   checks {
     `seat IN (1, 2)` [name: 'match_player_supported_seat']
+    `connection_generation >= 0` [name: 'match_player_connection_generation_non_negative']
+    `connection_state <> 'DISCONNECTED' OR connection_generation > 0` [name: 'match_player_disconnect_generation_consistent']
+    `ready = false OR connection_state <> 'CONNECTING'` [name: 'match_player_ready_connection_consistent']
   }
 }
 

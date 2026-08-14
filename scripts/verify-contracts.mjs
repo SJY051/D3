@@ -127,4 +127,17 @@ for (const privateField of ["sourceCode", "hiddenTests", "compilerCommand", "raw
   }
 }
 
-console.log(`contracts: PASS (${files.length} JSON documents, 6 compiled JSON Schemas, privacy and Judge v1 samples)`);
+const battleContract = parsedContracts.find(({ label }) => label.replaceAll("\\", "/") === "contracts/http/battle.openapi.json")?.contract;
+const joinRankedQueue = battleContract?.paths?.["/api/v1/battle/ranked/queue"]?.post;
+if (!joinRankedQueue) {
+  throw new Error("battle v1 ranked queue operation must be present");
+}
+if (joinRankedQueue.security?.[0]?.bearerAuth?.[0] !== "battle.play") {
+  throw new Error("battle v1 ranked queue must require battle.play authority");
+}
+const joinRequest = battleContract.components?.schemas?.RankedQueueJoinRequest;
+if (!joinRequest || joinRequest.additionalProperties !== false || Object.hasOwn(joinRequest.properties ?? {}, "playerId")) {
+  throw new Error("battle ranked queue request must be closed and derive player identity from JWT");
+}
+
+console.log(`contracts: PASS (${files.length} JSON documents, 6 compiled JSON Schemas, privacy, Judge v1, and Battle v1 samples)`);

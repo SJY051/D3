@@ -3,20 +3,41 @@ package com.ddd.d3.battle;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.ddd.d3.battle.application.RankedQueueConflictException;
+import com.ddd.d3.battle.application.RankedQueueStore;
+import com.ddd.d3.battle.application.OptimisticMatchConflictException;
+import com.ddd.d3.battle.application.RankedMatchStore;
+import com.ddd.d3.battle.application.RankedMatchmakingCoordinator;
+import com.ddd.d3.battle.domain.BattleMatch;
+import com.ddd.d3.battle.domain.RankedMatchmaker;
+import com.ddd.d3.battle.infrastructure.persistence.JdbcBattleMatchRepository;
+import com.ddd.d3.battle.infrastructure.persistence.JdbcRankedMatchStore;
+import com.ddd.d3.battle.infrastructure.persistence.JdbcPublicRatingReader;
+import com.ddd.d3.battle.infrastructure.redis.RedisRankedQueueStore;
 import io.lettuce.core.RedisClient;
 import java.sql.Types;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.Clock;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -57,7 +78,7 @@ class BattleInfrastructureIntegrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(2, migrations);
+        assertEquals(3, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -88,6 +109,212 @@ class BattleInfrastructureIntegrationTest {
         try (AdminClient admin = AdminClient.create(Map.of(
                 AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers()))) {
             assertFalse(admin.describeCluster().clusterId().get().isBlank());
+        }
+    }
+
+    @Test
+    void d3Btl001PersistsOneIdempotentRankedLobbyForTwoQueueTickets() {
+        createProblem();
+        RankedMatchmaker.Entry first = rankedEntry(1, 11, 1_000, 1);
+        RankedMatchmaker.Entry second = rankedEntry(2, 22, 1_050, 2);
+        JdbcRankedMatchStore store = new JdbcRankedMatchStore(
+                dataSource, new DataSourceTransactionManager(dataSource));
+        Instant createdAt = Instant.parse("2026-08-14T00:00:00Z");
+
+        RankedMatchStore.RankedMatch created =
+                store.create(new RankedMatchmaker.Pair(second, first), createdAt);
+        RankedMatchStore.RankedMatch retried =
+                store.create(new RankedMatchmaker.Pair(first, second), createdAt.plusSeconds(5));
+
+        assertEquals(created, retried);
+        assertEquals(
+                created.matchId(),
+                store.findMatchIdByTicket(first.ticketId(), first.playerId()).orElseThrow());
+        assertEquals(
+                created.matchId(),
+                store.findMatchIdByTicket(second.ticketId(), second.playerId()).orElseThrow());
+        assertTrue(store.findMatchIdByTicket(first.ticketId(), second.playerId()).isEmpty());
+        assertEquals(1, jdbc.sql("select count(*) from match where id = :matchId")
+                .param("matchId", created.matchId())
+                .query(Integer.class)
+                .single());
+        assertEquals("LOBBY", jdbc.sql("select status from match where id = :matchId")
+                .param("matchId", created.matchId())
+                .query(String.class)
+                .single());
+        assertEquals(2, jdbc.sql("select count(*) from match_player where match_id = :matchId")
+                .param("matchId", created.matchId())
+                .query(Integer.class)
+                .single());
+        assertEquals(2, jdbc.sql("""
+                        select count(*)
+                        from match_player
+                        where match_id = :matchId and connection_state = 'CONNECTING'
+                        """)
+                .param("matchId", created.matchId())
+                .query(Integer.class)
+                .single());
+    }
+
+    @Test
+    void d3Btl002RestoresAndOptimisticallyCommitsAuthoritativeMatchState() {
+        createProblem();
+        RankedMatchmaker.Entry first = rankedEntry(1, 11, 1_000, 1);
+        RankedMatchmaker.Entry second = rankedEntry(2, 22, 1_050, 2);
+        DataSourceTransactionManager transactionManager = new DataSourceTransactionManager(dataSource);
+        JdbcRankedMatchStore matchmaking = new JdbcRankedMatchStore(dataSource, transactionManager);
+        RankedMatchStore.RankedMatch created = matchmaking.create(
+                new RankedMatchmaker.Pair(first, second), Instant.parse("2026-08-14T00:00:00Z"));
+        JdbcBattleMatchRepository matches = new JdbcBattleMatchRepository(dataSource, transactionManager);
+        Clock clock = Clock.fixed(Instant.parse("2026-08-14T00:00:01Z"), ZoneOffset.UTC);
+
+        BattleMatch match = BattleMatch.restore(matches.findById(created.matchId()).orElseThrow(), clock);
+        assertEquals(BattleMatch.ConnectionState.CONNECTING, match.connectionState(first.playerId().toString()));
+        applyAndSave(matches, match, new BattleMatch.Ready(first.playerId().toString()));
+        applyAndSave(matches, match, new BattleMatch.Ready(second.playerId().toString()));
+        applyAndSave(matches, match, new BattleMatch.Start(Duration.ofMinutes(10)));
+        applyAndSave(matches, match, new BattleMatch.Disconnect(first.playerId().toString(), 1));
+
+        BattleMatch.Snapshot disconnected = matches.findById(created.matchId()).orElseThrow();
+        assertEquals(match.snapshot(), disconnected);
+        BattleMatch surrender = BattleMatch.restore(disconnected, clock);
+        BattleMatch incident = BattleMatch.restore(disconnected, clock);
+        surrender.handle(new BattleMatch.Surrender(first.playerId().toString()));
+        incident.handle(new BattleMatch.PlatformIncident("judge-incident-1"));
+
+        matches.save(surrender.snapshot(), disconnected.aggregateVersion());
+        assertThrows(
+                OptimisticMatchConflictException.class,
+                () -> matches.save(incident.snapshot(), disconnected.aggregateVersion()));
+
+        BattleMatch.Snapshot finished = matches.findById(created.matchId()).orElseThrow();
+        assertEquals(BattleMatch.State.FINISHED, finished.state());
+        assertEquals(second.playerId().toString(), finished.result().winnerId());
+        assertEquals(BattleMatch.ResolutionReason.SURRENDER, finished.result().reason());
+    }
+
+    @Test
+    void d3Btl001ReadsAuthoritativeRatingWithAPlacementFallback() {
+        UUID playerId = UUID.randomUUID();
+        JdbcPublicRatingReader ratings = new JdbcPublicRatingReader(dataSource, 1_500);
+
+        assertEquals(1_500, ratings.publicRating(playerId));
+        assertEquals(1, jdbc.sql("""
+                        insert into rating (
+                            user_id, public_rating, placement_count, games_played, updated_at
+                        ) values (:playerId, 1625, 2, 2, now())
+                        """)
+                .param("playerId", playerId)
+                .update());
+        assertEquals(1_625, ratings.publicRating(playerId));
+    }
+
+    @Test
+    void d3Btl001KeepsRedisQueueEntriesExpiringIdempotentAndLeaseFenced() {
+        LettuceConnectionFactory redisConnection =
+                new LettuceConnectionFactory(REDIS.getHost(), REDIS.getMappedPort(6379));
+        redisConnection.afterPropertiesSet();
+        redisConnection.start();
+        try {
+            StringRedisTemplate redisTemplate = new StringRedisTemplate(redisConnection);
+            redisTemplate.afterPropertiesSet();
+            String prefix = "d3:test:ranked:" + UUID.randomUUID();
+            RedisRankedQueueStore queue = new RedisRankedQueueStore(redisTemplate, prefix);
+            RankedQueueStore.Ticket ticket = new RankedQueueStore.Ticket(
+                    new UUID(1, 1),
+                    new UUID(2, 1),
+                    RankedMatchmaker.Language.JAVA,
+                    1_000,
+                    Instant.parse("2026-08-14T00:00:00Z"));
+            Duration entryTtl = Duration.ofMinutes(2);
+
+            RankedMatchmaker.Entry first;
+            try (RankedQueueStore.Lease lease = queue.tryAcquire(
+                            RankedMatchmaker.Language.JAVA, Duration.ofSeconds(5))
+                    .orElseThrow()) {
+                first = lease.enqueue(ticket, entryTtl);
+                assertEquals(first, lease.enqueue(ticket, entryTtl));
+                assertEquals(Set.of(first), Set.copyOf(lease.activeEntries()));
+                assertTrue(queue.tryAcquire(RankedMatchmaker.Language.JAVA, Duration.ofSeconds(5)).isEmpty());
+            }
+
+            try (RankedQueueStore.Lease otherLanguage = queue.tryAcquire(
+                            RankedMatchmaker.Language.PYTHON3, Duration.ofSeconds(5))
+                    .orElseThrow()) {
+                RankedQueueStore.Ticket conflicting = new RankedQueueStore.Ticket(
+                        new UUID(1, 2),
+                        ticket.playerId(),
+                        RankedMatchmaker.Language.PYTHON3,
+                        1_000,
+                        ticket.enqueuedAt());
+                assertThrows(
+                        RankedQueueConflictException.class,
+                        () -> otherLanguage.enqueue(conflicting, entryTtl));
+            }
+
+            Set<String> coordinationKeys = redisTemplate.keys(prefix + "*");
+            assertFalse(coordinationKeys.isEmpty());
+            assertTrue(coordinationKeys.stream().allMatch(key ->
+                    redisTemplate.getExpire(key, TimeUnit.MILLISECONDS) > 0));
+
+            try (RankedQueueStore.Lease lease = queue.tryAcquire(
+                            RankedMatchmaker.Language.JAVA, Duration.ofSeconds(5))
+                    .orElseThrow()) {
+                lease.remove(Set.of(first));
+                assertEquals(List.of(), lease.activeEntries());
+            }
+        } finally {
+            redisConnection.destroy();
+        }
+    }
+
+    @Test
+    void d3Btl001MatchesTwoUsersAcrossRedisAndAuthoritativePostgres() {
+        createProblem();
+        LettuceConnectionFactory redisConnection =
+                new LettuceConnectionFactory(REDIS.getHost(), REDIS.getMappedPort(6379));
+        redisConnection.afterPropertiesSet();
+        redisConnection.start();
+        try {
+            StringRedisTemplate redisTemplate = new StringRedisTemplate(redisConnection);
+            redisTemplate.afterPropertiesSet();
+            DataSourceTransactionManager transactionManager = new DataSourceTransactionManager(dataSource);
+            JdbcRankedMatchStore matches = new JdbcRankedMatchStore(dataSource, transactionManager);
+            RankedMatchmakingCoordinator coordinator = new RankedMatchmakingCoordinator(
+                    new RankedMatchmaker(new RankedMatchmaker.Policy(
+                            100, 50, Duration.ofSeconds(10), 300)),
+                    new RedisRankedQueueStore(
+                            redisTemplate, "d3:test:ranked-integration:" + UUID.randomUUID()),
+                    matches,
+                    playerId -> 1_500,
+                    Clock.fixed(Instant.parse("2026-08-14T00:00:00Z"), ZoneOffset.UTC),
+                    Duration.ofMinutes(2),
+                    Duration.ofSeconds(5));
+            UUID firstPlayer = UUID.randomUUID();
+            UUID secondPlayer = UUID.randomUUID();
+            UUID firstTicket = UUID.randomUUID();
+            UUID secondTicket = UUID.randomUUID();
+
+            RankedMatchmakingCoordinator.JoinResult queued =
+                    coordinator.join(firstTicket, firstPlayer, RankedMatchmaker.Language.TYPESCRIPT);
+            RankedMatchmakingCoordinator.JoinResult matched =
+                    coordinator.join(secondTicket, secondPlayer, RankedMatchmaker.Language.TYPESCRIPT);
+            RankedMatchmakingCoordinator.JoinResult replayed =
+                    coordinator.join(firstTicket, firstPlayer, RankedMatchmaker.Language.TYPESCRIPT);
+
+            assertEquals(RankedMatchmakingCoordinator.Status.QUEUED, queued.status());
+            assertEquals(RankedMatchmakingCoordinator.Status.MATCHED, matched.status());
+            assertEquals(matched.matchId(), replayed.matchId());
+            assertEquals(1, jdbc.sql("select count(*) from match where id = :matchId")
+                    .param("matchId", matched.matchId())
+                    .query(Integer.class)
+                    .single());
+            assertEquals(2, jdbc.sql("select count(*) from match_player where match_id = :matchId")
+                    .param("matchId", matched.matchId())
+                    .query(Integer.class)
+                    .single());
+        } finally {
+            redisConnection.destroy();
         }
     }
 
@@ -241,13 +468,21 @@ class BattleInfrastructureIntegrationTest {
     }
 
     @Test
-    void d3Qlt001UpgradesExistingJudgeCorrelationsWithoutChangingV1() {
+    void d3Qlt001UpgradesExistingBattleDataWithoutChangingV1() {
         migrateOnlyThrough("1");
         UUID matchId = createRunningMatch();
         UUID playerId = UUID.randomUUID();
         UUID opponentId = UUID.randomUUID();
         addPlayer(matchId, playerId, 1);
         addPlayer(matchId, opponentId, 2);
+        assertEquals(1, jdbc.sql("""
+                        update match_player
+                        set connection_state = 'DISCONNECTED', reconnect_deadline_at = now() + interval '30 seconds'
+                        where match_id = :matchId and user_id = :playerId
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .update());
         UUID runSubmissionId = insertLegacyRun(matchId, playerId);
         UUID acceptedSubmissionId = UUID.randomUUID();
         UUID supersededSubmissionId = UUID.randomUUID();
@@ -280,7 +515,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(1, applied);
+        assertEquals(2, applied);
         assertEquals(1, jdbc.sql("""
                         select count(*)
                         from judge_job_reference
@@ -367,6 +602,28 @@ class BattleInfrastructureIntegrationTest {
                         """)
                 .query(Integer.class)
                 .single());
+        assertEquals(2, jdbc.sql("""
+                        select count(*)
+                        from match_player
+                        where match_id = :matchId and ready = true
+                        """)
+                .param("matchId", matchId)
+                .query(Integer.class)
+                .single());
+        assertEquals(1, jdbc.sql("""
+                        select connection_generation
+                        from match_player
+                        where match_id = :matchId and user_id = :playerId
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .query(Long.class)
+                .single());
+        JdbcBattleMatchRepository upgradedMatches = new JdbcBattleMatchRepository(
+                dataSource, new DataSourceTransactionManager(dataSource));
+        assertEquals(
+                BattleMatch.State.RUNNING,
+                upgradedMatches.findById(matchId).orElseThrow().state());
     }
 
     @Test
@@ -457,6 +714,24 @@ class BattleInfrastructureIntegrationTest {
                 .param("slug", "fixture-" + problemId)
                 .update());
         return problemId;
+    }
+
+    private static RankedMatchmaker.Entry rankedEntry(
+            long ticketId, long playerId, int rating, long sequence) {
+        return new RankedMatchmaker.Entry(
+                new UUID(1, ticketId),
+                new UUID(2, playerId),
+                RankedMatchmaker.Language.JAVA,
+                rating,
+                Instant.parse("2026-08-14T00:00:00Z").plusSeconds(sequence),
+                sequence);
+    }
+
+    private static void applyAndSave(
+            JdbcBattleMatchRepository repository, BattleMatch match, BattleMatch.Command command) {
+        long expectedVersion = match.aggregateVersion();
+        match.handle(command);
+        repository.save(match.snapshot(), expectedVersion);
     }
 
     private UUID createRunningMatch() {
