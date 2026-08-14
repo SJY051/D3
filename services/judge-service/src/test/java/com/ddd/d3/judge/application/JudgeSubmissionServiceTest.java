@@ -198,6 +198,34 @@ class JudgeSubmissionServiceTest {
         }
     }
 
+    @Test
+    void d3Jdg001CommitsPlatformFailureOnlyThroughTheExplicitExhaustionPath() {
+        InMemoryRepository repository = new InMemoryRepository();
+        JudgeSubmissionService service = new JudgeSubmissionService(
+                repository,
+                new JudgeExecutionAdapter() {
+                    @Override
+                    public boolean isAvailable(JudgeLanguage language) {
+                        return true;
+                    }
+
+                    @Override
+                    public JudgeExecutionResult execute(SubmissionCommand command) {
+                        throw new IllegalStateException("temporary transport failure");
+                    }
+                },
+                Clock.fixed(ACCEPTED_AT, ZoneOffset.UTC),
+                () -> SUBMISSION_ID);
+        service.accept(submitCommand("private-source"));
+
+        assertThrows(IllegalStateException.class, () -> service.evaluate(SUBMISSION_ID));
+        assertEquals(JudgeStatus.QUEUED, repository.findById(SUBMISSION_ID).orElseThrow().status());
+
+        SafeEvaluationEvidence evidence = service.completePlatformFailure(SUBMISSION_ID);
+        assertEquals(JudgeStatus.PLATFORM_FAILURE, evidence.status());
+        assertEquals(evidence, repository.findById(SUBMISSION_ID).orElseThrow().evidence());
+    }
+
     private static JudgeSubmissionService service(boolean available) {
         return new JudgeSubmissionService(
                 new InMemoryRepository(),

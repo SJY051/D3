@@ -1,16 +1,18 @@
 package com.ddd.d3.judge.application;
 
-import com.ddd.d3.judge.domain.SubmissionAcceptance;
-import com.ddd.d3.judge.domain.SubmissionCommand;
+import com.ddd.d3.judge.domain.JudgeExecutionResult;
 import com.ddd.d3.judge.domain.JudgeStatus;
 import com.ddd.d3.judge.domain.JudgeSubmission;
 import com.ddd.d3.judge.domain.SafeEvaluationEvidence;
+import com.ddd.d3.judge.domain.SubmissionAcceptance;
+import com.ddd.d3.judge.domain.SubmissionCommand;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -100,6 +102,43 @@ public final class JudgeSubmissionService {
             throw new EvidenceNotReadyException(submissionId);
         }
         return submission.evidence();
+    }
+
+    public SafeEvaluationEvidence completePlatformFailure(UUID submissionId) {
+        Objects.requireNonNull(submissionId, "submissionId");
+        JudgeSubmission current = repository.findById(submissionId)
+                .orElseThrow(() -> new SubmissionNotFoundException(submissionId));
+        if (current.evidence() != null) {
+            return current.evidence();
+        }
+
+        JudgeSubmission claimed = repository.claimForEvaluation(submissionId).orElseGet(() -> {
+            JudgeSubmission latest = repository.findById(submissionId)
+                    .orElseThrow(() -> new SubmissionNotFoundException(submissionId));
+            if (latest.evidence() != null) {
+                return latest;
+            }
+            throw new EvaluationInProgressException(submissionId);
+        });
+        if (claimed.evidence() != null) {
+            return claimed.evidence();
+        }
+
+        try {
+            JudgeExecutionResult failure = new JudgeExecutionResult(
+                    JudgeStatus.PLATFORM_FAILURE,
+                    0,
+                    0,
+                    List.of(),
+                    "judge-platform-v1",
+                    "unavailable",
+                    clock.instant());
+            SafeEvaluationEvidence evidence = SafeEvaluationEvidence.from(claimed, failure);
+            return repository.completeEvaluation(claimed.complete(evidence)).evidence();
+        } catch (RuntimeException exception) {
+            repository.releaseEvaluationClaim(submissionId, claimed.evaluationClaimId());
+            throw exception;
+        }
     }
 
     private static String fingerprint(SubmissionCommand command) {

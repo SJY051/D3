@@ -214,6 +214,19 @@ class JudgeSubmissionControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.correlationId").value("corr-invalid-path"));
+
+        String unknownField = requestJson("print(1)").replace(
+                "\"attemptNumber\": 1",
+                "\"attemptNumber\": 1, \"attemptNumer\": 1");
+        mockMvc.perform(post("/internal/v1/judge/submissions")
+                        .with(serviceJwt("SCOPE_judge.submit"))
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Correlation-Id", "corr-unknown-field")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(unknownField))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.correlationId").value("corr-unknown-field"));
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor serviceJwt(String authority) {

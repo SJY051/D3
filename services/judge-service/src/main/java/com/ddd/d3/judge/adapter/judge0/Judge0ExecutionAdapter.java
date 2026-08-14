@@ -78,12 +78,7 @@ public final class Judge0ExecutionAdapter implements JudgeExecutionAdapter {
         boolean wrongAnswerObserved = false;
         String runtimeVersion = "unavailable";
         for (JudgeCase judgeCase : correctnessCases) {
-            Judge0Result result;
-            try {
-                result = client.execute(request(command, judgeCase));
-            } catch (RuntimeException exception) {
-                return platformFailure(command, correctnessCases.size());
-            }
+            Judge0Result result = client.execute(request(command, judgeCase));
             runtimeVersion = RUNTIMES.get(command.language()).runtimeVersion();
             JudgeStatus status = normalize(result);
             if (status == JudgeStatus.ACCEPTED) {
@@ -116,12 +111,7 @@ public final class Judge0ExecutionAdapter implements JudgeExecutionAdapter {
             for (JudgeCase judgeCase : problem.performanceCases()) {
                 List<Long> samples = new ArrayList<>();
                 for (int sample = 0; sample < PERFORMANCE_SAMPLE_COUNT; sample++) {
-                    Judge0Result result;
-                    try {
-                        result = client.execute(request(command, judgeCase));
-                    } catch (RuntimeException exception) {
-                        return platformFailure(command, correctnessCases.size());
-                    }
+                    Judge0Result result = client.execute(request(command, judgeCase));
                     runtimeVersion = RUNTIMES.get(command.language()).runtimeVersion();
                     JudgeStatus status = normalize(result);
                     if (status != JudgeStatus.ACCEPTED) {

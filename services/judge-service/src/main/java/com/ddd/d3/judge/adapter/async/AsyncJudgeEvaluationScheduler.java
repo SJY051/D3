@@ -49,10 +49,25 @@ public final class AsyncJudgeEvaluationScheduler implements JudgeEvaluationSched
                         attempt,
                         submissionId,
                         exception.getClass().getSimpleName());
-                if (attempt == MAX_ATTEMPTS || !sleep()) {
+                if (attempt == MAX_ATTEMPTS) {
+                    completePlatformFailure(submissionId);
+                    return;
+                }
+                if (!sleep()) {
                     return;
                 }
             }
+        }
+    }
+
+    private void completePlatformFailure(UUID submissionId) {
+        try {
+            submissionService.completePlatformFailure(submissionId);
+        } catch (RuntimeException exception) {
+            LOGGER.warn(
+                    "Judge platform failure finalization deferred for submission {} with {}",
+                    submissionId,
+                    exception.getClass().getSimpleName());
         }
     }
 

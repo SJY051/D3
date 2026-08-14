@@ -98,9 +98,7 @@ class Judge0ExecutionAdapterTest {
         client.next = new Judge0Result("Runtime Error (Other)", 1, 1024, "Python 3.8.1");
         assertEquals(JudgeStatus.RUNTIME_ERROR, adapter.execute(command("runtime")).status());
         client.failure = new IllegalStateException("private provider diagnostic");
-        var platformFailure = adapter.execute(command("private source"));
-        assertEquals(JudgeStatus.PLATFORM_FAILURE, platformFailure.status());
-        assertEquals(0, platformFailure.passedCount());
+        assertThrows(IllegalStateException.class, () -> adapter.execute(command("private source")));
     }
 
     @Test
