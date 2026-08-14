@@ -89,18 +89,18 @@ final class BattleWebSocketSessionRegistry {
     private void sendLatestQuietly(Registration registration) {
         try {
             sendLatest(registration);
-        } catch (IOException exception) {
+        } catch (SnapshotPreparationException exception) {
+            LOGGER.warn(
+                    "Battle snapshot read deferred; matchId={} sessionId={}",
+                    registration.matchId,
+                    registration.session.getId());
+        } catch (IOException | RuntimeException exception) {
             evict(registration);
             LOGGER.warn(
                     "Battle snapshot delivery failed; matchId={} sessionId={}",
                     registration.matchId,
                     registration.session.getId());
             closeQuietly(registration.session, CloseStatus.SERVER_ERROR);
-        } catch (RuntimeException exception) {
-            LOGGER.warn(
-                    "Battle snapshot read deferred; matchId={} sessionId={}",
-                    registration.matchId,
-                    registration.session.getId());
         }
     }
 
@@ -110,13 +110,25 @@ final class BattleWebSocketSessionRegistry {
                 evict(registration);
                 return;
             }
-            var view = views.read(registration.matchId, registration.viewerId);
-            if (view.aggregateVersion() <= registration.lastSequence) {
+            PreparedSnapshot prepared = prepareLatest(registration);
+            if (prepared == null) {
                 return;
             }
+            registration.session.sendMessage(prepared.message());
+            registration.lastSequence = prepared.sequence();
+        }
+    }
+
+    private PreparedSnapshot prepareLatest(Registration registration) {
+        try {
+            var view = views.read(registration.matchId, registration.viewerId);
+            if (view.aggregateVersion() <= registration.lastSequence) {
+                return null;
+            }
             String payload = objectMapper.writeValueAsString(BattleSnapshotMessageV2.from(view));
-            registration.session.sendMessage(new TextMessage(payload));
-            registration.lastSequence = view.aggregateVersion();
+            return new PreparedSnapshot(view.aggregateVersion(), new TextMessage(payload));
+        } catch (RuntimeException exception) {
+            throw new SnapshotPreparationException(exception);
         }
     }
 
@@ -173,6 +185,15 @@ final class BattleWebSocketSessionRegistry {
             this.matchId = matchId;
             this.viewerId = viewerId;
             this.generation = generation;
+        }
+    }
+
+    private record PreparedSnapshot(long sequence, TextMessage message) {}
+
+    private static final class SnapshotPreparationException extends RuntimeException {
+
+        private SnapshotPreparationException(Exception cause) {
+            super(cause);
         }
     }
 }

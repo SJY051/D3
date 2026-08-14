@@ -17,7 +17,6 @@ import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchView;
 import com.ddd.d3.battle.application.BattleMatchViewService;
 import com.ddd.d3.battle.domain.BattleMatch;
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -148,7 +147,9 @@ class BattleWebSocketHandlerTest {
         BattleWebSocketHandler handler = handler(views);
         WebSocketSession failed = session("failed", PLAYER_ONE);
         WebSocketSession healthy = session("healthy", PLAYER_TWO);
-        doNothing().doThrow(new IOException("closed transport")).when(failed).sendMessage(any(TextMessage.class));
+        doNothing().doThrow(new IllegalStateException("closed transport"))
+                .when(failed)
+                .sendMessage(any(TextMessage.class));
 
         handler.afterConnectionEstablished(failed);
         handler.afterConnectionEstablished(healthy);
