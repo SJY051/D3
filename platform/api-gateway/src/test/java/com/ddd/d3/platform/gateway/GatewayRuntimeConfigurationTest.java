@@ -3,6 +3,7 @@ package com.ddd.d3.platform.gateway;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -11,12 +12,19 @@ import java.net.http.HttpResponse;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Mono;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -28,12 +36,26 @@ import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 class GatewayRuntimeConfigurationTest {
 
     private static final String CORRELATION_HEADER = "X-Correlation-Id";
+    private static final String TEST_TOKEN = "header.payload.signature";
 
     @LocalServerPort
     int port;
 
     @Autowired
     RouteDefinitionLocator routeDefinitionLocator;
+
+    @MockitoBean
+    ReactiveJwtDecoder jwtDecoder;
+
+    @BeforeEach
+    void setUpJwtDecoder() {
+        Jwt jwt = Jwt.withTokenValue(TEST_TOKEN)
+                .header("alg", "none")
+                .subject("11111111-1111-4111-8111-111111111111")
+                .claim("scope", "battle.play")
+                .build();
+        when(jwtDecoder.decode(TEST_TOKEN)).thenReturn(Mono.just(jwt));
+    }
 
     @Test
     void d3Qlt001UsesExplicitGatewayRoutesWithoutExposingJudge0() {
@@ -108,6 +130,25 @@ class GatewayRuntimeConfigurationTest {
                 allowed.headers().firstValue("Access-Control-Allow-Origin").orElseThrow());
         assertEquals(403, rejected.statusCode());
         assertTrue(rejected.headers().firstValue("Access-Control-Allow-Origin").isEmpty());
+    }
+
+    @Test
+    void d3Sec001AuthenticatesBrowserWebSocketCredentialsBeforeRouting() {
+        WebTestClient client = WebTestClient.bindToServer()
+                .baseUrl("http://127.0.0.1:" + port)
+                .build();
+
+        client.get()
+                .uri("/ws/v1/battle/matches/33333333-3333-4333-8333-333333333333")
+                .header(HttpHeaders.CONNECTION, "Upgrade")
+                .header(HttpHeaders.UPGRADE, "websocket")
+                .header(HttpHeaders.ORIGIN, "http://localhost:5173")
+                .header("Sec-WebSocket-Version", "13")
+                .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+                .header("Sec-WebSocket-Protocol", "d3.battle.v2, d3.jwt." + TEST_TOKEN)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(503);
     }
 
     private HttpResponse<String> request(String correlationId) throws Exception {

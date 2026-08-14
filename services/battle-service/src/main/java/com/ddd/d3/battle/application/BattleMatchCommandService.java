@@ -5,27 +5,33 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionOperations;
 
 public class BattleMatchCommandService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(BattleMatchCommandService.class);
     private final BattleMatchRepository matches;
     private final BattleCommandReceiptStore receipts;
     private final Clock clock;
     private final Duration matchDuration;
     private final TransactionOperations transactions;
+    private final BattleSnapshotPublisher snapshots;
 
     public BattleMatchCommandService(
             BattleMatchRepository matches,
             BattleCommandReceiptStore receipts,
             Clock clock,
             Duration matchDuration,
-            TransactionOperations transactions) {
+            TransactionOperations transactions,
+            BattleSnapshotPublisher snapshots) {
         this.matches = Objects.requireNonNull(matches, "matches must not be null");
         this.receipts = Objects.requireNonNull(receipts, "receipts must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.matchDuration = requirePositive(matchDuration);
         this.transactions = Objects.requireNonNull(transactions, "transactions must not be null");
+        this.snapshots = Objects.requireNonNull(snapshots, "snapshots must not be null");
     }
 
     public BattleMatch.Snapshot handle(
@@ -34,8 +40,14 @@ public class BattleMatchCommandService {
         Objects.requireNonNull(commandId, "commandId must not be null");
         Objects.requireNonNull(actorId, "actorId must not be null");
         Objects.requireNonNull(command, "command must not be null");
-        return Objects.requireNonNull(transactions.execute(
+        BattleMatch.Snapshot committed = Objects.requireNonNull(transactions.execute(
                 status -> handleInsideTransaction(matchId, commandId, actorId, command)));
+        try {
+            snapshots.publish(matchId);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Committed battle snapshot fan-out failed for matchId={}", matchId);
+        }
+        return committed;
     }
 
     private BattleMatch.Snapshot handleInsideTransaction(

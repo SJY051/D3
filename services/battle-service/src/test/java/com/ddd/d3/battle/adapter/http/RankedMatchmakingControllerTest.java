@@ -5,6 +5,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -120,6 +121,17 @@ class RankedMatchmakingControllerTest {
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value("QUEUE_UNAVAILABLE"))
                 .andExpect(jsonPath("$.correlationId").value("corr-busy"));
+    }
+
+    @Test
+    void d3Sec001AllowsAuthenticatedBattlePlayersToReachTheWebSocketHandshake() throws Exception {
+        mockMvc.perform(get("/ws/v1/battle/matches/" + MATCH_ID).with(playerJwt()))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/ws/v1/battle/matches/" + MATCH_ID)
+                        .with(jwt().jwt(token -> token.subject(PLAYER_ID.toString()))
+                                .authorities(new SimpleGrantedAuthority("SCOPE_identity.profile"))))
+                .andExpect(status().isForbidden());
     }
 
     @Test
