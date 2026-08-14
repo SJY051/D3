@@ -110,6 +110,9 @@ const readJudgeEvidence = judgeContract?.paths?.["/internal/v1/judge/submissions
 if (!acceptJudgeSubmission || !readJudgeEvidence) {
   throw new Error("judge v1 acceptance and safe-evidence operations must both be present");
 }
+if (readJudgeEvidence.responses?.["400"]?.$ref !== "#/components/responses/BadRequest") {
+  throw new Error("judge v1 evidence read must declare its bad-request response");
+}
 const safeEvidence = judgeContract.components?.schemas?.SafeEvaluationEvidence;
 if (!safeEvidence || safeEvidence.additionalProperties !== false) {
   throw new Error("judge safe evidence must be a closed schema");

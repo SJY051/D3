@@ -1,6 +1,6 @@
 // D³ logical ERD — D3-DOC-001
 // Owner: service owners
-// Status: logical baseline; physical migrations and query evidence pending
+// Status: logical baseline; Judge physical migration active, other services pending
 // Last verified: 2026-08-14 against the event contracts, MVP specification and service boundaries
 //
 // Each schema below represents a separately owned PostgreSQL database, not a
@@ -9,7 +9,7 @@
 
 Project d3 {
   database_type: "PostgreSQL"
-  Note: 'Logical submission model. Flyway migrations remain authoritative once implemented.'
+  Note: 'Logical submission model. Each service Flyway migration is authoritative when present.'
 }
 
 Enum identity_login_provider {
@@ -275,7 +275,7 @@ Ref: battle_db.attack_event.match_id > battle_db.match.id
 
 Table judge_db.submission {
   id uuid [pk]
-  idempotency_key text [not null, unique]
+  idempotency_key uuid [not null, unique]
   user_id uuid [not null, note: 'Logical identity contract reference']
   match_id uuid [note: 'Logical battle contract reference; null for solo']
   problem_id uuid [not null, note: 'Versioned logical problem reference']
@@ -284,12 +284,23 @@ Table judge_db.submission {
   language_key text [not null]
   source_code text [not null, note: 'Private by default; excluded from public events and logs']
   attempt_number int
-  accepted_at timestamptz
+  correlation_id text [not null]
+  request_fingerprint text [not null, note: 'Detects conflicting reuse of one idempotency key without retaining another source copy']
+  status judge_run_status [not null]
+  evaluation_claim_id uuid [note: 'Opaque fencing token; present only while one worker owns a RUNNING evaluation']
+  claim_started_at timestamptz [note: 'Supports bounded recovery of an abandoned RUNNING claim']
+  evaluation_started_at timestamptz [note: 'Durable no-replay fence set before any Judge0 provider request']
+  accepted_at timestamptz [not null]
   created_at timestamptz [not null]
 
   Indexes {
+    (status, accepted_at)
     (match_id, user_id, attempt_number)
     (user_id, created_at)
+  }
+
+  checks {
+    `(status = 'RUNNING' AND evaluation_claim_id IS NOT NULL AND claim_started_at IS NOT NULL) OR (status <> 'RUNNING' AND evaluation_claim_id IS NULL AND claim_started_at IS NULL)` [name: 'submission_evaluation_claim_state']
   }
 }
 
@@ -299,24 +310,24 @@ Table judge_db.judge_run {
   adapter_version text [not null]
   runtime_version text [not null]
   status judge_run_status [not null]
-  cpu_time_ms bigint
-  wall_time_ms bigint
-  memory_kib bigint
-  started_at timestamptz
-  completed_at timestamptz
+  passed_count int [not null]
+  total_count int [not null]
+  completed_at timestamptz [not null]
   correlation_id text [not null]
 }
 
 Table judge_db.evaluation_evidence {
   id uuid [pk]
   judge_run_id uuid [not null]
-  case_group text [not null]
-  passed_count int [not null]
-  total_count int [not null]
-  measured_runtime_ms bigint
-  static_complexity text
-  static_confidence numeric
+  tier text [not null, note: 'SMALL, MEDIUM, or LARGE dynamic-runtime tier']
+  input_size bigint [not null]
+  sample_count int [not null]
+  median_runtime_micros bigint [not null]
   created_at timestamptz [not null]
+
+  Indexes {
+    (judge_run_id, tier)
+  }
 }
 
 Table judge_db.outbox_event {

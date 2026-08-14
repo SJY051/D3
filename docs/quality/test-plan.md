@@ -2,9 +2,9 @@
 
 Owner: 최정민 and service owners
 
-Status: Initial executable baseline; behavior, load and chaos evidence pending
+Status: Executable baseline with partial Judge adapter evidence; integrated behavior, load and chaos pending
 
-Last verified: 2026-08-14 against D3-QLT-001, current test sources, CI scaffold and Judge0 host boundary
+Last verified: 2026-08-14 against D3-QLT-001, issue #13 test sources, CI scaffold and Judge0 host boundary
 
 Requirement: D3-QLT-001
 
@@ -12,11 +12,12 @@ Requirement: D3-QLT-001
 
 | Layer | Primary risk | Current evidence | Completion evidence | Status |
 |---|---|---|---|---|
-| Domain unit | Match state, outcome, rating, energy | Active Battle lifecycle and fake-Judge boundary tests; remaining requirement skeletons disabled | Deterministic examples, boundaries and clock control | PARTIAL: active Judge/Battle slices plus remaining skips |
-| Adapter integration | PostgreSQL, Redis, Kafka, outbox/inbox | Testcontainers dependencies and disabled tests | Real-container transaction, uniqueness and retry evidence | SKIP: adapters not implemented |
-| Contract | HTTP, events, WebSocket | Ten parseable versioned documents, Judge v1 acceptance/evidence boundary and privacy samples | Producer/consumer compatibility and negative samples | PARTIAL PASS; Judge v1 active, other HTTP behavior incomplete |
+| Domain unit | Match state, outcome, rating, energy | Active Battle lifecycle plus deterministic fake and real-Judge normalization slices; remaining requirement skeletons disabled | Deterministic examples, boundaries and clock control | PARTIAL PASS: active Judge/Battle slices plus remaining skips |
+| Adapter integration | PostgreSQL, Redis, Kafka, outbox/inbox | Judge PostgreSQL idempotency/claim/evidence/outbox and Kafka producer use real Testcontainers; other service adapters remain disabled | Real-container transaction, uniqueness and retry evidence | PARTIAL PASS: Judge producer boundary only |
+| Contract | HTTP, events, WebSocket | Ten parseable versioned documents; Judge HTTP auth, acceptance, validation, limits, evidence privacy and error behavior have active tests | Producer/consumer compatibility and negative samples | PARTIAL PASS: Judge HTTP active; Battle consumer and other HTTP behavior incomplete |
 | Browser | Ranked golden path and privacy | Skipped Playwright Scenario A | Two independent sessions with fake judge | SKIP: vertical slice absent |
-| Judge smoke | Runtime mapping and isolation | Bound zero-ingress host, pinned images, hardened startup and executable sanitized smoke | Real Judge0 cases for six pinned runtimes | PASS: six hello-world plus six deterministic cases; live outage injection NOT RUN |
+| Judge host smoke | Runtime mapping and host isolation | Bound zero-ingress host, pinned images, hardened startup and executable sanitized smoke | Real Judge0 cases for six pinned runtimes | PASS: six hello-world plus six deterministic cases; live outage injection NOT RUN |
+| Judge application smoke | Real adapter routing, credential and private connectivity | Local HTTP-fixture tests exercise the selectable real adapter path | judge-service calls the designated host over the bound private route for all six runtimes | NOT RUN: private service route PENDING |
 | Load | Match fan-out, judge queue, feed reads | Scenario definitions below | Versioned report on designated host | NOT RUN |
 | Chaos | Reconnect, broker lag, cache loss, Judge failure | Scenario definitions below | Recovery and no-duplicate assertions | NOT RUN |
 | Demo preflight | Full-stack dependency readiness | HTTP/TCP checker | All required live dependencies pass on frozen build | NOT RUN for full stack |
@@ -26,6 +27,19 @@ Requirement: D3-QLT-001
 Every PR reports the command, revision, environment and separate counts for `PASS`, `FAIL`, `SKIP`, and `NOT RUN`. A disabled skeleton proves only location and requirement mapping. A load or chaos number is valid only for its recorded host, build, dataset, runtime versions and configuration.
 
 For failures, retain the request or correlation ID and sanitized operational signal. Source code, tokens, credentials and hidden tests stay out of reports.
+
+## Issue #13 Judge evidence
+
+| Slice | Current result | What it proves |
+|---|---|---|
+| Deterministic fake and normalization | PASS | `RUN` public-only behavior, `SUBMIT` hidden/performance behavior, normalized user-code failures and separate platform failure |
+| Judge0 HTTP client and adapter | PASS | Authenticated bounded polling, six allowlisted runtime mappings, fixed isolation options, request/response ceilings and provider-status normalization against a local HTTP fixture |
+| Judge HTTP resource boundary | PASS | Service caller authorization, validation, idempotent acceptance, safe evidence reads, bounded error responses and request/source rejection |
+| PostgreSQL repository | PASS | Idempotent insert/conflict, terminal evidence plus outbox atomicity, private event payload and opaque stale-worker claim fencing on PostgreSQL |
+| Kafka outbox publisher | PASS | Acknowledged producer publication before the outbox row is marked published; duplicate delivery remains a consumer inbox concern |
+| Full application to designated Judge0 | NOT RUN | Requires the PENDING private Judge-service route and deployment egress binding; issue #14 host smoke is not a substitute |
+
+These rows summarize narrow test evidence. The issue #13 PR report remains authoritative for exact commands, revision, counts and any skipped scaffold tests.
 
 ## Critical functional suites
 

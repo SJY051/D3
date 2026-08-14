@@ -4,11 +4,11 @@
 
 Owner: D³ team
 
-Status: Contributor baseline; product behavior pending
+Status: Contributor baseline; Judge vertical slice partially implemented
 
 Last verified: 2026-08-14 against repository commands, paths, scaffold evidence and the lead developer AWS identity
 
-> **현재 상태 (2026-08-14): 구조 스캐폴드.** 라우트 셸, 서비스 경계, 버전된 계약, 로컬 인프라 모델과 비활성 요구사항 테스트가 있습니다. 인증, 매칭, 판정, 대전, 커뮤니티 동작은 아직 구현 완료로 볼 수 없습니다. 상세 상태와 필요한 증거는 [산출물 현황](docs/artifact-status.md)을 따릅니다.
+> **현재 상태 (2026-08-14): Judge 경계 부분 구현.** 라우트 셸, 서비스 경계, 버전된 계약과 로컬 인프라 모델에 더해 judge-service의 인증된 HTTP 경계, PostgreSQL 제출·증거·outbox, Kafka producer, 결정론적 로컬 fake와 선택형 real Judge0 adapter 경로가 있습니다. AWS Judge0 호스트의 6개 런타임 스모크는 PASS지만 애플리케이션의 사설 경로 호출은 NOT RUN이며, 로그인·매칭·대전·커뮤니티를 잇는 시나리오는 아직 완료되지 않았습니다. 상세 상태와 필요한 증거는 [산출물 현황](docs/artifact-status.md)을 따릅니다.
 
 ## 왜 D³인가
 
@@ -27,12 +27,12 @@ Last verified: 2026-08-14 against repository commands, paths, scaffold evidence 
 |---|---|---|
 | 제품 요구사항 | 16개 요구사항 ID와 4개 관찰 시나리오 | 초기 기준선 |
 | Web | React 라우트 셸과 WF-01~08 매핑 | 구조만 존재 |
-| Backend | 4개 도메인 서비스와 3개 플랫폼 앱의 부팅 진입점 | 도메인 동작 미구현 |
-| Contracts | HTTP 4개, event 5개, WebSocket 1개 문서 | 스키마 기준선; HTTP 경로는 비어 있음 |
-| Data | 서비스별 PostgreSQL 소유권과 논리 ERD | 마이그레이션 미구현 |
+| Backend | 4개 도메인 서비스와 3개 플랫폼 앱; Judge HTTP·비동기 평가·outbox 경로 | Judge 부분 구현; 나머지 수직 경로 미구현 |
+| Contracts | HTTP 4개, event 5개, WebSocket 1개 문서 | Judge HTTP v1 활성; Battle consumer 등은 미구현 |
+| Data | 서비스별 PostgreSQL 소유권과 논리 ERD; Judge Flyway 물리 스키마 | Judge만 부분 구현; 서비스 간 DB 공유 없음 |
 | Local infra | PostgreSQL, Redis, Kafka 및 선택적 관측성 Compose 모델 | 구성 검증 대상; 실행 상태는 별도 확인 필요 |
-| Quality | 요구사항에 매핑된 비활성 테스트와 검증 스크립트 | 구조 증거이며 기능 통과가 아님 |
-| Cloud/Judge0 | 전용 zero-ingress Judge0 호스트와 고정 6개 런타임 활성; 애플리케이션 목표 구조 | Judge0 PASS; 애플리케이션 IAM·서비스는 `UNKNOWN` |
+| Quality | 요구사항 스캐폴드와 Judge 단위·HTTP·PostgreSQL·Kafka 테스트 | Judge 경계 PARTIAL PASS; 브라우저·전체 통합은 NOT RUN/SKIP |
+| Cloud/Judge0 | 전용 zero-ingress Judge0 호스트와 고정 6개 런타임; real adapter 코드 경로 | 호스트 PASS; 애플리케이션 사설 연결 PENDING/NOT RUN |
 
 ## 아키텍처
 
@@ -87,7 +87,7 @@ pnpm --filter @d3/web dev
 
 Vite가 출력한 로컬 주소에서 `/feed`, `/practice`, `/ranked` 등의 구조 라우트를 확인할 수 있습니다. 표시되는 화면은 `STRUCTURAL PROTOTYPE`이며 실제 API 동작을 증명하지 않습니다.
 
-Spring 애플리케이션의 구성과 빌드는 검증할 수 있지만, 아직 사용자 시나리오를 제공하지 않습니다. 제품 실행 절차는 첫 수직 슬라이스가 통과한 뒤 [데모 런북](docs/operations/demo-runbook.md)에 고정합니다.
+judge-service는 로컬에서 결정론적 fake adapter를 기본으로 사용하며, 이는 API·영속성·이벤트 개발용이지 실제 코드 실행 증거가 아닙니다. real Judge0 adapter는 명시적으로 선택하고 사설 연결 preflight를 통과한 환경에서만 live 증거로 기록합니다. 로그인부터 결과 투영까지의 사용자 시나리오는 아직 제공하지 않으며, 전체 실행 절차는 첫 수직 슬라이스가 통과한 뒤 [데모 런북](docs/operations/demo-runbook.md)에 고정합니다.
 
 ## 검증
 

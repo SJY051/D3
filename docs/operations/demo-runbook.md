@@ -14,7 +14,7 @@ The target allocation is 15 minutes of presentation and demonstration plus 5 min
 
 ## Evidence boundary
 
-The current repository can validate scaffold structure, contracts, builds and the Compose model. A dedicated AWS Judge0 host and its six-language smoke are active, but the real Judge adapter, live ranked path, application deployment, final screenshots, measured latency and backup recording are **not yet evidenced**. Mark each item below with a revision and capture time during rehearsal; do not replace a failed live step with an unlabeled mock.
+The current repository can validate scaffold structure, contracts, builds, the Compose model, and the Judge-owned HTTP/persistence/outbox path with a deterministic local fake. A selectable real Judge0 adapter exists and has bounded local HTTP-fixture tests. A dedicated AWS Judge0 host and its six-language host smoke are active, but the judge-service-to-host private call is **NOT RUN** and its route is **PENDING**. The live ranked path, application deployment, final screenshots, measured latency and backup recording are also not yet evidenced. Mark each item below with a revision and capture time during rehearsal; do not replace a failed live step with an unlabeled mock.
 
 ## Freeze one demonstrable build
 
@@ -40,7 +40,8 @@ Credentials stay outside the repository and recording. Seeded demo identities mu
 | Reviewed WF-01~08 | 최정민 | UI review is recorded before styled acceptance | Review required |
 | Scenario A | Service owners | Two browsers complete ranked flow without database edits | Blocked: behavior not implemented |
 | Scenarios B and C | Battle/Judge owners | Reconnect, surrender and incident void are deterministic | Blocked: behavior not implemented |
-| Six language runtimes | Judge owner | Versioned smoke cases pass on designated host | PASS: pinned Judge0 CE 1.13.1 matrix and 12/12 language cases; real application adapter remains blocked by #13 |
+| Six language runtimes | Judge owner | Versioned smoke cases pass on designated host | PASS for host: pinned Judge0 CE 1.13.1 matrix and 12/12 language cases |
+| Judge application route | 윤서진 | judge-service reaches the designated host through the source-SG-only path and repeats the sanitized six-runtime smoke | NOT RUN: private route and deployment egress PENDING |
 | Observability | 윤서진 | Health, correlation and failure views are identified | Baseline only |
 | Deployment target | 윤서진 | Environment and rollback owner are bound | AWS `UNKNOWN`; local fallback planned |
 | Backup recording | 최정민 | Same build and real services are visibly labeled | Not recorded |
@@ -59,7 +60,7 @@ docker compose -f infra/compose.yaml config --quiet
 pnpm demo:preflight
 ```
 
-`pnpm demo:preflight` requires Web, discovery, config, gateway, four domain services, Judge0, PostgreSQL, Redis and Kafka. It prints one JSON object per target and exits non-zero when any required target is unavailable. Archive the terminal output with the revision; a `NOT READY` result blocks the live path.
+`pnpm demo:preflight` requires Web, discovery, config, gateway, four domain services, PostgreSQL, Redis, Kafka, and the adapter selected for that build. The deterministic fake is the local-development default; the primary presentation must explicitly select and verify real Judge0. Preflight prints one JSON object per target and exits non-zero when any required target is unavailable. Archive the terminal output with the revision; a `NOT READY` result blocks the live path.
 
 Before opening the browser, confirm:
 
