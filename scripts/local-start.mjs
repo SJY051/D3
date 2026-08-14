@@ -6,6 +6,7 @@ import {
   resolveLocalEnvironment,
   resolveLocalWebServer,
 } from "./local-start-config.mjs";
+import { mergeRequestedExitCode } from "./local-start-lifecycle.mjs";
 
 const windows = process.platform === "win32";
 const gradle = windows ? "gradlew.bat" : "./gradlew";
@@ -123,7 +124,7 @@ function waitForRetry(delayMillis) {
 }
 
 async function shutdown(exitCode = 0) {
-  if (requestedExitCode === undefined || exitCode === 0) requestedExitCode = exitCode;
+  requestedExitCode = mergeRequestedExitCode(requestedExitCode, exitCode);
   if (shutdownTask) {
     process.exitCode = requestedExitCode;
     return shutdownTask;
