@@ -1,6 +1,7 @@
 alter table match_projection
     add column player_one_user_id uuid,
-    add column player_two_user_id uuid;
+    add column player_two_user_id uuid,
+    add column projection_status text not null default 'ACTIVE';
 
 create table match_projection_rebuild_queue (
     match_id uuid primary key,
@@ -37,18 +38,31 @@ where not (
     and lower(player_ids ->> 0) <> lower(player_ids ->> 1)
 );
 
-delete from match_projection projection
-using match_projection_rebuild_queue rebuild
+update match_projection projection
+set projection_status = 'REBUILD_REQUIRED'
+from match_projection_rebuild_queue rebuild
 where projection.match_id = rebuild.match_id;
 
 update match_projection
 set player_one_user_id = (player_ids ->> 0)::uuid,
-    player_two_user_id = (player_ids ->> 1)::uuid;
+    player_two_user_id = (player_ids ->> 1)::uuid
+where projection_status = 'ACTIVE';
 
 alter table match_projection
-    alter column player_one_user_id set not null,
-    alter column player_two_user_id set not null,
-    add constraint match_projection_players_distinct
-        check (player_one_user_id <> player_two_user_id),
+    add constraint match_projection_status_supported
+        check (projection_status in ('ACTIVE', 'REBUILD_REQUIRED')),
+    add constraint match_projection_player_state_consistent check (
+        (
+            projection_status = 'ACTIVE'
+            and player_one_user_id is not null
+            and player_two_user_id is not null
+            and player_one_user_id <> player_two_user_id
+        )
+        or (
+            projection_status = 'REBUILD_REQUIRED'
+            and player_one_user_id is null
+            and player_two_user_id is null
+        )
+    ),
     drop constraint match_projection_players_are_two_seats,
     drop column player_ids;

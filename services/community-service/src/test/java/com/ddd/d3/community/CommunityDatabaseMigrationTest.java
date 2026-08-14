@@ -106,6 +106,20 @@ class CommunityDatabaseMigrationTest {
     void d3Qlt001QuarantinesLegacyProjectionsThatCannotBeTyped() {
         migrateOnlyThrough("1");
         UUID nullPlayers = insertLegacyProjection("[null,null]");
+        UUID referencingPost = UUID.randomUUID();
+        assertEquals(1, jdbc.sql("""
+                        insert into post (
+                            id, author_user_id, visibility, prose_markdown,
+                            match_projection_id, created_at, updated_at
+                        ) values (
+                            :id, :authorId, 'PUBLIC', 'legacy result',
+                            :matchId, now(), now()
+                        )
+                        """)
+                .param("id", referencingPost)
+                .param("authorId", UUID.randomUUID())
+                .param("matchId", nullPlayers)
+                .update());
         insertLegacyProjection("[{},{}]");
         insertLegacyProjection("[\"not-a-uuid\",\"11111111-1111-4111-8111-111111111111\"]");
         UUID duplicatePlayer = UUID.fromString("22222222-2222-4222-8222-222222222222");
@@ -114,7 +128,13 @@ class CommunityDatabaseMigrationTest {
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
         assertEquals(1, applied);
-        assertEquals(0, jdbc.sql("select count(*) from match_projection")
+        assertEquals(4, jdbc.sql("""
+                        select count(*)
+                        from match_projection
+                        where projection_status = 'REBUILD_REQUIRED'
+                          and player_one_user_id is null
+                          and player_two_user_id is null
+                        """)
                 .query(Integer.class)
                 .single());
         assertEquals(4, jdbc.sql("select count(*) from match_projection_rebuild_queue")
@@ -127,6 +147,14 @@ class CommunityDatabaseMigrationTest {
                         """)
                 .param("matchId", nullPlayers)
                 .query(String.class)
+                .single());
+        assertEquals(nullPlayers, jdbc.sql("""
+                        select match_projection_id
+                        from post
+                        where id = :postId
+                        """)
+                .param("postId", referencingPost)
+                .query(UUID.class)
                 .single());
     }
 

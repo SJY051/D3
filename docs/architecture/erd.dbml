@@ -502,8 +502,9 @@ Table community_db.profile_projection {
 
 Table community_db.match_projection {
   match_id uuid [pk, note: 'Logical battle aggregate reference']
-  player_one_user_id uuid [not null, note: 'Seat-ordered projection of match-finished.v1 playerIds[0]']
-  player_two_user_id uuid [not null, note: 'Seat-ordered projection of match-finished.v1 playerIds[1]']
+  player_one_user_id uuid [note: 'Seat-ordered projection of match-finished.v1 playerIds[0]; null only while rebuild is required']
+  player_two_user_id uuid [note: 'Seat-ordered projection of match-finished.v1 playerIds[1]; null only while rebuild is required']
+  projection_status text [not null, note: 'ACTIVE or REBUILD_REQUIRED']
   result community_match_result [not null]
   ranked boolean [not null]
   score_summary jsonb [note: 'Null until an enriched Battle contract is applied']
@@ -513,7 +514,7 @@ Table community_db.match_projection {
   projected_at timestamptz [not null]
 
   checks {
-    `player_one_user_id <> player_two_user_id` [name: 'match_projection_players_distinct']
+    `(projection_status = 'ACTIVE' AND player_one_user_id IS NOT NULL AND player_two_user_id IS NOT NULL AND player_one_user_id <> player_two_user_id) OR (projection_status = 'REBUILD_REQUIRED' AND player_one_user_id IS NULL AND player_two_user_id IS NULL)` [name: 'match_projection_player_state_consistent']
   }
 }
 
