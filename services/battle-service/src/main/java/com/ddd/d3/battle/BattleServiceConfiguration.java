@@ -6,9 +6,9 @@ import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.BattleMatchRepository;
 import com.ddd.d3.battle.application.BattleMatchViewService;
-import com.ddd.d3.battle.application.BattleReconnectExpiryClaimStore;
-import com.ddd.d3.battle.application.BattleReconnectExpiryScheduler;
-import com.ddd.d3.battle.application.BattleReconnectExpiryService;
+import com.ddd.d3.battle.application.BattleDeadlineClaimStore;
+import com.ddd.d3.battle.application.BattleDeadlineScheduler;
+import com.ddd.d3.battle.application.BattleDeadlineService;
 import com.ddd.d3.battle.application.BattleSnapshotPublisher;
 import com.ddd.d3.battle.application.PublicRatingReader;
 import com.ddd.d3.battle.application.RankedMatchStore;
@@ -94,13 +94,13 @@ class BattleServiceConfiguration {
     }
 
     @Bean
-    BattleReconnectExpiryService battleReconnectExpiryService(
-            BattleReconnectExpiryClaimStore claims,
+    BattleDeadlineService battleDeadlineService(
+            BattleDeadlineClaimStore claims,
             BattleMatchRepository matches,
             Clock clock,
             PlatformTransactionManager transactionManager,
             BattleSnapshotPublisher snapshots) {
-        return new BattleReconnectExpiryService(
+        return new BattleDeadlineService(
                 claims,
                 matches,
                 clock,
@@ -109,9 +109,9 @@ class BattleServiceConfiguration {
     }
 
     @Bean
-    BattleReconnectExpiryScheduler battleReconnectExpiryScheduler(
-            BattleReconnectExpiryService expiries,
-            @Value("${d3.battle.reconnect-expiry.batch-size:25}") int batchSize) {
-        return new BattleReconnectExpiryScheduler(expiries, batchSize);
+    BattleDeadlineScheduler battleDeadlineScheduler(
+            BattleDeadlineService deadlines,
+            @Value("${d3.battle.deadline-driver.batch-size:25}") int batchSize) {
+        return new BattleDeadlineScheduler(deadlines, batchSize);
     }
 }

@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionOperations;
 
-class BattleReconnectExpiryServiceTest {
+class BattleDeadlineServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-08-14T00:00:00Z");
     private static final UUID MATCH_ID = UUID.fromString("11111111-1111-4111-8111-111111111111");
@@ -39,14 +39,14 @@ class BattleReconnectExpiryServiceTest {
                 return result;
             }
         };
-        BattleReconnectExpiryService service = new BattleReconnectExpiryService(
+        BattleDeadlineService service = new BattleDeadlineService(
                 claims,
                 matches,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 transactions,
                 matchId -> order.add("publish-" + matchId));
 
-        int expired = service.expireDue(1);
+        int expired = service.advanceDue(1);
 
         assertEquals(1, expired);
         assertEquals(BattleMatch.State.FINISHED, matches.saved.state());
@@ -64,29 +64,47 @@ class BattleReconnectExpiryServiceTest {
         FakeClaims claims = new FakeClaims();
         FakeMatches matches = new FakeMatches();
         List<UUID> published = new ArrayList<>();
-        BattleReconnectExpiryService service = new BattleReconnectExpiryService(
+        BattleDeadlineService service = new BattleDeadlineService(
                 claims,
                 matches,
                 Clock.fixed(NOW.minusNanos(1), ZoneOffset.UTC),
                 DirectTransactions.INSTANCE,
                 published::add);
 
-        assertEquals(0, service.expireDue(10));
+        assertEquals(0, service.advanceDue(10));
         assertEquals(null, matches.saved);
         assertEquals(List.of(), published);
         assertEquals(List.of(NOW.minusNanos(1)), claims.cutoffs);
     }
 
     @Test
+    void d3Btl002CommitsAnEarlierMatchDeadlineBeforeALaterReconnectDeadline() {
+        FakeClaims claims = new FakeClaims(disconnectedAfterMatchDeadline());
+        FakeMatches matches = new FakeMatches();
+        List<UUID> published = new ArrayList<>();
+        BattleDeadlineService service = new BattleDeadlineService(
+                claims,
+                matches,
+                Clock.fixed(NOW.plusSeconds(30), ZoneOffset.UTC),
+                DirectTransactions.INSTANCE,
+                published::add);
+
+        assertEquals(1, service.advanceDue(1));
+        assertEquals(BattleMatch.State.JUDGING, matches.saved.state());
+        assertEquals(null, matches.saved.result());
+        assertEquals(List.of(MATCH_ID), published);
+    }
+
+    @Test
     void d3Btl002RejectsAnUnboundedExpiryBatch() {
-        BattleReconnectExpiryService service = new BattleReconnectExpiryService(
+        BattleDeadlineService service = new BattleDeadlineService(
                 new FakeClaims(),
                 new FakeMatches(),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 DirectTransactions.INSTANCE,
                 ignored -> {});
 
-        assertThrows(IllegalArgumentException.class, () -> service.expireDue(0));
+        assertThrows(IllegalArgumentException.class, () -> service.advanceDue(0));
     }
 
     private static BattleMatch.Snapshot disconnectedAtDeadline() {
@@ -108,7 +126,26 @@ class BattleReconnectExpiryServiceTest {
         return restored.snapshot();
     }
 
-    private static final class FakeClaims implements BattleReconnectExpiryClaimStore {
+    private static BattleMatch.Snapshot disconnectedAfterMatchDeadline() {
+        Instant startedAt = NOW.minus(Duration.ofMinutes(10));
+        BattleMatch match = new BattleMatch(
+                MATCH_ID.toString(),
+                PLAYER_ONE.toString(),
+                PLAYER_TWO.toString(),
+                Clock.fixed(startedAt, ZoneOffset.UTC));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE.toString(), 1));
+        match.handle(new BattleMatch.Reconnect(PLAYER_TWO.toString(), 2));
+        match.handle(new BattleMatch.Ready(PLAYER_ONE.toString()));
+        match.handle(new BattleMatch.Ready(PLAYER_TWO.toString()));
+        match.handle(new BattleMatch.Start(Duration.ofMinutes(10)));
+        BattleMatch restored = BattleMatch.restore(
+                match.snapshot(),
+                Clock.fixed(NOW.minusSeconds(10), ZoneOffset.UTC));
+        restored.handle(new BattleMatch.Disconnect(PLAYER_ONE.toString(), 1));
+        return restored.snapshot();
+    }
+
+    private static final class FakeClaims implements BattleDeadlineClaimStore {
         private final Deque<BattleMatch.Snapshot> claims;
         private final List<Instant> cutoffs = new ArrayList<>();
 
@@ -117,7 +154,7 @@ class BattleReconnectExpiryServiceTest {
         }
 
         @Override
-        public Optional<BattleMatch.Snapshot> claimNextExpired(Instant cutoff) {
+        public Optional<BattleMatch.Snapshot> claimNextDue(Instant cutoff) {
             cutoffs.add(cutoff);
             return Optional.ofNullable(claims.pollFirst());
         }

@@ -287,6 +287,14 @@ public final class BattleMatch {
                 .min(Comparator.comparing(Map.Entry<String, Instant>::getValue)
                         .thenComparing(Map.Entry::getKey))
                 .map(Map.Entry::getKey);
+        Instant reconnectDeadline = expiredPlayer.map(reconnectDeadlines::get).orElse(null);
+        boolean matchDeadlineExpired = state == State.RUNNING && !now.isBefore(matchDeadline);
+        if (matchDeadlineExpired
+                && (reconnectDeadline == null || matchDeadline.isBefore(reconnectDeadline))) {
+            state = State.JUDGING;
+            judgingStarted = true;
+            return;
+        }
         if (expiredPlayer.isPresent()) {
             finish(new Result(
                     Outcome.WIN,
@@ -297,7 +305,7 @@ public final class BattleMatch {
             return;
         }
 
-        if (state == State.RUNNING && !now.isBefore(matchDeadline)) {
+        if (matchDeadlineExpired) {
             state = State.JUDGING;
             judgingStarted = true;
         }

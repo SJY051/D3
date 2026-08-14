@@ -359,6 +359,36 @@ class BattleMatchTest {
     }
 
     @Test
+    void d3Btl002AdvancesAnEarlierMatchDeadlineBeforeALaterReconnectDeadline() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+        clock.advance(Duration.ofMinutes(9).plusSeconds(50));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+        clock.advance(Duration.ofSeconds(40));
+
+        match.handle(new BattleMatch.AdvanceTime());
+
+        assertEquals(BattleMatch.State.JUDGING, match.state());
+        assertTrue(match.result().isEmpty());
+    }
+
+    @Test
+    void d3Btl002KeepsTheReconnectBoundaryWhenBothDeadlinesAreEqual() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+        clock.advance(Duration.ofMinutes(9).plusSeconds(30));
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 1));
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+        clock.advance(Duration.ofSeconds(30));
+
+        match.handle(new BattleMatch.AdvanceTime());
+
+        assertEquals(BattleMatch.State.FINISHED, match.state());
+        assertEquals(BattleMatch.ResolutionReason.DISCONNECT_TIMEOUT, match.result().orElseThrow().reason());
+    }
+
+    @Test
     void d3Btl002TreatsARepeatedBeginJudgingAsAnIdempotentRetry() {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);

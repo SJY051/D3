@@ -4,11 +4,11 @@ import com.ddd.d3.battle.domain.BattleMatch;
 import java.time.Instant;
 import java.util.Optional;
 
-public interface BattleReconnectExpiryClaimStore {
+public interface BattleDeadlineClaimStore {
 
     /**
      * Claims one due aggregate for the caller's enclosing transaction.
      * The caller must keep that transaction open until its aggregate save completes.
      */
-    Optional<BattleMatch.Snapshot> claimNextExpired(Instant cutoff);
+    Optional<BattleMatch.Snapshot> claimNextDue(Instant cutoff);
 }

@@ -1,7 +1,7 @@
 package com.ddd.d3.battle.infrastructure.persistence;
 
 import com.ddd.d3.battle.application.BattleMatchRepository;
-import com.ddd.d3.battle.application.BattleReconnectExpiryClaimStore;
+import com.ddd.d3.battle.application.BattleDeadlineClaimStore;
 import com.ddd.d3.battle.application.OptimisticMatchConflictException;
 import com.ddd.d3.battle.domain.BattleMatch;
 import java.sql.Timestamp;
@@ -17,7 +17,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
-public final class JdbcBattleMatchRepository implements BattleMatchRepository, BattleReconnectExpiryClaimStore {
+public final class JdbcBattleMatchRepository implements BattleMatchRepository, BattleDeadlineClaimStore {
 
     private final JdbcClient jdbc;
     private final TransactionTemplate transactions;
@@ -46,24 +46,33 @@ public final class JdbcBattleMatchRepository implements BattleMatchRepository, B
     }
 
     @Override
-    public Optional<BattleMatch.Snapshot> claimNextExpired(Instant cutoff) {
+    public Optional<BattleMatch.Snapshot> claimNextDue(Instant cutoff) {
         Objects.requireNonNull(cutoff, "cutoff must not be null");
         return Objects.requireNonNull(transactions.execute(status -> jdbc.sql("""
                         select battle_match.id
                         from match battle_match
                         where battle_match.status = 'RUNNING'
-                          and exists (
-                              select 1
-                              from match_player player
-                              where player.match_id = battle_match.id
-                                and player.connection_state = 'DISCONNECTED'
-                                and player.reconnect_deadline_at <= :cutoff
+                          and (
+                              battle_match.deadline_at <= :cutoff
+                              or exists (
+                                  select 1
+                                  from match_player player
+                                  where player.match_id = battle_match.id
+                                    and player.connection_state = 'DISCONNECTED'
+                                    and player.reconnect_deadline_at <= :cutoff
+                              )
                           )
-                        order by (
-                            select min(player.reconnect_deadline_at)
-                            from match_player player
-                            where player.match_id = battle_match.id
-                              and player.connection_state = 'DISCONNECTED'
+                        order by least(
+                            battle_match.deadline_at,
+                            coalesce(
+                                (
+                                    select min(player.reconnect_deadline_at)
+                                    from match_player player
+                                    where player.match_id = battle_match.id
+                                      and player.connection_state = 'DISCONNECTED'
+                                ),
+                                battle_match.deadline_at
+                            )
                         ), battle_match.id
                         limit 1
                         for update of battle_match skip locked
