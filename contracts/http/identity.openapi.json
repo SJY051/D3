@@ -114,8 +114,8 @@
         "type": "object",
         "required": ["email", "handle", "displayName", "password"],
         "properties": {
-          "email": {"type": "string", "format": "email"},
-          "handle": {"type": "string", "maxLength": 39},
+          "email": {"type": "string", "format": "email", "description": "Stored lowercased; matching is case-insensitive."},
+          "handle": {"type": "string", "pattern": "^[a-z0-9-]{1,39}$"},
           "displayName": {"type": "string", "maxLength": 80},
           "password": {"type": "string", "minLength": 8, "maxLength": 200}
         }

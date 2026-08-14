@@ -159,4 +159,17 @@ class IdentityControllerTest {
 
         verify(identityService, org.mockito.Mockito.never()).register(any(), any(), any(), any());
     }
+
+    @Test
+    void d3Id001RejectsAHandleThatIsNotLowercaseSlug() throws Exception {
+        mockMvc.perform(post("/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"dev@d3.dev","handle":"Dev Handle","displayName":"Dev","password":"correct horse"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        verify(identityService, org.mockito.Mockito.never()).register(any(), any(), any(), any());
+    }
 }

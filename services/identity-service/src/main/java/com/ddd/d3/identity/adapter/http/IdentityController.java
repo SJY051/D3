@@ -9,6 +9,7 @@ import com.ddd.d3.identity.domain.Account;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -76,7 +77,8 @@ public final class IdentityController {
 
     public record RegisterRequest(
             @Email @NotBlank String email,
-            @NotBlank @Size(max = 39) String handle,
+            // Lowercase public identifier: reject mixed case so the unique handle stays canonical.
+            @NotBlank @Pattern(regexp = "^[a-z0-9-]{1,39}$") String handle,
             @NotBlank @Size(max = 80) String displayName,
             @NotBlank @Size(min = 8, max = 200) String password) {}
 

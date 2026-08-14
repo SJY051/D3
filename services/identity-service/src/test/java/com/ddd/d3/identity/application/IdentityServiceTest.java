@@ -1,5 +1,6 @@
 package com.ddd.d3.identity.application;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -49,6 +50,16 @@ class IdentityServiceTest {
         assertThrows(
                 DuplicateAccountException.class,
                 () -> service.register("dev@d3.dev", "dev2", "Dev Two", "another one"));
+    }
+
+    @Test
+    void d3Id001TreatsEmailCaseInsensitively() {
+        service.register("Dev@d3.dev", "dev", "Dev", "correct horse");
+
+        assertDoesNotThrow(() -> service.login("dev@d3.dev", "correct horse"));
+        assertThrows(
+                DuplicateAccountException.class,
+                () -> service.register("DEV@d3.dev", "dev-two", "Dev Two", "another one"));
     }
 
     @Test

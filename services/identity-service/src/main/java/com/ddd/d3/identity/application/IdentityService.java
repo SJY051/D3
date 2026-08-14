@@ -8,6 +8,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.HexFormat;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -45,7 +46,7 @@ public final class IdentityService {
         Account account = new Account(
                 uuidSupplier.get(),
                 handle,
-                email,
+                normalizeEmail(email),
                 passwordEncoder.encode(rawPassword),
                 displayName,
                 Account.ACTIVE,
@@ -58,7 +59,7 @@ public final class IdentityService {
     public SessionToken login(String email, String rawPassword) {
         requireText(email, "email");
         requireText(rawPassword, "password");
-        Account account = repository.findAccountByEmail(email)
+        Account account = repository.findAccountByEmail(normalizeEmail(email))
                 .filter(candidate -> passwordEncoder.matches(rawPassword, candidate.passwordHash()))
                 .filter(Account::isActive)
                 .orElseThrow(InvalidCredentialsException::new);
@@ -100,6 +101,10 @@ public final class IdentityService {
                 rotatedFromId,
                 null,
                 clock.instant());
+    }
+
+    private static String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 
     private static void requireText(String value, String field) {
