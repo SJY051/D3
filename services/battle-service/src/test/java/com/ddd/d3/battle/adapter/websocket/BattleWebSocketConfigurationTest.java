@@ -47,10 +47,7 @@ class BattleWebSocketConfigurationTest {
 
     @Test
     void d3Btl002BoundsAsynchronousCrossInstanceFanoutWork() {
-        BattleWebSocketConfiguration configuration = new BattleWebSocketConfiguration(
-                mock(BattleWebSocketHandler.class),
-                mock(BattleWebSocketHandshakeInterceptor.class),
-                "http://localhost:5173");
+        BattleSnapshotFanoutConfiguration configuration = new BattleSnapshotFanoutConfiguration();
         ThreadPoolTaskExecutor executor = configuration.battleSnapshotFanoutExecutor();
         executor.initialize();
         try {

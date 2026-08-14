@@ -20,8 +20,8 @@ function isHttpContract(label) {
 }
 
 const files = collectJson(contractsRoot);
-if (files.length !== 11) {
-  throw new Error(`Expected 11 contract documents, found ${files.length}`);
+if (files.length !== 12) {
+  throw new Error(`Expected 12 contract documents, found ${files.length}`);
 }
 
 const parsedContracts = [];
@@ -220,4 +220,29 @@ if (battleSnapshot(resultWithWinnerId)) {
   throw new Error("battle snapshot accepted an absolute winner identifier");
 }
 
-console.log(`contracts: PASS (${files.length} JSON documents, 7 compiled JSON Schemas, privacy, Judge v1, and Battle v1/v2 samples)`);
+const battleCommand = ajv.getSchema("https://d3.local/contracts/websocket/battle-command.v2.schema.json");
+if (!battleCommand) throw new Error("battle command v2 validator was not created");
+const readyCommand = {
+  type: "READY",
+  version: 2,
+  matchId: "11111111-1111-4111-8111-111111111111",
+  commandId: "55555555-5555-4555-8555-555555555555",
+};
+if (!battleCommand(readyCommand)) {
+  throw new Error(`battle command rejected READY: ${ajv.errorsText(battleCommand.errors)}`);
+}
+if (!battleCommand({ ...readyCommand, type: "SURRENDER" })) {
+  throw new Error(`battle command rejected SURRENDER: ${ajv.errorsText(battleCommand.errors)}`);
+}
+for (const unsafe of [
+  { ...readyCommand, playerId: "22222222-2222-4222-8222-222222222222" },
+  { ...readyCommand, sourceCode: "private" },
+  { ...readyCommand, type: "DISCONNECT" },
+  { ...readyCommand, version: 1 },
+]) {
+  if (battleCommand(unsafe)) {
+    throw new Error("battle command accepted an undeclared or client-owned field");
+  }
+}
+
+console.log(`contracts: PASS (${files.length} JSON documents, 8 compiled JSON Schemas, privacy, Judge v1, and Battle v1/v2 samples)`);

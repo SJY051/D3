@@ -1,0 +1,123 @@
+package com.ddd.d3.battle.adapter.websocket;
+
+import com.ddd.d3.battle.application.BattleMatchViewService;
+import java.io.IOException;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
+import tools.jackson.databind.ObjectMapper;
+
+@Component
+final class BattleWebSocketSessionRegistry {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(BattleWebSocketSessionRegistry.class);
+    private final BattleMatchViewService views;
+    private final ObjectMapper objectMapper;
+    private final Map<String, Registration> sessions = new ConcurrentHashMap<>();
+
+    BattleWebSocketSessionRegistry(BattleMatchViewService views, ObjectMapper objectMapper) {
+        this.views = Objects.requireNonNull(views, "views must not be null");
+        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
+    }
+
+    void register(WebSocketSession session) throws IOException {
+        UUID matchId = requiredAttribute(
+                session, BattleWebSocketHandshakeInterceptor.MATCH_ID_ATTRIBUTE, UUID.class);
+        UUID viewerId = requiredAttribute(
+                session, BattleWebSocketHandshakeInterceptor.VIEWER_ID_ATTRIBUTE, UUID.class);
+        Registration registration = new Registration(session, matchId, viewerId);
+        sessions.put(session.getId(), registration);
+        try {
+            sendLatest(registration);
+        } catch (IOException | RuntimeException exception) {
+            sessions.remove(session.getId(), registration);
+            closeQuietly(session, CloseStatus.SERVER_ERROR);
+            throw exception;
+        }
+    }
+
+    void publish(UUID matchId) {
+        Objects.requireNonNull(matchId, "matchId must not be null");
+        sessions.values().stream()
+                .filter(registration -> registration.matchId.equals(matchId))
+                .forEach(this::sendLatestQuietly);
+    }
+
+    void close(WebSocketSession session, CloseStatus status) {
+        Registration registration = sessions.remove(session.getId());
+        if (registration != null) {
+            closeQuietly(session, status);
+        }
+    }
+
+    void remove(WebSocketSession session) {
+        sessions.remove(session.getId());
+    }
+
+    private void sendLatestQuietly(Registration registration) {
+        try {
+            sendLatest(registration);
+        } catch (IOException | RuntimeException exception) {
+            sessions.remove(registration.session.getId(), registration);
+            LOGGER.warn(
+                    "Battle snapshot delivery failed; matchId={} sessionId={}",
+                    registration.matchId,
+                    registration.session.getId());
+            closeQuietly(registration.session, CloseStatus.SERVER_ERROR);
+        }
+    }
+
+    private void sendLatest(Registration registration) throws IOException {
+        synchronized (registration) {
+            if (!registration.session.isOpen()) {
+                sessions.remove(registration.session.getId(), registration);
+                return;
+            }
+            var view = views.read(registration.matchId, registration.viewerId);
+            if (view.aggregateVersion() <= registration.lastSequence) {
+                return;
+            }
+            String payload = objectMapper.writeValueAsString(BattleSnapshotMessageV2.from(view));
+            registration.session.sendMessage(new TextMessage(payload));
+            registration.lastSequence = view.aggregateVersion();
+        }
+    }
+
+    static <T> T requiredAttribute(WebSocketSession session, String name, Class<T> type) {
+        Object value = session.getAttributes().get(name);
+        if (!type.isInstance(value)) {
+            throw new IllegalStateException("authorized WebSocket attribute is missing");
+        }
+        return type.cast(value);
+    }
+
+    private static void closeQuietly(WebSocketSession session, CloseStatus status) {
+        try {
+            if (session.isOpen()) {
+                session.close(status);
+            }
+        } catch (IOException ignored) {
+            // The session is already unusable; no committed match state depends on transport cleanup.
+        }
+    }
+
+    private static final class Registration {
+        private final WebSocketSession session;
+        private final UUID matchId;
+        private final UUID viewerId;
+        private long lastSequence = -1;
+
+        private Registration(WebSocketSession session, UUID matchId, UUID viewerId) {
+            this.session = session;
+            this.matchId = matchId;
+            this.viewerId = viewerId;
+        }
+    }
+}

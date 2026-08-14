@@ -1,12 +1,14 @@
 package com.ddd.d3.battle.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.ddd.d3.battle.domain.BattleMatch;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionOperations;
@@ -133,6 +136,104 @@ class BattleMatchCommandServiceTest {
         assertEquals(1, receipts.receipts.size());
     }
 
+    @Test
+    void d3Sec001RejectsANewCommandIdThatWouldOnlyGrowReceipts() {
+        FakeMatches matches = new FakeMatches(initialSnapshot());
+        FakeReceipts receipts = new FakeReceipts();
+        BattleMatchCommandService service = service(matches, receipts);
+        service.handle(
+                MATCH_ID,
+                COMMAND_ONE,
+                PLAYER_ONE,
+                new BattleMatch.Ready(PLAYER_ONE.toString()));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> service.handle(
+                        MATCH_ID,
+                        COMMAND_TWO,
+                        PLAYER_ONE,
+                        new BattleMatch.Ready(PLAYER_ONE.toString())));
+
+        assertEquals(1, receipts.receipts.size());
+        assertEquals(1, matches.snapshot.aggregateVersion());
+    }
+
+    @Test
+    void d3Btl002CommitsDeadlineAdvancementBeforeRejectingLateSurrender() {
+        FakeMatches matches = new FakeMatches(runningSnapshotAtDeadline());
+        FakeReceipts receipts = new FakeReceipts();
+        List<UUID> published = new ArrayList<>();
+        BattleMatchCommandService service = new BattleMatchCommandService(
+                matches,
+                receipts,
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                Duration.ofMinutes(10),
+                DirectTransactions.INSTANCE,
+                published::add);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> service.handle(
+                        MATCH_ID,
+                        COMMAND_ONE,
+                        PLAYER_ONE,
+                        new BattleMatch.Surrender(PLAYER_ONE.toString())));
+
+        assertEquals(BattleMatch.State.JUDGING, matches.snapshot.state());
+        assertEquals(4, matches.snapshot.aggregateVersion());
+        assertNull(matches.snapshot.result());
+        assertEquals(List.of(3L), matches.expectedVersions);
+        assertEquals(0, receipts.receipts.size());
+        assertEquals(List.of(MATCH_ID), published);
+    }
+
+    @Test
+    void d3Btl002OrdersSurrenderAgainstOneCapturedServerInstant() {
+        FakeMatches matches = new FakeMatches(runningSnapshotAtDeadline());
+        FakeReceipts receipts = new FakeReceipts();
+        List<UUID> published = new ArrayList<>();
+        AtomicInteger clockReads = new AtomicInteger();
+        Clock crossingDeadline = new Clock() {
+            @Override
+            public ZoneId getZone() {
+                return ZoneOffset.UTC;
+            }
+
+            @Override
+            public Clock withZone(ZoneId zone) {
+                return this;
+            }
+
+            @Override
+            public Instant instant() {
+                return clockReads.getAndIncrement() == 0 ? NOW.minusNanos(1) : NOW;
+            }
+        };
+        BattleMatchCommandService service = new BattleMatchCommandService(
+                matches,
+                receipts,
+                crossingDeadline,
+                Duration.ofMinutes(10),
+                DirectTransactions.INSTANCE,
+                published::add);
+
+        BattleMatch.Snapshot surrendered = service.handle(
+                MATCH_ID,
+                COMMAND_ONE,
+                PLAYER_ONE,
+                new BattleMatch.Surrender(PLAYER_ONE.toString()));
+
+        assertEquals(BattleMatch.State.FINISHED, surrendered.state());
+        assertEquals(BattleMatch.ResolutionReason.SURRENDER, surrendered.result().reason());
+        assertEquals(PLAYER_TWO.toString(), surrendered.result().winnerId());
+        assertEquals(NOW.minusNanos(1), surrendered.result().resolvedAt());
+        assertEquals(4, surrendered.aggregateVersion());
+        assertEquals(1, receipts.receipts.size());
+        assertEquals(List.of(MATCH_ID), published);
+        assertEquals(1, clockReads.get());
+    }
+
     private static BattleMatchCommandService service(FakeMatches matches, FakeReceipts receipts) {
         return new BattleMatchCommandService(
                 matches,
@@ -147,6 +248,19 @@ class BattleMatchCommandServiceTest {
         return new BattleMatch(MATCH_ID.toString(), PLAYER_ONE.toString(), PLAYER_TWO.toString(),
                         Clock.fixed(NOW, ZoneOffset.UTC))
                 .snapshot();
+    }
+
+    private static BattleMatch.Snapshot runningSnapshotAtDeadline() {
+        Instant startedAt = NOW.minus(Duration.ofMinutes(10));
+        BattleMatch match = new BattleMatch(
+                MATCH_ID.toString(),
+                PLAYER_ONE.toString(),
+                PLAYER_TWO.toString(),
+                Clock.fixed(startedAt, ZoneOffset.UTC));
+        match.handle(new BattleMatch.Ready(PLAYER_ONE.toString()));
+        match.handle(new BattleMatch.Ready(PLAYER_TWO.toString()));
+        match.handle(new BattleMatch.Start(Duration.ofMinutes(10)));
+        return match.snapshot();
     }
 
     private static final class FakeMatches implements BattleMatchRepository {
