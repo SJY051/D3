@@ -2,10 +2,127 @@
   "openapi": "3.1.0",
   "info": {
     "title": "D3 Community API",
-    "version": "0.0.0-scaffold",
-    "description": "No operations are implemented in the scaffold."
+    "version": "0.1.0",
+    "description": "P0 public developer feed contract. Markdown rendering is a safe minimal subset: paragraphs, line breaks, and fenced code blocks."
   },
-  "x-requirements": ["D3-COM-001", "D3-STAT-001"],
-  "paths": {}
+  "x-requirements": ["D3-COM-001", "D3-SEC-001"],
+  "paths": {
+    "/v1/community/posts": {
+      "post": {
+        "summary": "Create a public Markdown post",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreatePostRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created post",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Post" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" }
+        }
+      }
+    },
+    "/v1/community/feed": {
+      "get": {
+        "summary": "List public feed posts with keyset pagination",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "cursor", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public feed page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FeedPage" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "responses": {
+      "InvalidRequest": {
+        "description": "Invalid request",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unauthorized": {
+        "description": "Authentication required",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "PayloadTooLarge": {
+        "description": "Request body is too large",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "schemas": {
+      "CreatePostRequest": {
+        "type": "object",
+        "required": ["markdown"],
+        "properties": {
+          "markdown": { "type": "string", "minLength": 1 },
+          "visibility": { "$ref": "#/components/schemas/PostVisibility" }
+        },
+        "additionalProperties": false
+      },
+      "PostVisibility": {
+        "type": "string",
+        "enum": ["PUBLIC", "FOLLOWERS", "CIRCLE", "PRIVATE"],
+        "description": "P0 APIs accept only PUBLIC; persistence recognizes every documented value."
+      },
+      "Post": {
+        "type": "object",
+        "required": ["id", "authorUserId", "visibility", "markdown", "renderedHtml", "proseCharacterCount", "createdAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "authorUserId": { "type": "string", "format": "uuid" },
+          "visibility": { "$ref": "#/components/schemas/PostVisibility" },
+          "markdown": { "type": "string" },
+          "renderedHtml": { "type": "string" },
+          "proseCharacterCount": { "type": "integer", "minimum": 0 },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "FeedPage": {
+        "type": "object",
+        "required": ["posts"],
+        "properties": {
+          "posts": { "type": "array", "items": { "$ref": "#/components/schemas/Post" } },
+          "nextCursor": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "required": ["code", "message", "correlationId"],
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "correlationId": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
 }
-

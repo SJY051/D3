@@ -41,7 +41,7 @@ class CommunityDatabaseMigrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(2, migrations);
+        assertEquals(3, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
