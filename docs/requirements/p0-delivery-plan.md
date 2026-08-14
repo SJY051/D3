@@ -153,8 +153,10 @@ Battle은 사용자 access token을 Judge로 전달하지 않는다. Identity가
 ### 6.3 #15 — ranked realtime lifecycle
 
 - 동일 언어를 선택한 두 사용자만 하나의 ranked match로 원자적으로 매칭한다.
+- public rating이 가까운 사용자부터 시작하고 서버가 측정한 대기 구간에 따라 허용 범위를 결정론적으로 확대하며, 최대 범위와 경계 시각을 테스트로 고정한다.
 - 서버 시간이 lifecycle과 deadline의 유일한 권위이며 client는 RTT 보정 표시만 한다.
 - WebSocket handshake와 match command 모두 authenticated participant만 허용한다.
+- 상대방 observation은 허용된 connectivity와 masked run/submit 상태만 포함한다. 상대 identifier, literal, source와 private snapshot이 계약·event·오류에 포함되지 않음을 negative privacy test로 증명한다.
 - 30초 reconnect window, disconnect 표시, surrender, incident `VOIDED`를 결정론적 state test로 증명한다.
 - Run/Submit은 Judge request와 match/player/submission correlation을 유지한다.
 - service token은 5.3 계약을 사용하며 사용자 token이나 source를 로그에 남기지 않는다.
@@ -268,7 +270,7 @@ priority score = 3G + 2D + 2E + R - C
 5. **박주형 (`david3123123`):** PR #28을 최신 main에 rebase하고 공통 API adapter, 상태 UI, P1 mock 비노출을 확인한다. #18 전체 완료가 아니라 부분 구현으로 증거를 남긴다.
 6. **최정민:** WF-01~WF-06의 승인/수정/deviation 상태와 #19 acceptance matrix·발표 동선을 정리한다. 휴가 복귀 후 실제 QA owner와 GitHub assignee를 맞춘다.
 7. **임수혁:** #26이 review-ready가 되면 #17의 public post/feed slice로 이동하고 projection은 versioned producer event 확정 후 연결한다.
-8. **전원:** 각 PR에서 P0/P1만 병합 차단으로 유지하고, 비차단 P2/P3는 후속 이슈로 이관해 WIP 1개 원칙을 지킨다.
+8. **전원:** P0/P1과 8절의 차단 조건을 재현한 P2는 현재 PR에서 해결한다. 그 외 P2/P3만 후속 이슈로 이관해 WIP 1개 원칙을 지킨다.
 
 ## 11. Change control
 
