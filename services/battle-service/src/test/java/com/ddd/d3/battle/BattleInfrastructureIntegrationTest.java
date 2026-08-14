@@ -5,13 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.ddd.d3.battle.application.RankedQueueConflictException;
 import com.ddd.d3.battle.application.ActiveRankedMatchConflictException;
-import com.ddd.d3.battle.application.RankedQueueStore;
-import com.ddd.d3.battle.application.OptimisticMatchConflictException;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
+import com.ddd.d3.battle.application.OptimisticMatchConflictException;
 import com.ddd.d3.battle.application.RankedMatchStore;
 import com.ddd.d3.battle.application.RankedMatchmakingCoordinator;
+import com.ddd.d3.battle.application.RankedQueueConflictException;
+import com.ddd.d3.battle.application.RankedQueueStore;
 import com.ddd.d3.battle.domain.BattleMatch;
 import com.ddd.d3.battle.domain.RankedMatchmaker;
 import com.ddd.d3.battle.infrastructure.persistence.JdbcBattleMatchRepository;
@@ -20,10 +20,14 @@ import com.ddd.d3.battle.infrastructure.persistence.JdbcRankedMatchStore;
 import com.ddd.d3.battle.infrastructure.persistence.JdbcPublicRatingReader;
 import com.ddd.d3.battle.infrastructure.redis.RedisRankedQueueStore;
 import io.lettuce.core.RedisClient;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.Types;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.flywaydb.core.Flyway;
@@ -86,7 +91,7 @@ class BattleInfrastructureIntegrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(5, migrations);
+        assertEquals(7, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -269,6 +274,57 @@ class BattleInfrastructureIntegrationTest {
         assertEquals(BattleMatch.State.FINISHED, finished.state());
         assertEquals(second.playerId().toString(), finished.result().winnerId());
         assertEquals(BattleMatch.ResolutionReason.SURRENDER, finished.result().reason());
+    }
+
+    @Test
+    void d3Btl002ReadsMatchAndPlayersFromOneDatabaseSnapshot() throws Exception {
+        UUID matchId = createLobbyMatch();
+        UUID playerOneId = UUID.randomUUID();
+        UUID playerTwoId = UUID.randomUUID();
+        addPlayer(matchId, playerOneId, 1);
+        addPlayer(matchId, playerTwoId, 2);
+        CountDownLatch matchRead = new CountDownLatch(1);
+        CountDownLatch writerCommitted = new CountDownLatch(1);
+        DataSource pausingDataSource = pauseAfterMatchRead(dataSource, matchRead, writerCommitted);
+        JdbcBattleMatchRepository reader = new JdbcBattleMatchRepository(
+                pausingDataSource, new DataSourceTransactionManager(pausingDataSource));
+        TransactionTemplate writerTransaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+
+        try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+            Future<?> writer = executor.submit(() -> {
+                if (!matchRead.await(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Repository did not begin its match read");
+                }
+                writerTransaction.executeWithoutResult(status -> {
+                    assertEquals(1, jdbc.sql("""
+                                    update match
+                                    set status = 'READY', aggregate_version = aggregate_version + 1
+                                    where id = :matchId
+                                    """)
+                            .param("matchId", matchId)
+                            .update());
+                    assertEquals(2, jdbc.sql("""
+                                    update match_player
+                                    set ready = true
+                                    where match_id = :matchId
+                                    """)
+                            .param("matchId", matchId)
+                            .update());
+                });
+                writerCommitted.countDown();
+                return null;
+            });
+
+            BattleMatch.Snapshot snapshot = reader.findById(matchId).orElseThrow();
+            writer.get(5, TimeUnit.SECONDS);
+
+            assertEquals(BattleMatch.State.LOBBY, snapshot.state());
+            assertEquals(0, snapshot.aggregateVersion());
+            assertTrue(snapshot.players().stream().noneMatch(BattleMatch.PlayerSnapshot::ready));
+            BattleMatch.restore(snapshot, Clock.systemUTC());
+        } finally {
+            writerCommitted.countDown();
+        }
     }
 
     @Test
@@ -641,7 +697,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(4, applied);
+        assertEquals(6, applied);
         assertEquals(1, jdbc.sql("""
                         select count(*)
                         from judge_job_reference
@@ -758,6 +814,10 @@ class BattleInfrastructureIntegrationTest {
         UUID problemId = createProblem();
         UUID matchId = UUID.randomUUID();
         UUID playerId = UUID.randomUUID();
+        UUID opponentId = UUID.randomUUID();
+        UUID runningMatchId = UUID.randomUUID();
+        UUID runningPlayerId = UUID.randomUUID();
+        UUID runningOpponentId = UUID.randomUUID();
         assertEquals(1, jdbc.sql("""
                         insert into match (
                             id, problem_id, ranked, status, result,
@@ -782,15 +842,46 @@ class BattleInfrastructureIntegrationTest {
                 .param("matchId", matchId)
                 .param("playerId", playerId)
                 .update());
+        assertEquals(1, jdbc.sql("""
+                        insert into match_player (
+                            match_id, user_id, seat, language_key, connection_state
+                        ) values (:matchId, :playerId, 2, 'JAVA', 'CONNECTED')
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", opponentId)
+                .update());
+        assertEquals(1, jdbc.sql("""
+                        insert into match (id, problem_id, ranked, status, result, created_at)
+                        values (:id, :problemId, true, 'RUNNING', null, now())
+                        """)
+                .param("id", runningMatchId)
+                .param("problemId", problemId)
+                .update());
+        assertEquals(1, jdbc.sql("""
+                        insert into match_player (
+                            match_id, user_id, seat, language_key, connection_state
+                        ) values (:matchId, :playerId, 1, 'JAVA', 'DISCONNECTED')
+                        """)
+                .param("matchId", runningMatchId)
+                .param("playerId", runningPlayerId)
+                .update());
+        assertEquals(1, jdbc.sql("""
+                        insert into match_player (
+                            match_id, user_id, seat, language_key, connection_state
+                        ) values (:matchId, :playerId, 2, 'JAVA', 'CONNECTED')
+                        """)
+                .param("matchId", runningMatchId)
+                .param("playerId", runningOpponentId)
+                .update());
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(4, applied);
+        assertEquals(6, applied);
         assertEquals(1, jdbc.sql("select count(*) from match where id = :id")
                 .param("id", matchId)
                 .query(Integer.class)
                 .single());
-        assertEquals(2, jdbc.sql("""
+        assertEquals(0, jdbc.sql("""
                         select count(*)
                         from pg_constraint
                         where conname in (
@@ -800,6 +891,37 @@ class BattleInfrastructureIntegrationTest {
                         """)
                 .query(Integer.class)
                 .single());
+        assertEquals(0, jdbc.sql("""
+                        select count(*)
+                        from match
+                        where id = :matchId
+                          and (server_started_at is not null or deadline_at is not null)
+                        """)
+                .param("matchId", matchId)
+                .query(Integer.class)
+                .single());
+        assertEquals(0, jdbc.sql("""
+                        select count(*)
+                        from match_player
+                        where match_id = :matchId and reconnect_deadline_at is not null
+                        """)
+                .param("matchId", matchId)
+                .query(Integer.class)
+                .single());
+        JdbcBattleMatchRepository upgradedMatches = new JdbcBattleMatchRepository(
+                dataSource, new DataSourceTransactionManager(dataSource));
+        BattleMatch.Snapshot restored = upgradedMatches.findById(matchId).orElseThrow();
+        assertEquals(BattleMatch.State.LOBBY, restored.state());
+        BattleMatch.restore(restored, Clock.systemUTC());
+        BattleMatch.Snapshot restoredRunning = upgradedMatches.findById(runningMatchId).orElseThrow();
+        assertEquals(BattleMatch.State.RUNNING, restoredRunning.state());
+        assertTrue(restoredRunning.matchDeadline().isAfter(restoredRunning.startedAt()));
+        assertTrue(restoredRunning.players().stream()
+                .filter(player -> player.playerId().equals(runningPlayerId.toString()))
+                .findFirst()
+                .orElseThrow()
+                .reconnectDeadline() != null);
+        BattleMatch.restore(restoredRunning, Clock.systemUTC());
         assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
                         insert into match_player (
                             match_id, user_id, seat, language_key,
@@ -823,6 +945,17 @@ class BattleInfrastructureIntegrationTest {
         UUID playerTwoId = UUID.randomUUID();
         LegacyFinishedMatch draw = insertLegacyFinishedMatch(problemId, "DRAW", null);
         LegacyFinishedMatch voided = insertLegacyFinishedMatch(problemId, "VOIDED", null);
+        LegacyFinishedMatch clockless = new LegacyFinishedMatch(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        assertEquals(1, jdbc.sql("""
+                        insert into match (id, problem_id, ranked, status, result, created_at)
+                        values (:id, :problemId, true, 'FINISHED', 'DRAW', now())
+                        """)
+                .param("id", clockless.matchId())
+                .param("problemId", problemId)
+                .update());
+        addPlayer(clockless.matchId(), clockless.playerOneId(), 1);
+        addPlayer(clockless.matchId(), clockless.playerTwoId(), 2);
         assertEquals(1, jdbc.sql("""
                         insert into match (
                             id, problem_id, ranked, status, result,
@@ -845,6 +978,7 @@ class BattleInfrastructureIntegrationTest {
         BattleMatch.Snapshot restored = upgradedMatches.findById(matchId).orElseThrow();
         BattleMatch.Snapshot restoredDraw = upgradedMatches.findById(draw.matchId()).orElseThrow();
         BattleMatch.Snapshot restoredVoid = upgradedMatches.findById(voided.matchId()).orElseThrow();
+        BattleMatch.Snapshot restoredClockless = upgradedMatches.findById(clockless.matchId()).orElseThrow();
 
         assertEquals(BattleMatch.State.FINISHED, restored.state());
         assertEquals("WIN", restored.result().outcome().name());
@@ -856,6 +990,9 @@ class BattleInfrastructureIntegrationTest {
         assertEquals("VOID", restoredVoid.result().outcome().name());
         assertEquals("PLATFORM_INCIDENT", restoredVoid.result().reason().name());
         assertEquals("legacy-import", restoredVoid.result().incidentReference());
+        assertTrue(restoredClockless.matchDeadline().isAfter(restoredClockless.startedAt()));
+        assertTrue(restoredClockless.result().resolvedAt() != null);
+        BattleMatch.restore(restoredClockless, Clock.systemUTC());
     }
 
     @Test
@@ -923,6 +1060,19 @@ class BattleInfrastructureIntegrationTest {
         return matchId;
     }
 
+    private UUID createLobbyMatch() {
+        UUID problemId = createProblem();
+        UUID matchId = UUID.randomUUID();
+        assertEquals(1, jdbc.sql("""
+                        insert into match (id, problem_id, ranked, status, result, created_at)
+                        values (:id, :problemId, true, 'LOBBY', null, now())
+                        """)
+                .param("id", matchId)
+                .param("problemId", problemId)
+                .update());
+        return matchId;
+    }
+
     private LegacyFinishedMatch insertLegacyFinishedMatch(UUID problemId, String result, String voidReason) {
         LegacyFinishedMatch legacy = new LegacyFinishedMatch(
                 UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
@@ -959,6 +1109,64 @@ class BattleInfrastructureIntegrationTest {
             return store.create(pair, Instant.parse("2026-08-14T00:00:00Z"));
         } catch (ActiveRankedMatchConflictException conflict) {
             return conflict;
+        }
+    }
+
+    private static DataSource pauseAfterMatchRead(
+            DataSource delegate, CountDownLatch matchRead, CountDownLatch writerCommitted) {
+        return (DataSource) Proxy.newProxyInstance(
+                BattleInfrastructureIntegrationTest.class.getClassLoader(),
+                new Class<?>[] {DataSource.class},
+                (proxy, method, arguments) -> {
+                    Object result = invoke(delegate, method, arguments);
+                    if (method.getName().equals("getConnection")) {
+                        return pauseAfterMatchRead((Connection) result, matchRead, writerCommitted);
+                    }
+                    return result;
+                });
+    }
+
+    private static Connection pauseAfterMatchRead(
+            Connection delegate, CountDownLatch matchRead, CountDownLatch writerCommitted) {
+        return (Connection) Proxy.newProxyInstance(
+                BattleInfrastructureIntegrationTest.class.getClassLoader(),
+                new Class<?>[] {Connection.class},
+                (proxy, method, arguments) -> {
+                    Object result = invoke(delegate, method, arguments);
+                    if (method.getName().equals("prepareStatement")
+                            && arguments != null
+                            && arguments.length > 0
+                            && arguments[0] instanceof String sql
+                            && sql.toLowerCase().contains("from match")) {
+                        return pauseAfterMatchRead((PreparedStatement) result, matchRead, writerCommitted);
+                    }
+                    return result;
+                });
+    }
+
+    private static PreparedStatement pauseAfterMatchRead(
+            PreparedStatement delegate, CountDownLatch matchRead, CountDownLatch writerCommitted) {
+        return (PreparedStatement) Proxy.newProxyInstance(
+                BattleInfrastructureIntegrationTest.class.getClassLoader(),
+                new Class<?>[] {PreparedStatement.class},
+                (proxy, method, arguments) -> {
+                    Object result = invoke(delegate, method, arguments);
+                    if (method.getName().equals("executeQuery")) {
+                        matchRead.countDown();
+                        if (!writerCommitted.await(5, TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("Concurrent writer did not commit");
+                        }
+                    }
+                    return result;
+                });
+    }
+
+    private static Object invoke(Object delegate, java.lang.reflect.Method method, Object[] arguments)
+            throws Throwable {
+        try {
+            return method.invoke(delegate, arguments);
+        } catch (InvocationTargetException failure) {
+            throw failure.getCause();
         }
     }
 

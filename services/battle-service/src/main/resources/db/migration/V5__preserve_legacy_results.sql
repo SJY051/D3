@@ -10,6 +10,32 @@ alter table match
         )
     );
 
+with normalized_terminal_clock as (
+    select id,
+           greatest(coalesce(server_started_at, created_at), created_at) as started_at
+    from match
+    where status = 'FINISHED'
+)
+update match battle_match
+set server_started_at = normalized_terminal_clock.started_at,
+    deadline_at = case
+        when battle_match.deadline_at > normalized_terminal_clock.started_at then battle_match.deadline_at
+        else normalized_terminal_clock.started_at + interval '10 minutes'
+    end,
+    finished_at = greatest(
+        coalesce(battle_match.finished_at, normalized_terminal_clock.started_at),
+        normalized_terminal_clock.started_at
+    )
+from normalized_terminal_clock
+where battle_match.id = normalized_terminal_clock.id
+  and (
+      battle_match.server_started_at is distinct from normalized_terminal_clock.started_at
+      or battle_match.deadline_at is null
+      or battle_match.deadline_at <= normalized_terminal_clock.started_at
+      or battle_match.finished_at is null
+      or battle_match.finished_at < normalized_terminal_clock.started_at
+  );
+
 update match
 set void_reason = 'legacy-import'
 where result = 'VOIDED'

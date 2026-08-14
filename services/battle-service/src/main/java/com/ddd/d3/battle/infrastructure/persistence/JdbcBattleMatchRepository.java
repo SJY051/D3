@@ -45,47 +45,67 @@ public final class JdbcBattleMatchRepository implements BattleMatchRepository {
     }
 
     private Optional<BattleMatch.Snapshot> findInsideTransaction(UUID matchId) {
-        Optional<MatchRow> match = jdbc.sql("""
-                        select status, result, server_started_at, deadline_at, finished_at,
-                               void_reason, resolution_reason, aggregate_version
-                        from match
-                        where id = :matchId
+        List<SnapshotRow> rows = jdbc.sql("""
+                        select battle_match.status,
+                               battle_match.result,
+                               battle_match.server_started_at,
+                               battle_match.deadline_at,
+                               battle_match.finished_at,
+                               battle_match.void_reason,
+                               battle_match.resolution_reason,
+                               battle_match.aggregate_version,
+                               player.user_id as player_user_id,
+                               player.seat as player_seat,
+                               player.ready as player_ready,
+                               player.connection_state as player_connection_state,
+                               player.connection_generation as player_connection_generation,
+                               player.reconnect_deadline_at as player_reconnect_deadline_at
+                        from match battle_match
+                        left join match_player player on player.match_id = battle_match.id
+                        where battle_match.id = :matchId
+                        order by player.seat
                         """)
                 .param("matchId", matchId)
-                .query((resultSet, rowNumber) -> new MatchRow(
-                        resultSet.getString("status"),
-                        resultSet.getString("result"),
-                        instant(resultSet.getTimestamp("server_started_at")),
-                        instant(resultSet.getTimestamp("deadline_at")),
-                        instant(resultSet.getTimestamp("finished_at")),
-                        resultSet.getString("void_reason"),
-                        resultSet.getString("resolution_reason"),
-                        resultSet.getLong("aggregate_version")))
-                .optional();
-        if (match.isEmpty()) {
+                .query((resultSet, rowNumber) -> {
+                    MatchRow match = new MatchRow(
+                            resultSet.getString("status"),
+                            resultSet.getString("result"),
+                            instant(resultSet.getTimestamp("server_started_at")),
+                            instant(resultSet.getTimestamp("deadline_at")),
+                            instant(resultSet.getTimestamp("finished_at")),
+                            resultSet.getString("void_reason"),
+                            resultSet.getString("resolution_reason"),
+                            resultSet.getLong("aggregate_version"));
+                    UUID playerId = resultSet.getObject("player_user_id", UUID.class);
+                    PlayerRow player = playerId == null
+                            ? null
+                            : new PlayerRow(
+                                    playerId,
+                                    resultSet.getInt("player_seat"),
+                                    resultSet.getBoolean("player_ready"),
+                                    BattleMatch.ConnectionState.valueOf(
+                                            resultSet.getString("player_connection_state")),
+                                    resultSet.getLong("player_connection_generation"),
+                                    instant(resultSet.getTimestamp("player_reconnect_deadline_at")));
+                    return new SnapshotRow(match, player);
+                })
+                .list();
+        if (rows.isEmpty()) {
             return Optional.empty();
         }
-        List<PlayerRow> players = jdbc.sql("""
-                        select user_id, seat, ready, connection_state,
-                               connection_generation, reconnect_deadline_at
-                        from match_player
-                        where match_id = :matchId
-                        order by seat
-                        """)
-                .param("matchId", matchId)
-                .query((resultSet, rowNumber) -> new PlayerRow(
-                        resultSet.getObject("user_id", UUID.class),
-                        resultSet.getInt("seat"),
-                        resultSet.getBoolean("ready"),
-                        BattleMatch.ConnectionState.valueOf(resultSet.getString("connection_state")),
-                        resultSet.getLong("connection_generation"),
-                        instant(resultSet.getTimestamp("reconnect_deadline_at"))))
-                .list();
-        if (players.size() != 2 || players.get(0).seat() != 1 || players.get(1).seat() != 2) {
+        List<PlayerRow> players = rows.stream().map(SnapshotRow::player).toList();
+        if (players.size() != 2
+                || players.get(0) == null
+                || players.get(1) == null
+                || players.get(0).seat() != 1
+                || players.get(1).seat() != 2) {
             throw new IllegalStateException("Battle match must have two ordered players");
         }
 
-        MatchRow row = match.orElseThrow();
+        MatchRow row = rows.get(0).match();
+        if (!row.equals(rows.get(1).match())) {
+            throw new IllegalStateException("Battle match snapshot rows are inconsistent");
+        }
         String playerOneId = players.get(0).userId().toString();
         String playerTwoId = players.get(1).userId().toString();
         BattleMatch.State state = BattleMatch.State.valueOf(row.status());
@@ -233,4 +253,6 @@ public final class JdbcBattleMatchRepository implements BattleMatchRepository {
             BattleMatch.ConnectionState connectionState,
             long connectionGeneration,
             Instant reconnectDeadline) {}
+
+    private record SnapshotRow(MatchRow match, PlayerRow player) {}
 }

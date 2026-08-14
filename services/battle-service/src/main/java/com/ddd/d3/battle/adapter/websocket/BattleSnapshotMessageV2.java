@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
-public record BattleSnapshotMessageV1(
+public record BattleSnapshotMessageV2(
         String type,
         int version,
         UUID matchId,
@@ -14,11 +14,11 @@ public record BattleSnapshotMessageV1(
         Payload payload) {
 
     private static final String MESSAGE_TYPE = "MATCH_SNAPSHOT";
-    private static final int MESSAGE_VERSION = 1;
+    private static final int MESSAGE_VERSION = 2;
 
-    public static BattleSnapshotMessageV1 from(BattleMatchView view) {
+    public static BattleSnapshotMessageV2 from(BattleMatchView view) {
         Objects.requireNonNull(view, "view must not be null");
-        return new BattleSnapshotMessageV1(
+        return new BattleSnapshotMessageV2(
                 MESSAGE_TYPE,
                 MESSAGE_VERSION,
                 view.matchId(),
@@ -28,17 +28,22 @@ public record BattleSnapshotMessageV1(
                         view.state().name(),
                         view.startedAt(),
                         view.matchDeadline(),
-                        participant(view.self()),
-                        participant(view.opponent()),
+                        selfParticipant(view.self()),
+                        opponentParticipant(view.opponent()),
                         result(view.result())));
     }
 
-    private static Participant participant(BattleMatchView.Participant participant) {
-        return new Participant(
+    private static SelfParticipant selfParticipant(BattleMatchView.Participant participant) {
+        return new SelfParticipant(
                 participant.playerId(),
                 participant.ready(),
                 participant.connectionState().name(),
                 participant.reconnectDeadline());
+    }
+
+    private static OpponentParticipant opponentParticipant(BattleMatchView.Participant participant) {
+        return new OpponentParticipant(
+                participant.ready(), participant.connectionState().name(), participant.reconnectDeadline());
     }
 
     private static Result result(BattleMatchView.Result result) {
@@ -56,12 +61,17 @@ public record BattleSnapshotMessageV1(
             String state,
             Instant startedAt,
             Instant matchDeadline,
-            Participant self,
-            Participant opponent,
+            SelfParticipant self,
+            OpponentParticipant opponent,
             Result result) {}
 
-    public record Participant(
+    public record SelfParticipant(
             UUID playerId,
+            boolean ready,
+            String connectionState,
+            Instant reconnectDeadline) {}
+
+    public record OpponentParticipant(
             boolean ready,
             String connectionState,
             Instant reconnectDeadline) {}

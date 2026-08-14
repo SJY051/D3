@@ -1,168 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://d3.local/contracts/websocket/battle-event.v1.schema.json",
-  "title": "Battle WebSocket Snapshot v1",
-  "x-requirements": ["D3-BTL-002", "D3-SEC-001"],
+  "title": "Battle WebSocket Event v1",
+  "x-requirements": ["D3-BTL-002", "D3-BTL-004"],
   "type": "object",
   "required": ["type", "version", "matchId", "sequence", "serverTime", "payload"],
   "properties": {
-    "type": { "const": "MATCH_SNAPSHOT" },
+    "type": {
+      "enum": ["MATCH_STATE", "TIMER_SYNC", "PLAYER_ACTIVITY", "CONNECTION_STATE", "ATTACK_WARNING", "ATTACK_APPLIED", "SUBMISSION_STATE", "MATCH_RESULT"]
+    },
     "version": { "type": "integer", "const": 1 },
     "matchId": { "type": "string", "format": "uuid" },
     "sequence": { "type": "integer", "minimum": 0 },
     "serverTime": { "type": "string", "format": "date-time" },
-    "payload": { "$ref": "#/$defs/matchSnapshot" }
-  },
-  "$defs": {
-    "matchSnapshot": {
-      "type": "object",
-      "required": ["state", "startedAt", "matchDeadline", "self", "opponent", "result"],
-      "properties": {
-        "state": { "enum": ["LOBBY", "READY", "RUNNING", "JUDGING", "FINISHED"] },
-        "startedAt": {
-          "oneOf": [
-            { "type": "string", "format": "date-time" },
-            { "type": "null" }
-          ]
-        },
-        "matchDeadline": {
-          "oneOf": [
-            { "type": "string", "format": "date-time" },
-            { "type": "null" }
-          ]
-        },
-        "self": { "$ref": "#/$defs/participant" },
-        "opponent": { "$ref": "#/$defs/participant" },
-        "result": {
-          "oneOf": [
-            { "$ref": "#/$defs/result" },
-            { "type": "null" }
-          ]
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": { "state": { "enum": ["LOBBY", "READY"] } },
-            "required": ["state"]
-          },
-          "then": {
-            "properties": {
-              "startedAt": { "type": "null" },
-              "matchDeadline": { "type": "null" },
-              "result": { "type": "null" }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": { "state": { "enum": ["RUNNING", "JUDGING"] } },
-            "required": ["state"]
-          },
-          "then": {
-            "properties": {
-              "startedAt": { "type": "string", "format": "date-time" },
-              "matchDeadline": { "type": "string", "format": "date-time" },
-              "result": { "type": "null" }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": { "state": { "const": "FINISHED" } },
-            "required": ["state"]
-          },
-          "then": {
-            "properties": {
-              "startedAt": { "type": "string", "format": "date-time" },
-              "matchDeadline": { "type": "string", "format": "date-time" },
-              "result": { "$ref": "#/$defs/result" }
-            }
-          }
-        }
-      ],
-      "additionalProperties": false
-    },
-    "participant": {
-      "type": "object",
-      "required": ["playerId", "ready", "connectionState", "reconnectDeadline"],
-      "properties": {
-        "playerId": { "type": "string", "format": "uuid" },
-        "ready": { "type": "boolean" },
-        "connectionState": { "enum": ["CONNECTING", "CONNECTED", "DISCONNECTED"] },
-        "reconnectDeadline": {
-          "oneOf": [
-            { "type": "string", "format": "date-time" },
-            { "type": "null" }
-          ]
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": { "connectionState": { "const": "DISCONNECTED" } },
-            "required": ["connectionState"]
-          },
-          "then": {
-            "properties": {
-              "reconnectDeadline": { "type": "string", "format": "date-time" }
-            }
-          },
-          "else": {
-            "properties": { "reconnectDeadline": { "type": "null" } }
-          }
-        }
-      ],
-      "additionalProperties": false
-    },
-    "result": {
-      "type": "object",
-      "required": ["outcome", "winnerId", "reason", "resolvedAt"],
-      "properties": {
-        "outcome": { "enum": ["WIN", "DRAW", "VOIDED"] },
-        "winnerId": {
-          "oneOf": [
-            { "type": "string", "format": "uuid" },
-            { "type": "null" }
-          ]
-        },
-        "reason": { "enum": ["SURRENDER", "DISCONNECT_TIMEOUT", "PLATFORM_INCIDENT", "LEGACY_IMPORT"] },
-        "resolvedAt": { "type": "string", "format": "date-time" }
-      },
-      "additionalProperties": false,
-      "allOf": [
-        {
-          "if": {
-            "properties": { "outcome": { "const": "VOIDED" } },
-            "required": ["outcome"]
-          },
-          "then": {
-            "properties": {
-              "winnerId": { "type": "null" },
-              "reason": { "const": "PLATFORM_INCIDENT" }
-            }
-          },
-          "else": {
-            "if": {
-              "properties": { "outcome": { "const": "DRAW" } },
-              "required": ["outcome"]
-            },
-            "then": {
-              "properties": {
-                "winnerId": { "type": "null" },
-                "reason": { "const": "LEGACY_IMPORT" }
-              }
-            },
-            "else": {
-              "properties": {
-                "winnerId": { "type": "string", "format": "uuid" },
-                "reason": { "enum": ["SURRENDER", "DISCONNECT_TIMEOUT", "LEGACY_IMPORT"] }
-              }
-            }
-          }
-        }
-      ]
-    }
+    "payload": { "type": "object" }
   },
   "additionalProperties": false
 }

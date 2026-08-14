@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-class BattleSnapshotMessageV1Test {
+class BattleSnapshotMessageV2Test {
 
     private static final UUID MATCH_ID = UUID.fromString("11111111-1111-4111-8111-111111111111");
     private static final UUID PLAYER_ONE = UUID.fromString("22222222-2222-4222-8222-222222222222");
@@ -35,16 +35,20 @@ class BattleSnapshotMessageV1Test {
                 null);
 
         JsonNode message = objectMapper.readTree(
-                objectMapper.writeValueAsString(BattleSnapshotMessageV1.from(view)));
+                objectMapper.writeValueAsString(BattleSnapshotMessageV2.from(view)));
 
         assertEquals("MATCH_SNAPSHOT", message.path("type").asText());
-        assertEquals(1, message.path("version").asInt());
+        assertEquals(2, message.path("version").asInt());
         assertEquals(4, message.path("sequence").asLong());
         assertEquals(NOW.toString(), message.path("serverTime").asText());
         assertEquals("DISCONNECTED", message.path("payload").path("opponent").path("connectionState").asText());
         assertEquals(
                 NOW.plusSeconds(30).toString(),
                 message.path("payload").path("opponent").path("reconnectDeadline").asText());
+        assertEquals(PLAYER_ONE.toString(), message.path("payload").path("self").path("playerId").asText());
+        assertFalse(message.path("payload").path("opponent").has("playerId"));
+        assertFalse(message.path("payload").path("opponent").has("literal"));
+        assertFalse(message.path("payload").path("opponent").has("sourceCode"));
         assertTrue(message.path("payload").has("result"));
         assertTrue(message.path("payload").path("result").isNull());
         assertFalse(message.path("payload").path("self").has("activeConnectionGeneration"));
@@ -71,7 +75,7 @@ class BattleSnapshotMessageV1Test {
                         NOW));
 
         JsonNode message = objectMapper.readTree(
-                objectMapper.writeValueAsString(BattleSnapshotMessageV1.from(view)));
+                objectMapper.writeValueAsString(BattleSnapshotMessageV2.from(view)));
 
         assertEquals("VOIDED", message.path("payload").path("result").path("outcome").asText());
         assertTrue(message.path("payload").path("result").path("winnerId").isNull());
@@ -98,7 +102,7 @@ class BattleSnapshotMessageV1Test {
                         NOW));
 
         JsonNode result = objectMapper.readTree(
-                        objectMapper.writeValueAsString(BattleSnapshotMessageV1.from(view)))
+                        objectMapper.writeValueAsString(BattleSnapshotMessageV2.from(view)))
                 .path("payload")
                 .path("result");
 

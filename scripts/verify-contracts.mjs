@@ -20,8 +20,8 @@ function isHttpContract(label) {
 }
 
 const files = collectJson(contractsRoot);
-if (files.length !== 10) {
-  throw new Error(`Expected 10 contract documents, found ${files.length}`);
+if (files.length !== 11) {
+  throw new Error(`Expected 11 contract documents, found ${files.length}`);
 }
 
 const parsedContracts = [];
@@ -140,11 +140,23 @@ if (!joinRequest || joinRequest.additionalProperties !== false || Object.hasOwn(
   throw new Error("battle ranked queue request must be closed and derive player identity from JWT");
 }
 
-const battleSnapshot = ajv.getSchema("https://d3.local/contracts/websocket/battle-event.v1.schema.json");
+const battleEventV1 = ajv.getSchema("https://d3.local/contracts/websocket/battle-event.v1.schema.json");
+if (!battleEventV1) throw new Error("battle event v1 validator was not preserved");
+if (!battleEventV1({
+  type: "MATCH_STATE",
+  version: 1,
+  matchId: "11111111-1111-4111-8111-111111111111",
+  sequence: 3,
+  serverTime: "2026-08-14T00:00:00Z",
+  payload: {},
+})) {
+  throw new Error(`battle event v1 rejected its original shape: ${ajv.errorsText(battleEventV1.errors)}`);
+}
+const battleSnapshot = ajv.getSchema("https://d3.local/contracts/websocket/battle-event.v2.schema.json");
 if (!battleSnapshot) throw new Error("battle snapshot validator was not created");
 const battleSnapshotEvent = {
   type: "MATCH_SNAPSHOT",
-  version: 1,
+  version: 2,
   matchId: "11111111-1111-4111-8111-111111111111",
   sequence: 4,
   serverTime: "2026-08-14T00:00:00Z",
@@ -159,7 +171,6 @@ const battleSnapshotEvent = {
       reconnectDeadline: null,
     },
     opponent: {
-      playerId: "33333333-3333-4333-8333-333333333333",
       ready: true,
       connectionState: "DISCONNECTED",
       reconnectDeadline: "2026-08-14T00:00:30Z",
@@ -170,7 +181,7 @@ const battleSnapshotEvent = {
 if (!battleSnapshot(battleSnapshotEvent)) {
   throw new Error(`battle snapshot valid sample was rejected: ${ajv.errorsText(battleSnapshot.errors)}`);
 }
-for (const privateField of ["activeConnectionGeneration", "incidentReference", "sourceCode"]) {
+for (const privateField of ["playerId", "activeConnectionGeneration", "incidentReference", "sourceCode", "literal"]) {
   const unsafe = structuredClone(battleSnapshotEvent);
   unsafe.payload.opponent[privateField] = "private";
   if (battleSnapshot(unsafe)) {
@@ -204,4 +215,4 @@ if (battleSnapshot(legacyDrawWithWinner)) {
   throw new Error("battle snapshot accepted a legacy draw with a winner");
 }
 
-console.log(`contracts: PASS (${files.length} JSON documents, 6 compiled JSON Schemas, privacy, Judge v1, and Battle v1 samples)`);
+console.log(`contracts: PASS (${files.length} JSON documents, 7 compiled JSON Schemas, privacy, Judge v1, and Battle v1/v2 samples)`);
