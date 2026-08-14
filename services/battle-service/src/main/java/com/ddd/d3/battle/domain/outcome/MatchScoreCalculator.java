@@ -1,6 +1,7 @@
 package com.ddd.d3.battle.domain.outcome;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.util.Collections;
@@ -12,8 +13,8 @@ import java.util.Set;
 public final class MatchScoreCalculator {
 
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
-    private static final int SCORE_SCALE = 3;
-    private static final int RATIO_SCALE = 9;
+    private static final int SCORE_SCALE = 6;
+    private static final MathContext COMPARISON_CONTEXT = MathContext.DECIMAL128;
 
     public record ScoringWeights(
             BigDecimal speed,
@@ -136,6 +137,8 @@ public final class MatchScoreCalculator {
         }
     }
 
+    private record CalculatedScore(PlayerScore committed, BigDecimal comparisonTotal) {}
+
     private final String calculationVersion;
     private final ScoringWeights weights;
 
@@ -164,12 +167,16 @@ public final class MatchScoreCalculator {
         }
 
         BigDecimal[] primaryScores = primaryScores(playerOne, playerTwo);
-        PlayerScore playerOneScore = score(playerOne, primaryScores[0]);
-        PlayerScore playerTwoScore = score(playerTwo, primaryScores[1]);
-        MatchOutcome outcome = decideOutcome(playerOne, playerTwo, playerOneScore, playerTwoScore);
+        CalculatedScore playerOneScore = score(playerOne, primaryScores[0]);
+        CalculatedScore playerTwoScore = score(playerTwo, primaryScores[1]);
+        MatchOutcome outcome = decideOutcome(
+                playerOne,
+                playerTwo,
+                playerOneScore.comparisonTotal(),
+                playerTwoScore.comparisonTotal());
         Map<String, PlayerScore> scores = new LinkedHashMap<>();
-        scores.put(playerOne.playerId(), playerOneScore);
-        scores.put(playerTwo.playerId(), playerTwoScore);
+        scores.put(playerOne.playerId(), playerOneScore.committed());
+        scores.put(playerTwo.playerId(), playerTwoScore.committed());
         return new MatchScoreResult(outcome, playerOne.playerId(), playerTwo.playerId(), scores);
     }
 
@@ -197,43 +204,57 @@ public final class MatchScoreCalculator {
     }
 
     private static BigDecimal ratioScore(BigDecimal fastest, BigDecimal duration) {
-        return fastest.divide(duration, RATIO_SCALE, RoundingMode.HALF_UP).multiply(ONE_HUNDRED);
+        return fastest.divide(duration, COMPARISON_CONTEXT).multiply(ONE_HUNDRED, COMPARISON_CONTEXT);
     }
 
-    private PlayerScore score(PlayerPerformance performance, BigDecimal primaryScore) {
-        BigDecimal speed = weighted(primaryScore, weights.speed());
-        BigDecimal efficiency = weighted(performance.dynamicEfficiency(), weights.dynamicEfficiency());
-        BigDecimal discipline = weighted(disciplineScore(performance.submissionAttempts()), weights.submissionDiscipline());
+    private CalculatedScore score(PlayerPerformance performance, BigDecimal primaryScore) {
+        BigDecimal comparisonSpeed = weightedForComparison(primaryScore, weights.speed());
+        BigDecimal comparisonEfficiency = weightedForComparison(
+                performance.dynamicEfficiency(), weights.dynamicEfficiency());
+        BigDecimal comparisonDiscipline = weightedForComparison(
+                disciplineScore(performance.submissionAttempts()), weights.submissionDiscipline());
+        BigDecimal comparisonTotal = comparisonSpeed
+                .add(comparisonEfficiency, COMPARISON_CONTEXT)
+                .add(comparisonDiscipline, COMPARISON_CONTEXT);
+        BigDecimal speed = committed(comparisonSpeed);
+        BigDecimal efficiency = committed(comparisonEfficiency);
+        BigDecimal discipline = committed(comparisonDiscipline);
         BigDecimal total = speed.add(efficiency).add(discipline).setScale(SCORE_SCALE, RoundingMode.HALF_UP);
-        return new PlayerScore(
-                speed,
-                efficiency,
-                discipline,
-                total,
-                calculationVersion,
-                performance.evidenceVersion());
+        return new CalculatedScore(
+                new PlayerScore(
+                        speed,
+                        efficiency,
+                        discipline,
+                        total,
+                        calculationVersion,
+                        performance.evidenceVersion()),
+                comparisonTotal);
     }
 
     private static BigDecimal disciplineScore(int attempts) {
         if (attempts == 0) {
             return BigDecimal.ZERO;
         }
-        return ONE_HUNDRED.divide(BigDecimal.valueOf(attempts), RATIO_SCALE, RoundingMode.HALF_UP);
+        return ONE_HUNDRED.divide(BigDecimal.valueOf(attempts), COMPARISON_CONTEXT);
     }
 
-    private static BigDecimal weighted(BigDecimal rawScore, BigDecimal weight) {
-        return rawScore.multiply(weight).setScale(SCORE_SCALE, RoundingMode.HALF_UP);
+    private static BigDecimal weightedForComparison(BigDecimal rawScore, BigDecimal weight) {
+        return rawScore.multiply(weight, COMPARISON_CONTEXT);
+    }
+
+    private static BigDecimal committed(BigDecimal score) {
+        return score.setScale(SCORE_SCALE, RoundingMode.HALF_UP);
     }
 
     private static MatchOutcome decideOutcome(
             PlayerPerformance playerOne,
             PlayerPerformance playerTwo,
-            PlayerScore playerOneScore,
-            PlayerScore playerTwoScore) {
+            BigDecimal playerOneTotal,
+            BigDecimal playerTwoTotal) {
         if (playerOne.accepted() != playerTwo.accepted()) {
             return playerOne.accepted() ? MatchOutcome.PLAYER_ONE_WIN : MatchOutcome.PLAYER_TWO_WIN;
         }
-        int comparison = playerOneScore.total().compareTo(playerTwoScore.total());
+        int comparison = playerOneTotal.compareTo(playerTwoTotal);
         if (comparison > 0) {
             return MatchOutcome.PLAYER_ONE_WIN;
         }

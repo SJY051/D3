@@ -69,6 +69,17 @@ class MatchScoreCalculatorTest {
     }
 
     @Test
+    void d3Btl003DoesNotTurnASmallMeasuredSpeedDifferenceIntoADraw() {
+        var result = calculator.calculate(
+                accepted("player-one", Duration.ofSeconds(300), "80", 1),
+                accepted("player-two", Duration.ofMillis(300_001), "80", 1));
+
+        assertThat(result.outcome()).isEqualTo(MatchOutcome.PLAYER_ONE_WIN);
+        assertThat(result.scoreFor("player-one").total())
+                .isGreaterThan(result.scoreFor("player-two").total());
+    }
+
+    @Test
     void d3Btl003VoidsWithoutInventingPerformanceScores() {
         var result = calculator.voided("player-one", "player-two");
 
@@ -119,10 +130,15 @@ class MatchScoreCalculatorTest {
 
     private static PlayerPerformance accepted(
             String playerId, long solveSeconds, String efficiency, int attempts) {
+        return accepted(playerId, Duration.ofSeconds(solveSeconds), efficiency, attempts);
+    }
+
+    private static PlayerPerformance accepted(
+            String playerId, Duration solveDuration, String efficiency, int attempts) {
         return new PlayerPerformance(
                 playerId,
                 true,
-                Duration.ofSeconds(solveSeconds),
+                solveDuration,
                 new BigDecimal("100"),
                 new BigDecimal(efficiency),
                 attempts,
