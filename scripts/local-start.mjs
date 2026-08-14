@@ -8,6 +8,7 @@ import {
 } from "./local-start-config.mjs";
 import {
   assertSynchronousRunCompleted,
+  hasChildExited,
   mergeRequestedExitCode,
   StartupCancelledError,
 } from "./local-start-lifecycle.mjs";
@@ -134,13 +135,13 @@ async function shutdown(exitCode = 0) {
   startupAbort.abort();
   shutdownTask = (async () => {
     for (const child of children.toReversed()) {
-      if (child.exitCode === null) child.kill("SIGTERM");
+      if (!hasChildExited(child)) child.kill("SIGTERM");
     }
     await Promise.all(children.map((child) => new Promise((resolve) => {
-      if (child.exitCode !== null) return resolve();
+      if (hasChildExited(child)) return resolve();
       child.once("exit", resolve);
       setTimeout(() => {
-        if (child.exitCode === null) child.kill("SIGKILL");
+        if (!hasChildExited(child)) child.kill("SIGKILL");
         resolve();
       }, 5_000).unref();
     })));

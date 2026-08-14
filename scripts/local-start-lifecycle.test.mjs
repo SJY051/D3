@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   assertSynchronousRunCompleted,
+  hasChildExited,
   mergeRequestedExitCode,
   StartupCancelledError,
 } from "./local-start-lifecycle.mjs";
@@ -41,4 +42,11 @@ test("local runtime keeps synchronous command and unexpected signal failures act
     () => assertSynchronousRunCompleted({ status: null, signal: "SIGKILL" }, "fixture"),
     /fixture terminated by SIGKILL/,
   );
+});
+
+test("local runtime recognizes both normal and signal child completion", () => {
+  assert.equal(hasChildExited({ exitCode: 0, signalCode: null }), true);
+  assert.equal(hasChildExited({ exitCode: null, signalCode: "SIGKILL" }), true);
+  assert.equal(hasChildExited({ exitCode: null, signalCode: "SIGTERM" }), true);
+  assert.equal(hasChildExited({ exitCode: null, signalCode: null }), false);
 });

@@ -15,6 +15,10 @@ export function assertSynchronousRunCompleted(result, command) {
   if (result.status !== 0) throw new Error(`${command} exited with ${result.status}`);
 }
 
+export function hasChildExited(child) {
+  return child.exitCode != null || child.signalCode != null;
+}
+
 export function mergeRequestedExitCode(currentExitCode, nextExitCode) {
   if (currentExitCode === undefined || currentExitCode === 0) return nextExitCode;
   return currentExitCode;
