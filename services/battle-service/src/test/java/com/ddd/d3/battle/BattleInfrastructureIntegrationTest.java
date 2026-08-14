@@ -820,10 +820,10 @@ class BattleInfrastructureIntegrationTest {
         UUID runningOpponentId = UUID.randomUUID();
         assertEquals(1, jdbc.sql("""
                         insert into match (
-                            id, problem_id, ranked, status, result,
+                            id, problem_id, ranked, status, result, void_reason,
                             server_started_at, deadline_at, created_at
                         ) values (
-                            :id, :problemId, true, 'LOBBY', null,
+                            :id, :problemId, true, 'LOBBY', null, 'legacy-marker',
                             now(), now() + interval '10 minutes', now()
                         )
                         """)
@@ -895,7 +895,11 @@ class BattleInfrastructureIntegrationTest {
                         select count(*)
                         from match
                         where id = :matchId
-                          and (server_started_at is not null or deadline_at is not null)
+                          and (
+                              server_started_at is not null
+                              or deadline_at is not null
+                              or void_reason is not null
+                          )
                         """)
                 .param("matchId", matchId)
                 .query(Integer.class)

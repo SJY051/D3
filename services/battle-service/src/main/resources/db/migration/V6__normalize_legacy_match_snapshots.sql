@@ -1,9 +1,15 @@
 update match
 set server_started_at = null,
     deadline_at = null,
-    finished_at = null
+    finished_at = null,
+    void_reason = null
 where status in ('LOBBY', 'READY')
-  and (server_started_at is not null or deadline_at is not null or finished_at is not null);
+  and (
+      server_started_at is not null
+      or deadline_at is not null
+      or finished_at is not null
+      or void_reason is not null
+  );
 
 with normalized_clock as (
     select id,
@@ -21,6 +27,10 @@ set server_started_at = normalized_clock.started_at,
         when battle_match.status = 'FINISHED' then
             greatest(coalesce(battle_match.finished_at, normalized_clock.started_at), normalized_clock.started_at)
         else null
+    end,
+    void_reason = case
+        when battle_match.result = 'VOIDED' then battle_match.void_reason
+        else null
     end
 from normalized_clock
 where battle_match.id = normalized_clock.id
@@ -33,6 +43,7 @@ where battle_match.id = normalized_clock.id
           or battle_match.finished_at < normalized_clock.started_at
       ))
       or (battle_match.status <> 'FINISHED' and battle_match.finished_at is not null)
+      or (battle_match.result is distinct from 'VOIDED' and battle_match.void_reason is not null)
   );
 
 update match_player player
