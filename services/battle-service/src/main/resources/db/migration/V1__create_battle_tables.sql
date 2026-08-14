@@ -30,6 +30,7 @@ create table match (
     constraint match_result_supported
         check (result is null or result in ('PLAYER_ONE_WIN', 'PLAYER_TWO_WIN', 'DRAW', 'VOIDED')),
     constraint match_terminal_result_consistent check ((status = 'FINISHED') = (result is not null)),
+    constraint match_terminal_finish_time_consistent check ((status = 'FINISHED') = (finished_at is not null)),
     constraint match_deadline_after_start check (
         deadline_at is null or (server_started_at is not null and deadline_at > server_started_at)
     ),
