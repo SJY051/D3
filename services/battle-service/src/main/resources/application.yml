@@ -57,9 +57,14 @@ d3:
   battle:
     match-duration: ${D3_BATTLE_MATCH_DURATION:10m}
     snapshot-topic: ${D3_BATTLE_SNAPSHOT_TOPIC:d3:battle:snapshot:committed:v2}
+    snapshot-retry-delay: ${D3_BATTLE_SNAPSHOT_RETRY_DELAY:250ms}
+    snapshot-resync-interval: ${D3_BATTLE_SNAPSHOT_RESYNC_INTERVAL:1s}
     connection:
       maximum-attempts: ${D3_BATTLE_CONNECTION_MAXIMUM_ATTEMPTS:3}
       retry-delay: ${D3_BATTLE_CONNECTION_RETRY_DELAY:50ms}
+    deadline-driver:
+      poll-interval: ${D3_BATTLE_DEADLINE_POLL_INTERVAL:500ms}
+      batch-size: ${D3_BATTLE_DEADLINE_BATCH_SIZE:25}
     ranked-matchmaking:
       initial-rating: ${D3_RANKED_INITIAL_RATING:1500}
       initial-window: ${D3_RANKED_INITIAL_WINDOW:100}
