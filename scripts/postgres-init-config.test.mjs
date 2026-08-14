@@ -38,3 +38,32 @@ test("PostgreSQL initialization uses the same configurable service roles as appl
     rmSync(temporaryDirectory, { recursive: true, force: true });
   }
 });
+
+test("PostgreSQL initialization rejects shared and administrator service roles", () => {
+  const commonEnvironment = {
+    ...process.env,
+    POSTGRES_USER: "admin",
+    POSTGRES_DB: "postgres",
+    IDENTITY_DB_USER: "identity_custom",
+    BATTLE_DB_USER: "battle_custom",
+    JUDGE_DB_USER: "judge_custom",
+    COMMUNITY_DB_USER: "community_custom",
+  };
+  const script = "infra/postgres/init/01-create-databases.sh";
+
+  const shared = spawnSync("sh", [script], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    env: { ...commonEnvironment, BATTLE_DB_USER: "identity_custom" },
+  });
+  assert.notEqual(shared.status, 0);
+  assert.match(shared.stderr, /service database roles must be distinct/);
+
+  const administrator = spawnSync("sh", [script], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    env: { ...commonEnvironment, JUDGE_DB_USER: "admin" },
+  });
+  assert.notEqual(administrator.status, 0);
+  assert.match(administrator.stderr, /service database roles must differ from POSTGRES_USER/);
+});
