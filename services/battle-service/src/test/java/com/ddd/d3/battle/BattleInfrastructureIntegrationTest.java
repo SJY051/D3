@@ -254,12 +254,11 @@ class BattleInfrastructureIntegrationTest {
         UUID fallbackSubmissionId = UUID.randomUUID();
         UUID fallbackSupersededSubmissionId = UUID.randomUUID();
         UUID duplicateAttemptSubmissionId = UUID.randomUUID();
-        UUID invalidAcceptedPointer = UUID.randomUUID();
         insertCompletedSubmit(acceptedSubmissionId, matchId, playerId, 1, "ACCEPTED");
         insertCompletedSubmit(supersededSubmissionId, matchId, playerId, 2, "ACCEPTED");
         insertCompletedSubmit(fallbackSupersededSubmissionId, matchId, opponentId, 2, "ACCEPTED");
         insertCompletedSubmit(fallbackSubmissionId, matchId, opponentId, 1, "ACCEPTED");
-        insertCompletedSubmit(duplicateAttemptSubmissionId, matchId, opponentId, 1, "WRONG_ANSWER");
+        insertQueuedJudgeJob(duplicateAttemptSubmissionId, matchId, opponentId, "SUBMIT", 1);
         assertEquals(1, jdbc.sql("""
                         update match_player
                         set accepted_submission_id = :submissionId
@@ -274,7 +273,7 @@ class BattleInfrastructureIntegrationTest {
                         set accepted_submission_id = :submissionId
                         where match_id = :matchId and user_id = :playerId
                         """)
-                .param("submissionId", invalidAcceptedPointer)
+                .param("submissionId", duplicateAttemptSubmissionId)
                 .param("matchId", matchId)
                 .param("playerId", opponentId)
                 .update());
@@ -509,6 +508,11 @@ class BattleInfrastructureIntegrationTest {
     }
 
     private int insertQueuedJudgeJob(UUID matchId, UUID playerId, String mode, Integer attemptNumber) {
+        return insertQueuedJudgeJob(UUID.randomUUID(), matchId, playerId, mode, attemptNumber);
+    }
+
+    private int insertQueuedJudgeJob(
+            UUID submissionId, UUID matchId, UUID playerId, String mode, Integer attemptNumber) {
         return jdbc.sql("""
                         insert into judge_job_reference (
                             submission_id, match_id, player_user_id, mode, command_id,
@@ -518,7 +522,7 @@ class BattleInfrastructureIntegrationTest {
                             :attemptNumber, 'QUEUED', now()
                         )
                         """)
-                .param("submissionId", UUID.randomUUID())
+                .param("submissionId", submissionId)
                 .param("matchId", matchId)
                 .param("playerId", playerId)
                 .param("mode", mode)

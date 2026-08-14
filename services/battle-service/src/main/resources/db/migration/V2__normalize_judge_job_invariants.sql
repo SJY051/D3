@@ -46,27 +46,36 @@ create table judge_job_reference_legacy_duplicate (
 );
 
 -- Preserve one logical result per SUBMIT attempt. Prefer the legacy accepted
--- pointer, then an ACCEPTED result, then the earliest accepted command.
+-- pointer only when it correlated to an ACCEPTED SUBMIT, then prefer an
+-- ACCEPTED result and the earliest accepted command.
 with ranked_attempts as (
     select job.*,
            first_value(job.submission_id) over (
                partition by job.match_id, job.player_user_id, job.attempt_number
-               order by case when job.submission_id = player.accepted_submission_id then 0 else 1 end,
+               order by case
+                            when pointer.correlation_valid
+                             and job.submission_id = pointer.accepted_submission_id then 0
+                            else 1
+                        end,
                         case when job.last_judge_status = 'ACCEPTED' then 0 else 1 end,
                         job.accepted_at asc,
                         job.submission_id asc
            ) as canonical_submission_id,
            row_number() over (
                partition by job.match_id, job.player_user_id, job.attempt_number
-               order by case when job.submission_id = player.accepted_submission_id then 0 else 1 end,
+               order by case
+                            when pointer.correlation_valid
+                             and job.submission_id = pointer.accepted_submission_id then 0
+                            else 1
+                        end,
                         case when job.last_judge_status = 'ACCEPTED' then 0 else 1 end,
                         job.accepted_at asc,
                         job.submission_id asc
            ) as submission_rank
     from judge_job_reference job
-    left join match_player player
-      on player.match_id = job.match_id
-     and player.user_id = job.player_user_id
+    left join match_player_legacy_accepted_pointer pointer
+      on pointer.match_id = job.match_id
+     and pointer.player_user_id = job.player_user_id
     where job.mode = 'SUBMIT'
 )
 insert into judge_job_reference_legacy_duplicate (
@@ -84,28 +93,36 @@ delete from judge_job_reference job
 using judge_job_reference_legacy_duplicate legacy
 where job.submission_id = legacy.submission_id;
 
--- V1 also allowed more than one accepted attempt. Preserve the pointer target
--- when present; otherwise the lowest successful attempt is canonical.
+-- V1 also allowed more than one accepted attempt. Preserve a valid pointer
+-- target when present; otherwise the lowest successful attempt is canonical.
 with ranked_accepts as (
     select job.*,
            first_value(job.submission_id) over (
                partition by job.match_id, job.player_user_id
-               order by case when job.submission_id = player.accepted_submission_id then 0 else 1 end,
+               order by case
+                            when pointer.correlation_valid
+                             and job.submission_id = pointer.accepted_submission_id then 0
+                            else 1
+                        end,
                         job.attempt_number asc,
                         job.accepted_at asc,
                         job.submission_id asc
            ) as canonical_submission_id,
            row_number() over (
                partition by job.match_id, job.player_user_id
-               order by case when job.submission_id = player.accepted_submission_id then 0 else 1 end,
+               order by case
+                            when pointer.correlation_valid
+                             and job.submission_id = pointer.accepted_submission_id then 0
+                            else 1
+                        end,
                         job.attempt_number asc,
                         job.accepted_at asc,
                         job.submission_id asc
            ) as submission_rank
     from judge_job_reference job
-    left join match_player player
-      on player.match_id = job.match_id
-     and player.user_id = job.player_user_id
+    left join match_player_legacy_accepted_pointer pointer
+      on pointer.match_id = job.match_id
+     and pointer.player_user_id = job.player_user_id
     where job.mode = 'SUBMIT'
       and job.last_judge_status = 'ACCEPTED'
 )
