@@ -1,6 +1,7 @@
 package com.ddd.d3.battle.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.ddd.d3.battle.domain.BattleMatch;
@@ -156,6 +157,35 @@ class BattleMatchCommandServiceTest {
         assertEquals(1, matches.snapshot.aggregateVersion());
     }
 
+    @Test
+    void d3Btl002CommitsDeadlineAdvancementBeforeRejectingLateSurrender() {
+        FakeMatches matches = new FakeMatches(runningSnapshotAtDeadline());
+        FakeReceipts receipts = new FakeReceipts();
+        List<UUID> published = new ArrayList<>();
+        BattleMatchCommandService service = new BattleMatchCommandService(
+                matches,
+                receipts,
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                Duration.ofMinutes(10),
+                DirectTransactions.INSTANCE,
+                published::add);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> service.handle(
+                        MATCH_ID,
+                        COMMAND_ONE,
+                        PLAYER_ONE,
+                        new BattleMatch.Surrender(PLAYER_ONE.toString())));
+
+        assertEquals(BattleMatch.State.JUDGING, matches.snapshot.state());
+        assertEquals(4, matches.snapshot.aggregateVersion());
+        assertNull(matches.snapshot.result());
+        assertEquals(List.of(3L), matches.expectedVersions);
+        assertEquals(0, receipts.receipts.size());
+        assertEquals(List.of(MATCH_ID), published);
+    }
+
     private static BattleMatchCommandService service(FakeMatches matches, FakeReceipts receipts) {
         return new BattleMatchCommandService(
                 matches,
@@ -170,6 +200,19 @@ class BattleMatchCommandServiceTest {
         return new BattleMatch(MATCH_ID.toString(), PLAYER_ONE.toString(), PLAYER_TWO.toString(),
                         Clock.fixed(NOW, ZoneOffset.UTC))
                 .snapshot();
+    }
+
+    private static BattleMatch.Snapshot runningSnapshotAtDeadline() {
+        Instant startedAt = NOW.minus(Duration.ofMinutes(10));
+        BattleMatch match = new BattleMatch(
+                MATCH_ID.toString(),
+                PLAYER_ONE.toString(),
+                PLAYER_TWO.toString(),
+                Clock.fixed(startedAt, ZoneOffset.UTC));
+        match.handle(new BattleMatch.Ready(PLAYER_ONE.toString()));
+        match.handle(new BattleMatch.Ready(PLAYER_TWO.toString()));
+        match.handle(new BattleMatch.Start(Duration.ofMinutes(10)));
+        return match.snapshot();
     }
 
     private static final class FakeMatches implements BattleMatchRepository {

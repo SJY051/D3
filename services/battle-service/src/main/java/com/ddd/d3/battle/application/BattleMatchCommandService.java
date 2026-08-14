@@ -40,17 +40,20 @@ public class BattleMatchCommandService {
         Objects.requireNonNull(commandId, "commandId must not be null");
         Objects.requireNonNull(actorId, "actorId must not be null");
         Objects.requireNonNull(command, "command must not be null");
-        BattleMatch.Snapshot committed = Objects.requireNonNull(transactions.execute(
+        CommandExecution execution = Objects.requireNonNull(transactions.execute(
                 status -> handleInsideTransaction(matchId, commandId, actorId, command)));
         try {
             snapshots.publish(matchId);
         } catch (RuntimeException exception) {
             LOGGER.warn("Committed battle snapshot fan-out failed for matchId={}", matchId);
         }
-        return committed;
+        if (!execution.commandAccepted()) {
+            throw new IllegalStateException("player command lost to an authoritative lifecycle transition");
+        }
+        return execution.snapshot();
     }
 
-    private BattleMatch.Snapshot handleInsideTransaction(
+    private CommandExecution handleInsideTransaction(
             UUID matchId, UUID commandId, UUID actorId, BattleMatch.Command command) {
         CommandDescriptor descriptor = descriptor(command);
         if (!descriptor.playerId().equals(actorId.toString())) {
@@ -66,7 +69,8 @@ public class BattleMatchCommandService {
                     || !receipt.payloadFingerprint().equals(descriptor.fingerprint())) {
                 throw new CommandIdConflictException();
             }
-            return matches.findById(matchId).orElseThrow(BattleMatchNotFoundException::new);
+            return CommandExecution.accepted(
+                    matches.findById(matchId).orElseThrow(BattleMatchNotFoundException::new));
         }
 
         BattleMatch.Snapshot loaded = matches.findById(matchId)
@@ -74,6 +78,13 @@ public class BattleMatchCommandService {
         BattleMatch match = BattleMatch.restore(loaded, clock);
         long initialVersion = match.aggregateVersion();
         long expectedVersion = match.aggregateVersion();
+        if (command instanceof BattleMatch.Surrender) {
+            match.handle(new BattleMatch.AdvanceTime());
+            if (match.aggregateVersion() != expectedVersion) {
+                matches.save(match.snapshot(), expectedVersion);
+                return CommandExecution.rejected(match.snapshot());
+            }
+        }
         match.handle(command);
         if (match.aggregateVersion() != expectedVersion) {
             matches.save(match.snapshot(), expectedVersion);
@@ -96,7 +107,7 @@ public class BattleMatchCommandService {
                 descriptor.fingerprint(),
                 committed.aggregateVersion(),
                 clock.instant()));
-        return committed;
+        return CommandExecution.accepted(committed);
     }
 
     private static CommandDescriptor descriptor(BattleMatch.Command command) {
@@ -125,4 +136,15 @@ public class BattleMatchCommandService {
     }
 
     private record CommandDescriptor(String type, String fingerprint, String playerId) {}
+
+    private record CommandExecution(BattleMatch.Snapshot snapshot, boolean commandAccepted) {
+
+        private static CommandExecution accepted(BattleMatch.Snapshot snapshot) {
+            return new CommandExecution(snapshot, true);
+        }
+
+        private static CommandExecution rejected(BattleMatch.Snapshot snapshot) {
+            return new CommandExecution(snapshot, false);
+        }
+    }
 }
