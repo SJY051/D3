@@ -133,6 +133,29 @@ class BattleMatchCommandServiceTest {
         assertEquals(1, receipts.receipts.size());
     }
 
+    @Test
+    void d3Sec001RejectsANewCommandIdThatWouldOnlyGrowReceipts() {
+        FakeMatches matches = new FakeMatches(initialSnapshot());
+        FakeReceipts receipts = new FakeReceipts();
+        BattleMatchCommandService service = service(matches, receipts);
+        service.handle(
+                MATCH_ID,
+                COMMAND_ONE,
+                PLAYER_ONE,
+                new BattleMatch.Ready(PLAYER_ONE.toString()));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> service.handle(
+                        MATCH_ID,
+                        COMMAND_TWO,
+                        PLAYER_ONE,
+                        new BattleMatch.Ready(PLAYER_ONE.toString())));
+
+        assertEquals(1, receipts.receipts.size());
+        assertEquals(1, matches.snapshot.aggregateVersion());
+    }
+
     private static BattleMatchCommandService service(FakeMatches matches, FakeReceipts receipts) {
         return new BattleMatchCommandService(
                 matches,

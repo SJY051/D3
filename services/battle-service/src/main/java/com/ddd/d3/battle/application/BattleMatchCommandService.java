@@ -72,6 +72,7 @@ public class BattleMatchCommandService {
         BattleMatch.Snapshot loaded = matches.findById(matchId)
                 .orElseThrow(BattleMatchNotFoundException::new);
         BattleMatch match = BattleMatch.restore(loaded, clock);
+        long initialVersion = match.aggregateVersion();
         long expectedVersion = match.aggregateVersion();
         match.handle(command);
         if (match.aggregateVersion() != expectedVersion) {
@@ -84,6 +85,9 @@ public class BattleMatchCommandService {
         }
 
         BattleMatch.Snapshot committed = match.snapshot();
+        if (committed.aggregateVersion() == initialVersion) {
+            throw new IllegalStateException("new commandId must change match state");
+        }
         receipts.record(new BattleCommandReceiptStore.Receipt(
                 commandId,
                 matchId,

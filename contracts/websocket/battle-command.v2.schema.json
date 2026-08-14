@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d3.local/contracts/websocket/battle-command.v2.schema.json",
+  "title": "Battle WebSocket Command v2",
+  "x-requirements": ["D3-BTL-002", "D3-SEC-001"],
+  "type": "object",
+  "required": ["type", "version", "matchId", "commandId"],
+  "properties": {
+    "type": { "enum": ["READY", "SURRENDER"] },
+    "version": { "type": "integer", "const": 2 },
+    "matchId": { "type": "string", "format": "uuid" },
+    "commandId": { "type": "string", "format": "uuid" }
+  },
+  "additionalProperties": false
+}

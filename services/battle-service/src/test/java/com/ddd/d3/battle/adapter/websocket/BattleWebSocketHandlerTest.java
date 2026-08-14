@@ -6,12 +6,16 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.BattleMatchView;
 import com.ddd.d3.battle.application.BattleMatchViewService;
+import com.ddd.d3.battle.domain.BattleMatch;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
@@ -30,6 +34,8 @@ class BattleWebSocketHandlerTest {
     private static final UUID MATCH_ID = UUID.fromString("11111111-1111-4111-8111-111111111111");
     private static final UUID PLAYER_ONE = UUID.fromString("22222222-2222-4222-8222-222222222222");
     private static final UUID PLAYER_TWO = UUID.fromString("33333333-3333-4333-8333-333333333333");
+    private static final UUID COMMAND_ONE = UUID.fromString("44444444-4444-4444-8444-444444444444");
+    private static final UUID COMMAND_TWO = UUID.fromString("55555555-5555-4555-8555-555555555555");
     private static final Instant NOW = Instant.parse("2026-08-14T00:00:00Z");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -41,7 +47,7 @@ class BattleWebSocketHandlerTest {
                 .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED))
                 .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 2, BattleMatchView.ConnectionState.DISCONNECTED))
                 .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 2, BattleMatchView.ConnectionState.DISCONNECTED));
-        BattleWebSocketHandler handler = new BattleWebSocketHandler(views, objectMapper);
+        BattleWebSocketHandler handler = handler(views);
         WebSocketSession session = session("one", PLAYER_ONE);
 
         handler.afterConnectionEstablished(session);
@@ -68,7 +74,7 @@ class BattleWebSocketHandlerTest {
                 .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 4, BattleMatchView.ConnectionState.CONNECTED));
         when(views.read(MATCH_ID, PLAYER_TWO))
                 .thenReturn(view(PLAYER_TWO, PLAYER_ONE, 4, BattleMatchView.ConnectionState.CONNECTED));
-        BattleWebSocketHandler handler = new BattleWebSocketHandler(views, objectMapper);
+        BattleWebSocketHandler handler = handler(views);
         WebSocketSession first = session("one", PLAYER_ONE);
         WebSocketSession second = session("two", PLAYER_TWO);
 
@@ -93,7 +99,7 @@ class BattleWebSocketHandlerTest {
         when(views.read(MATCH_ID, PLAYER_ONE))
                 .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED))
                 .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 5, BattleMatchView.ConnectionState.CONNECTED));
-        BattleWebSocketHandler handler = new BattleWebSocketHandler(views, objectMapper);
+        BattleWebSocketHandler handler = handler(views);
         WebSocketSession disconnected = session("old", PLAYER_ONE);
         WebSocketSession reconnected = session("new", PLAYER_ONE);
 
@@ -115,7 +121,7 @@ class BattleWebSocketHandlerTest {
         when(views.read(MATCH_ID, PLAYER_TWO))
                 .thenReturn(view(PLAYER_TWO, PLAYER_ONE, 1, BattleMatchView.ConnectionState.CONNECTED))
                 .thenReturn(view(PLAYER_TWO, PLAYER_ONE, 2, BattleMatchView.ConnectionState.CONNECTED));
-        BattleWebSocketHandler handler = new BattleWebSocketHandler(views, objectMapper);
+        BattleWebSocketHandler handler = handler(views);
         WebSocketSession failed = session("failed", PLAYER_ONE);
         WebSocketSession healthy = session("healthy", PLAYER_TWO);
         doNothing().doThrow(new IOException("closed transport")).when(failed).sendMessage(any(TextMessage.class));
@@ -129,17 +135,145 @@ class BattleWebSocketHandlerTest {
     }
 
     @Test
-    void d3Sec001RejectsClientMessagesUntilACommandContractIsActivated() throws Exception {
+    void d3Btl002DispatchesReadyAndSurrenderFromTheAuthenticatedSession() throws Exception {
         BattleMatchViewService views = mock(BattleMatchViewService.class);
         when(views.read(MATCH_ID, PLAYER_ONE))
                 .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED));
-        BattleWebSocketHandler handler = new BattleWebSocketHandler(views, objectMapper);
+        BattleMatchCommandService commands = mock(BattleMatchCommandService.class);
+        BattleWebSocketHandler handler = handler(views, commands);
         WebSocketSession session = session("one", PLAYER_ONE);
         handler.afterConnectionEstablished(session);
 
-        handler.handleTextMessage(session, new TextMessage("{\"type\":\"UNDECLARED_COMMAND\"}"));
+        handler.handleTextMessage(session, new TextMessage("""
+                {"type":"READY","version":2,"matchId":"%s","commandId":"%s"}
+                """.formatted(MATCH_ID, COMMAND_ONE)));
+        handler.handleTextMessage(session, new TextMessage("""
+                {"type":"SURRENDER","version":2,"matchId":"%s","commandId":"%s"}
+                """.formatted(MATCH_ID, COMMAND_TWO)));
 
-        verify(session).close(CloseStatus.NOT_ACCEPTABLE);
+        verify(commands).handle(
+                MATCH_ID,
+                COMMAND_ONE,
+                PLAYER_ONE,
+                new BattleMatch.Ready(PLAYER_ONE.toString()));
+        verify(commands).handle(
+                MATCH_ID,
+                COMMAND_TWO,
+                PLAYER_ONE,
+                new BattleMatch.Surrender(PLAYER_ONE.toString()));
+        verify(session, never()).close(CloseStatus.BAD_DATA);
+        verify(session, never()).close(CloseStatus.POLICY_VIOLATION);
+    }
+
+    @Test
+    void d3Sec001RejectsUnknownFieldsAndCrossMatchCommands() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED));
+        BattleMatchCommandService malformedCommands = mock(BattleMatchCommandService.class);
+        BattleWebSocketHandler malformedHandler = handler(views, malformedCommands);
+        WebSocketSession malformedSession = session("malformed", PLAYER_ONE);
+        malformedHandler.afterConnectionEstablished(malformedSession);
+
+        malformedHandler.handleTextMessage(malformedSession, new TextMessage("""
+                {"type":"READY","version":2,"matchId":"%s","commandId":"%s","playerId":"%s"}
+                """.formatted(MATCH_ID, COMMAND_ONE, PLAYER_TWO)));
+
+        verifyNoInteractions(malformedCommands);
+        verify(malformedSession).close(CloseStatus.BAD_DATA);
+
+        BattleMatchCommandService crossMatchCommands = mock(BattleMatchCommandService.class);
+        BattleWebSocketHandler crossMatchHandler = handler(views, crossMatchCommands);
+        WebSocketSession crossMatchSession = session("cross-match", PLAYER_ONE);
+        crossMatchHandler.afterConnectionEstablished(crossMatchSession);
+
+        crossMatchHandler.handleTextMessage(crossMatchSession, new TextMessage("""
+                {"type":"READY","version":2,"matchId":"%s","commandId":"%s"}
+                """.formatted(UUID.fromString("66666666-6666-4666-8666-666666666666"), COMMAND_ONE)));
+
+        verifyNoInteractions(crossMatchCommands);
+        verify(crossMatchSession).close(CloseStatus.POLICY_VIOLATION);
+    }
+
+    @Test
+    void d3Sec001RejectsUnsupportedAndOversizedCommandFrames() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED));
+
+        BattleMatchCommandService unsupportedCommands = mock(BattleMatchCommandService.class);
+        BattleWebSocketHandler unsupportedHandler = handler(views, unsupportedCommands);
+        WebSocketSession unsupportedSession = session("unsupported", PLAYER_ONE);
+        unsupportedHandler.afterConnectionEstablished(unsupportedSession);
+        unsupportedHandler.handleTextMessage(unsupportedSession, new TextMessage("""
+                {"type":"READY","version":1,"matchId":"%s","commandId":"%s"}
+                """.formatted(MATCH_ID, COMMAND_ONE)));
+
+        verifyNoInteractions(unsupportedCommands);
+        verify(unsupportedSession).close(CloseStatus.BAD_DATA);
+
+        BattleMatchCommandService coercedCommands = mock(BattleMatchCommandService.class);
+        BattleWebSocketHandler coercedHandler = handler(views, coercedCommands);
+        WebSocketSession coercedSession = session("coerced", PLAYER_ONE);
+        coercedHandler.afterConnectionEstablished(coercedSession);
+        coercedHandler.handleTextMessage(coercedSession, new TextMessage("""
+                {"type":"READY","version":"2","matchId":"%s","commandId":"%s"}
+                """.formatted(MATCH_ID, COMMAND_ONE)));
+
+        verifyNoInteractions(coercedCommands);
+        verify(coercedSession).close(CloseStatus.BAD_DATA);
+
+        BattleMatchCommandService oversizedCommands = mock(BattleMatchCommandService.class);
+        BattleWebSocketHandler oversizedHandler = handler(views, oversizedCommands);
+        WebSocketSession oversizedSession = session("oversized", PLAYER_ONE);
+        oversizedHandler.afterConnectionEstablished(oversizedSession);
+        oversizedHandler.handleTextMessage(
+                oversizedSession,
+                new TextMessage("x".repeat(4097)));
+
+        verifyNoInteractions(oversizedCommands);
+        verify(oversizedSession).close(CloseStatus.TOO_BIG_TO_PROCESS);
+    }
+
+    @Test
+    void d3Btl002ClosesInvalidStateWithoutExposingDomainDetails() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED));
+        BattleMatchCommandService commands = mock(BattleMatchCommandService.class);
+        when(commands.handle(
+                        MATCH_ID,
+                        COMMAND_ONE,
+                        PLAYER_ONE,
+                        new BattleMatch.Surrender(PLAYER_ONE.toString())))
+                .thenThrow(new IllegalStateException("internal domain state must stay private"));
+        BattleWebSocketHandler handler = handler(views, commands);
+        WebSocketSession session = session("invalid-state", PLAYER_ONE);
+        handler.afterConnectionEstablished(session);
+
+        handler.handleTextMessage(session, new TextMessage("""
+                {"type":"SURRENDER","version":2,"matchId":"%s","commandId":"%s"}
+                """.formatted(MATCH_ID, COMMAND_ONE)));
+
+        verify(session).close(CloseStatus.POLICY_VIOLATION);
+    }
+
+    @Test
+    void d3Sec001RejectsAmbiguousDuplicateCommandFields() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED));
+        BattleMatchCommandService commands = mock(BattleMatchCommandService.class);
+        BattleWebSocketHandler handler = handler(views, commands);
+        WebSocketSession session = session("duplicate-field", PLAYER_ONE);
+        handler.afterConnectionEstablished(session);
+
+        handler.handleTextMessage(session, new TextMessage("""
+                {"type":"READY","type":"SURRENDER","version":2,"matchId":"%s","commandId":"%s"}
+                """.formatted(MATCH_ID, COMMAND_ONE)));
+
+        verifyNoInteractions(commands);
+        verify(session).close(CloseStatus.BAD_DATA);
     }
 
     private static WebSocketSession session(String id, UUID viewerId) {
@@ -151,6 +285,18 @@ class BattleWebSocketHandlerTest {
         when(session.getAttributes()).thenReturn(attributes);
         when(session.isOpen()).thenReturn(true);
         return session;
+    }
+
+    private BattleWebSocketHandler handler(BattleMatchViewService views) {
+        return handler(views, mock(BattleMatchCommandService.class));
+    }
+
+    private BattleWebSocketHandler handler(
+            BattleMatchViewService views, BattleMatchCommandService commands) {
+        return new BattleWebSocketHandler(
+                new BattleWebSocketSessionRegistry(views, objectMapper),
+                commands,
+                objectMapper);
     }
 
     private static BattleMatchView view(
