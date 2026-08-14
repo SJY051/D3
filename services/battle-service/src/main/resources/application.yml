@@ -9,10 +9,20 @@ spring:
   datasource:
     url: ${BATTLE_DB_URL:jdbc:postgresql://localhost:5432/d3_battle}
     username: ${BATTLE_DB_USER:d3_battle}
-    password: ${BATTLE_DB_PASSWORD:local-only}
+    password: ${BATTLE_DB_PASSWORD:${D3_SERVICE_DB_PASSWORD:local-only}}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
+  data:
+    redis:
+      host: ${D3_REDIS_HOST:localhost}
+      port: ${D3_REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${D3_KAFKA_HOST:localhost}:${D3_KAFKA_PORT:9092}
 
 eureka:
   client:
@@ -20,6 +30,11 @@ eureka:
       defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
 
 management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
   endpoints:
     web:
       exposure:

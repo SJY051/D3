@@ -2,7 +2,7 @@
 
 Owner: 윤서진
 
-Status: Judge boundary partially implemented; remaining services at baseline
+Status: Local platform active; Judge boundary partially implemented
 
 Last verified: 2026-08-14 against the MVP system constraints and public contract inventory
 
@@ -28,6 +28,10 @@ Gateway authentication does not replace service authorization. Every domain serv
 - A projection may be stale, but it must retain the authoritative aggregate ID and version.
 
 ## Contract activation state
+
+Issue #11 activates the local platform boundary: Config Server serves the versioned `local-v1` profile, Eureka registers the Gateway and four domain services, and Gateway declares only Identity, Battle HTTP/WebSocket and Community browser routes. Judge remains an internal service boundary and has no browser route. Gateway health is public, other ingress requires a bearer token, and a bounded `X-Correlation-Id` is preserved or generated at ingress. Identity, Battle and Community deny non-health requests until their product security contracts are implemented.
+
+Each domain database now has a service-owned Flyway V1 migration aligned with this document's logical ERD. Container tests execute each migration; Battle additionally proves Redis and Kafka connectivity. These migrations provide persistence boundaries, not completed Identity, Battle or Community behavior.
 
 Judge HTTP v1 has service-authenticated `RUN`/`SUBMIT` handlers, idempotent acceptance with a stable submission ID, and a bounded evidence read containing the minimum correctness and repeated size-tier runtime summary required by Battle. Judge persists the private command and safe evidence in its PostgreSQL database, fences asynchronous evaluation claims, and commits the terminal evidence with a `submission.judged.v1` outbox record before Kafka publication. Public responses and events omit source, hidden cases, provider credentials, compiler commands, and raw diagnostics.
 
