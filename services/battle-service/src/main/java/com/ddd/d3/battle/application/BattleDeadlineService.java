@@ -3,9 +3,12 @@ package com.ddd.d3.battle.application;
 import com.ddd.d3.battle.domain.BattleMatch;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionOperations;
@@ -18,18 +21,21 @@ public final class BattleDeadlineService {
     private final Clock clock;
     private final TransactionOperations transactions;
     private final BattleSnapshotPublisher snapshots;
+    private final Executor snapshotExecutor;
 
     public BattleDeadlineService(
             BattleDeadlineClaimStore claims,
             BattleMatchRepository matches,
             Clock clock,
             TransactionOperations transactions,
-            BattleSnapshotPublisher snapshots) {
+            BattleSnapshotPublisher snapshots,
+            Executor snapshotExecutor) {
         this.claims = Objects.requireNonNull(claims, "claims must not be null");
         this.matches = Objects.requireNonNull(matches, "matches must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.transactions = Objects.requireNonNull(transactions, "transactions must not be null");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots must not be null");
+        this.snapshotExecutor = Objects.requireNonNull(snapshotExecutor, "snapshotExecutor must not be null");
     }
 
     public int advanceDue(int maximumMatches) {
@@ -37,17 +43,17 @@ public final class BattleDeadlineService {
             throw new IllegalArgumentException("maximumMatches must be positive");
         }
         Instant cutoff = clock.instant();
-        int expired = 0;
-        while (expired < maximumMatches) {
+        List<UUID> advancedMatches = new ArrayList<>(maximumMatches);
+        while (advancedMatches.size() < maximumMatches) {
             Optional<UUID> advancedMatch = Objects.requireNonNull(
                     transactions.execute(status -> advanceNextInsideTransaction(cutoff)));
             if (advancedMatch.isEmpty()) {
                 break;
             }
-            publish(advancedMatch.orElseThrow());
-            expired++;
+            advancedMatches.add(advancedMatch.orElseThrow());
         }
-        return expired;
+        advancedMatches.forEach(this::schedulePublish);
+        return advancedMatches.size();
     }
 
     private Optional<UUID> advanceNextInsideTransaction(Instant cutoff) {
@@ -76,6 +82,14 @@ public final class BattleDeadlineService {
             snapshots.publish(matchId);
         } catch (RuntimeException exception) {
             LOGGER.warn("Committed deadline snapshot fan-out failed for matchId={}", matchId);
+        }
+    }
+
+    private void schedulePublish(UUID matchId) {
+        try {
+            snapshotExecutor.execute(() -> publish(matchId));
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Committed deadline snapshot fan-out deferred for matchId={}", matchId);
         }
     }
 }

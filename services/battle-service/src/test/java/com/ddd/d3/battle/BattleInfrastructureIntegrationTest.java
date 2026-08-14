@@ -143,7 +143,8 @@ class BattleInfrastructureIntegrationTest {
                 matches,
                 Clock.fixed(cutoff, ZoneOffset.UTC),
                 new TransactionTemplate(transactionManager),
-                published::add);
+                published::add,
+                Runnable::run);
 
         assertEquals(1, deadlines.advanceDue(10));
 
@@ -167,7 +168,8 @@ class BattleInfrastructureIntegrationTest {
                 matches,
                 Clock.fixed(cutoff, ZoneOffset.UTC),
                 new TransactionTemplate(transactionManager),
-                published::add);
+                published::add,
+                Runnable::run);
 
         assertEquals(1, deadlines.advanceDue(10));
 

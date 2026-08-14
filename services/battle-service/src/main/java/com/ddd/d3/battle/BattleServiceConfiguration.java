@@ -17,6 +17,8 @@ import com.ddd.d3.battle.application.RankedQueueStore;
 import com.ddd.d3.battle.domain.RankedMatchmaker;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.concurrent.Executor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -99,13 +101,15 @@ class BattleServiceConfiguration {
             BattleMatchRepository matches,
             Clock clock,
             PlatformTransactionManager transactionManager,
-            BattleSnapshotPublisher snapshots) {
+            BattleSnapshotPublisher snapshots,
+            @Qualifier("battleSnapshotFanoutExecutor") Executor snapshotExecutor) {
         return new BattleDeadlineService(
                 claims,
                 matches,
                 clock,
                 new TransactionTemplate(transactionManager),
-                snapshots);
+                snapshots,
+                snapshotExecutor);
     }
 
     @Bean

@@ -2,6 +2,7 @@ package com.ddd.d3.battle.adapter.websocket;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +34,7 @@ class BattleSnapshotResynchronizerTest {
         BattleMatchViewService views = mock(BattleMatchViewService.class);
         when(views.read(MATCH_ID, PLAYER_ONE))
                 .thenReturn(view(1))
+                .thenThrow(new IllegalStateException("postgres unavailable"))
                 .thenReturn(view(2));
         BattleConnectionService connections = mock(BattleConnectionService.class);
         BattleWebSocketSessionRegistry sessions = new BattleWebSocketSessionRegistry(
@@ -48,6 +50,7 @@ class BattleSnapshotResynchronizerTest {
                 new BattleSnapshotResynchronizer(sessions, Runnable::run);
 
         resynchronizer.resynchronize();
+        resynchronizer.resynchronize();
 
         ArgumentCaptor<TextMessage> messages = ArgumentCaptor.forClass(TextMessage.class);
         verify(session, times(2)).sendMessage(messages.capture());
@@ -58,6 +61,7 @@ class BattleSnapshotResynchronizerTest {
         assertEquals(2, objectMapper.readTree(messages.getAllValues().get(1).getPayload())
                 .path("sequence")
                 .asLong());
+        verify(session, never()).close(org.springframework.web.socket.CloseStatus.SERVER_ERROR);
     }
 
     private static WebSocketSession session() {

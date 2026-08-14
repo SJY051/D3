@@ -89,13 +89,18 @@ final class BattleWebSocketSessionRegistry {
     private void sendLatestQuietly(Registration registration) {
         try {
             sendLatest(registration);
-        } catch (IOException | RuntimeException exception) {
+        } catch (IOException exception) {
             evict(registration);
             LOGGER.warn(
                     "Battle snapshot delivery failed; matchId={} sessionId={}",
                     registration.matchId,
                     registration.session.getId());
             closeQuietly(registration.session, CloseStatus.SERVER_ERROR);
+        } catch (RuntimeException exception) {
+            LOGGER.warn(
+                    "Battle snapshot read deferred; matchId={} sessionId={}",
+                    registration.matchId,
+                    registration.session.getId());
         }
     }
 

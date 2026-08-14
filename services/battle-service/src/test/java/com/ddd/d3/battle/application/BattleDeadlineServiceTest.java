@@ -44,7 +44,8 @@ class BattleDeadlineServiceTest {
                 matches,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 transactions,
-                matchId -> order.add("publish-" + matchId));
+                matchId -> order.add("publish-" + matchId),
+                Runnable::run);
 
         int expired = service.advanceDue(1);
 
@@ -69,7 +70,8 @@ class BattleDeadlineServiceTest {
                 matches,
                 Clock.fixed(NOW.minusNanos(1), ZoneOffset.UTC),
                 DirectTransactions.INSTANCE,
-                published::add);
+                published::add,
+                Runnable::run);
 
         assertEquals(0, service.advanceDue(10));
         assertEquals(null, matches.saved);
@@ -87,7 +89,8 @@ class BattleDeadlineServiceTest {
                 matches,
                 Clock.fixed(NOW.plusSeconds(30), ZoneOffset.UTC),
                 DirectTransactions.INSTANCE,
-                published::add);
+                published::add,
+                Runnable::run);
 
         assertEquals(1, service.advanceDue(1));
         assertEquals(BattleMatch.State.JUDGING, matches.saved.state());
@@ -103,13 +106,51 @@ class BattleDeadlineServiceTest {
     }
 
     @Test
+    void d3Btl002CommitsTheWholeDeadlineBatchBeforeStartingFanout() {
+        FakeClaims claims = new FakeClaims(disconnectedAtDeadline(), disconnectedAtDeadline());
+        FakeMatches matches = new FakeMatches();
+        List<String> order = new ArrayList<>();
+        List<Runnable> queuedFanout = new ArrayList<>();
+        TransactionOperations transactions = new TransactionOperations() {
+            @Override
+            public <T> T execute(TransactionCallback<T> action) {
+                order.add("transaction-start");
+                T result = action.doInTransaction(null);
+                order.add("transaction-return");
+                return result;
+            }
+        };
+        BattleDeadlineService service = new BattleDeadlineService(
+                claims,
+                matches,
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                transactions,
+                ignored -> order.add("publish"),
+                queuedFanout::add);
+
+        assertEquals(2, service.advanceDue(2));
+        assertEquals(
+                List.of(
+                        "transaction-start",
+                        "transaction-return",
+                        "transaction-start",
+                        "transaction-return"),
+                order);
+        assertEquals(2, queuedFanout.size());
+
+        queuedFanout.forEach(Runnable::run);
+        assertEquals(List.of("publish", "publish"), order.subList(4, 6));
+    }
+
+    @Test
     void d3Btl002RejectsAnUnboundedExpiryBatch() {
         BattleDeadlineService service = new BattleDeadlineService(
                 new FakeClaims(),
                 new FakeMatches(),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 DirectTransactions.INSTANCE,
-                ignored -> {});
+                ignored -> {},
+                Runnable::run);
 
         assertThrows(IllegalArgumentException.class, () -> service.advanceDue(0));
     }
