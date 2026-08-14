@@ -219,10 +219,12 @@ class JdbcJudgeSubmissionRepositoryTest {
     void d3Qlt001UpgradesExistingJudgeEvidenceWithoutChangingV1OrV2() {
         migrateOnlyThrough("2");
         UUID submissionId = UUID.randomUUID();
+        UUID legacyNullAttemptSubmissionId = UUID.randomUUID();
         UUID judgeRunId = UUID.randomUUID();
         UUID weakerEvidenceId = UUID.fromString("77777777-7777-4777-8777-777777777777");
         UUID representativeEvidenceId = UUID.fromString("88888888-8888-4888-8888-888888888888");
         insertRawSubmission(submissionId, "RUN", null);
+        insertRawSubmission(legacyNullAttemptSubmissionId, "SUBMIT", null);
         assertEquals(1, jdbc.sql("update submission set status = 'ACCEPTED' where id = :id")
                 .param("id", submissionId)
                 .update());
@@ -281,6 +283,45 @@ class JdbcJudgeSubmissionRepositoryTest {
                         """)
                 .param("judgeRunId", judgeRunId)
                 .query(Integer.class)
+                .single());
+        assertEquals(weakerEvidenceId, jdbc.sql("""
+                        select id
+                        from evaluation_evidence_legacy_duplicate
+                        where judge_run_id = :judgeRunId and tier = 'SMALL'
+                        """)
+                .param("judgeRunId", judgeRunId)
+                .query(UUID.class)
+                .single());
+        assertEquals(representativeEvidenceId, jdbc.sql("""
+                        select canonical_evidence_id
+                        from evaluation_evidence_legacy_duplicate
+                        where id = :id
+                        """)
+                .param("id", weakerEvidenceId)
+                .query(UUID.class)
+                .single());
+        assertEquals(700L, jdbc.sql("""
+                        select median_runtime_micros
+                        from evaluation_evidence_legacy_duplicate
+                        where id = :id
+                        """)
+                .param("id", weakerEvidenceId)
+                .query(Long.class)
+                .single());
+        assertEquals(1, jdbc.sql("""
+                        select count(*)
+                        from submission
+                        where id = :id and attempt_number is null
+                        """)
+                .param("id", legacyNullAttemptSubmissionId)
+                .query(Integer.class)
+                .single());
+        assertEquals(false, jdbc.sql("""
+                        select convalidated
+                        from pg_constraint
+                        where conname = 'submission_attempt_mode'
+                        """)
+                .query(Boolean.class)
                 .single());
     }
 

@@ -43,7 +43,13 @@ class IdentityDatabaseMigrationTest {
 
         assertEquals(2, migrations);
         assertEquals(
-                Set.of("flyway_schema_history", "user_account", "login_identity", "refresh_session", "outbox_event"),
+                Set.of(
+                        "flyway_schema_history",
+                        "user_account",
+                        "login_identity",
+                        "refresh_session",
+                        "refresh_session_legacy_normalization",
+                        "outbox_event"),
                 tables);
     }
 
@@ -97,6 +103,30 @@ class IdentityDatabaseMigrationTest {
         UUID secondUserId = createUser("upgrade-second");
         UUID parentSessionId = createRefreshSession(firstUserId, null);
         UUID childSessionId = createRefreshSession(firstUserId, parentSessionId);
+        UUID duplicateChildSessionId = createRefreshSession(firstUserId, parentSessionId);
+        UUID crossUserSessionId = createRefreshSession(secondUserId, parentSessionId);
+        UUID selfSessionId = UUID.randomUUID();
+        assertEquals(1, insertRefreshSession(selfSessionId, firstUserId, selfSessionId));
+        UUID invalidChronologySessionId = createRefreshSession(firstUserId, null);
+        assertEquals(1, jdbc.sql("""
+                        update refresh_session
+                        set revoked_at = created_at - interval '1 second'
+                        where id = :sessionId
+                        """)
+                .param("sessionId", invalidChronologySessionId)
+                .update());
+        assertEquals(2, jdbc.sql("""
+                        update refresh_session
+                        set created_at = case
+                                when id = :childSessionId then timestamptz '2026-08-13 00:00:01+00'
+                                else timestamptz '2026-08-13 00:00:02+00'
+                            end,
+                            expires_at = timestamptz '2026-08-13 01:00:00+00'
+                        where id in (:childSessionId, :duplicateChildSessionId)
+                        """)
+                .param("childSessionId", childSessionId)
+                .param("duplicateChildSessionId", duplicateChildSessionId)
+                .update());
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
@@ -108,6 +138,37 @@ class IdentityDatabaseMigrationTest {
                         """)
                 .param("childSessionId", childSessionId)
                 .query(UUID.class)
+                .single());
+        assertEquals(4, jdbc.sql("select count(*) from refresh_session_legacy_normalization")
+                .query(Integer.class)
+                .single());
+        assertEquals(childSessionId, jdbc.sql("""
+                        select canonical_child_session_id
+                        from refresh_session_legacy_normalization
+                        where session_id = :sessionId
+                        """)
+                .param("sessionId", duplicateChildSessionId)
+                .query(UUID.class)
+                .single());
+        assertEquals(3, jdbc.sql("""
+                        select count(*)
+                        from refresh_session
+                        where id in (:duplicateId, :crossUserId, :selfId)
+                          and rotated_from_id is null
+                          and revoked_at >= created_at
+                        """)
+                .param("duplicateId", duplicateChildSessionId)
+                .param("crossUserId", crossUserSessionId)
+                .param("selfId", selfSessionId)
+                .query(Integer.class)
+                .single());
+        assertEquals(1, jdbc.sql("""
+                        select count(*)
+                        from refresh_session
+                        where id = :sessionId and revoked_at = created_at
+                        """)
+                .param("sessionId", invalidChronologySessionId)
+                .query(Integer.class)
                 .single());
         assertThrows(DataIntegrityViolationException.class, () -> createRefreshSession(secondUserId, parentSessionId));
     }

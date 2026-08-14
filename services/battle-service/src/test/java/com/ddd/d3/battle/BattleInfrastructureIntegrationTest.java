@@ -64,7 +64,9 @@ class BattleInfrastructureIntegrationTest {
                         "problem",
                         "match",
                         "match_player",
+                        "match_player_legacy_accepted_pointer",
                         "judge_job_reference",
+                        "judge_job_reference_legacy_duplicate",
                         "attack_event",
                         "rating",
                         "season_rank",
@@ -243,11 +245,21 @@ class BattleInfrastructureIntegrationTest {
         migrateOnlyThrough("1");
         UUID matchId = createRunningMatch();
         UUID playerId = UUID.randomUUID();
+        UUID opponentId = UUID.randomUUID();
         addPlayer(matchId, playerId, 1);
-        addPlayer(matchId, UUID.randomUUID(), 2);
+        addPlayer(matchId, opponentId, 2);
         UUID runSubmissionId = insertLegacyRun(matchId, playerId);
         UUID acceptedSubmissionId = UUID.randomUUID();
+        UUID supersededSubmissionId = UUID.randomUUID();
+        UUID fallbackSubmissionId = UUID.randomUUID();
+        UUID fallbackSupersededSubmissionId = UUID.randomUUID();
+        UUID duplicateAttemptSubmissionId = UUID.randomUUID();
+        UUID invalidAcceptedPointer = UUID.randomUUID();
         insertCompletedSubmit(acceptedSubmissionId, matchId, playerId, 1, "ACCEPTED");
+        insertCompletedSubmit(supersededSubmissionId, matchId, playerId, 2, "ACCEPTED");
+        insertCompletedSubmit(fallbackSupersededSubmissionId, matchId, opponentId, 2, "ACCEPTED");
+        insertCompletedSubmit(fallbackSubmissionId, matchId, opponentId, 1, "ACCEPTED");
+        insertCompletedSubmit(duplicateAttemptSubmissionId, matchId, opponentId, 1, "WRONG_ANSWER");
         assertEquals(1, jdbc.sql("""
                         update match_player
                         set accepted_submission_id = :submissionId
@@ -256,6 +268,15 @@ class BattleInfrastructureIntegrationTest {
                 .param("submissionId", acceptedSubmissionId)
                 .param("matchId", matchId)
                 .param("playerId", playerId)
+                .update());
+        assertEquals(1, jdbc.sql("""
+                        update match_player
+                        set accepted_submission_id = :submissionId
+                        where match_id = :matchId and user_id = :playerId
+                        """)
+                .param("submissionId", invalidAcceptedPointer)
+                .param("matchId", matchId)
+                .param("playerId", opponentId)
                 .update());
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
@@ -281,6 +302,63 @@ class BattleInfrastructureIntegrationTest {
                 .param("playerId", playerId)
                 .query(UUID.class)
                 .single());
+        assertEquals(fallbackSubmissionId, jdbc.sql("""
+                        select submission_id
+                        from judge_job_reference
+                        where match_id = :matchId
+                          and player_user_id = :playerId
+                          and mode = 'SUBMIT'
+                          and last_judge_status = 'ACCEPTED'
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", opponentId)
+                .query(UUID.class)
+                .single());
+        assertEquals(3, jdbc.sql("select count(*) from judge_job_reference_legacy_duplicate")
+                .query(Integer.class)
+                .single());
+        assertEquals(acceptedSubmissionId, jdbc.sql("""
+                        select canonical_submission_id
+                        from judge_job_reference_legacy_duplicate
+                        where submission_id = :submissionId
+                        """)
+                .param("submissionId", supersededSubmissionId)
+                .query(UUID.class)
+                .single());
+        assertEquals(fallbackSubmissionId, jdbc.sql("""
+                        select canonical_submission_id
+                        from judge_job_reference_legacy_duplicate
+                        where submission_id = :submissionId
+                        """)
+                .param("submissionId", fallbackSupersededSubmissionId)
+                .query(UUID.class)
+                .single());
+        assertEquals("DUPLICATE_SUBMIT_ATTEMPT", jdbc.sql("""
+                        select archive_reason
+                        from judge_job_reference_legacy_duplicate
+                        where submission_id = :submissionId
+                        """)
+                .param("submissionId", duplicateAttemptSubmissionId)
+                .query(String.class)
+                .single());
+        assertEquals(true, jdbc.sql("""
+                        select correlation_valid
+                        from match_player_legacy_accepted_pointer
+                        where match_id = :matchId and player_user_id = :playerId
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .query(Boolean.class)
+                .single());
+        assertEquals(false, jdbc.sql("""
+                        select correlation_valid
+                        from match_player_legacy_accepted_pointer
+                        where match_id = :matchId and player_user_id = :playerId
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", opponentId)
+                .query(Boolean.class)
+                .single());
         assertEquals(0, jdbc.sql("""
                         select count(*)
                         from information_schema.columns
@@ -290,6 +368,68 @@ class BattleInfrastructureIntegrationTest {
                         """)
                 .query(Integer.class)
                 .single());
+    }
+
+    @Test
+    void d3Qlt001PreservesLegacyRowsWhileEnforcingNewLifecycleWrites() {
+        migrateOnlyThrough("1");
+        UUID problemId = createProblem();
+        UUID matchId = UUID.randomUUID();
+        UUID playerId = UUID.randomUUID();
+        assertEquals(1, jdbc.sql("""
+                        insert into match (
+                            id, problem_id, ranked, status, result,
+                            server_started_at, deadline_at, created_at
+                        ) values (
+                            :id, :problemId, true, 'LOBBY', null,
+                            now(), now() + interval '10 minutes', now()
+                        )
+                        """)
+                .param("id", matchId)
+                .param("problemId", problemId)
+                .update());
+        assertEquals(1, jdbc.sql("""
+                        insert into match_player (
+                            match_id, user_id, seat, language_key,
+                            connection_state, reconnect_deadline_at
+                        ) values (
+                            :matchId, :playerId, 1, 'JAVA',
+                            'CONNECTED', now() + interval '30 seconds'
+                        )
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .update());
+
+        int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
+
+        assertEquals(1, applied);
+        assertEquals(1, jdbc.sql("select count(*) from match where id = :id")
+                .param("id", matchId)
+                .query(Integer.class)
+                .single());
+        assertEquals(2, jdbc.sql("""
+                        select count(*)
+                        from pg_constraint
+                        where conname in (
+                            'match_clock_state_consistent',
+                            'match_player_reconnect_deadline_consistent'
+                        ) and not convalidated
+                        """)
+                .query(Integer.class)
+                .single());
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
+                        insert into match_player (
+                            match_id, user_id, seat, language_key,
+                            connection_state, reconnect_deadline_at
+                        ) values (
+                            :matchId, :playerId, 2, 'JAVA',
+                            'CONNECTED', now() + interval '30 seconds'
+                        )
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", UUID.randomUUID())
+                .update());
     }
 
     @Test

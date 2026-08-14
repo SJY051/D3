@@ -53,6 +53,7 @@ class CommunityDatabaseMigrationTest {
                         "post_like",
                         "profile_projection",
                         "match_projection",
+                        "match_projection_rebuild_queue",
                         "inbox_event"),
                 tables);
     }
@@ -101,6 +102,34 @@ class CommunityDatabaseMigrationTest {
                 .single());
     }
 
+    @Test
+    void d3Qlt001QuarantinesLegacyProjectionsThatCannotBeTyped() {
+        migrateOnlyThrough("1");
+        UUID nullPlayers = insertLegacyProjection("[null,null]");
+        insertLegacyProjection("[{},{}]");
+        insertLegacyProjection("[\"not-a-uuid\",\"11111111-1111-4111-8111-111111111111\"]");
+        UUID duplicatePlayer = UUID.fromString("22222222-2222-4222-8222-222222222222");
+        insertLegacyProjection("[\"" + duplicatePlayer + "\",\"" + duplicatePlayer + "\"]");
+
+        int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
+
+        assertEquals(1, applied);
+        assertEquals(0, jdbc.sql("select count(*) from match_projection")
+                .query(Integer.class)
+                .single());
+        assertEquals(4, jdbc.sql("select count(*) from match_projection_rebuild_queue")
+                .query(Integer.class)
+                .single());
+        assertEquals("[null, null]", jdbc.sql("""
+                        select legacy_player_ids::text
+                        from match_projection_rebuild_queue
+                        where match_id = :matchId
+                        """)
+                .param("matchId", nullPlayers)
+                .query(String.class)
+                .single());
+    }
+
     private int insertMatchProjection(UUID playerOneId, UUID playerTwoId) {
         return insertMatchProjection(UUID.randomUUID(), playerOneId, playerTwoId);
     }
@@ -132,6 +161,21 @@ class CommunityDatabaseMigrationTest {
                         resultSet.getObject("player_one_user_id", UUID.class),
                         resultSet.getObject("player_two_user_id", UUID.class)))
                 .single();
+    }
+
+    private UUID insertLegacyProjection(String playerIds) {
+        UUID matchId = UUID.randomUUID();
+        assertEquals(1, jdbc.sql("""
+                        insert into match_projection (
+                            match_id, player_ids, result, ranked, source_version, projected_at
+                        ) values (
+                            :matchId, cast(:playerIds as jsonb), 'DRAW', true, 1, now()
+                        )
+                        """)
+                .param("matchId", matchId)
+                .param("playerIds", playerIds)
+                .update());
+        return matchId;
     }
 
     private void migrateOnlyThrough(String version) {

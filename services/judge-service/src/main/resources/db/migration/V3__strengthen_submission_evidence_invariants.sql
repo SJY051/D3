@@ -3,29 +3,51 @@ alter table submission
     add constraint submission_attempt_mode check (
         (mode = 'RUN' and attempt_number is null)
         or (mode = 'SUBMIT' and attempt_number is not null and attempt_number > 0)
-    );
+    ) not valid;
 
 drop index evaluation_evidence_run_idx;
 
 -- V1 allowed more than one measurement for the same run and size tier. Keep the
--- strongest observed measurement as the deterministic representative before
+-- first observation active and archive every other raw observation before
 -- enforcing the one-row-per-tier invariant. Never synthesize a median from
 -- medians because the original runtime samples are not available here.
+create table evaluation_evidence_legacy_duplicate (
+    id uuid primary key,
+    judge_run_id uuid not null references judge_run (id),
+    tier text not null,
+    input_size bigint not null,
+    sample_count integer not null,
+    median_runtime_micros bigint not null,
+    created_at timestamptz not null,
+    canonical_evidence_id uuid not null references evaluation_evidence (id),
+    archived_at timestamptz not null default now(),
+    constraint evaluation_evidence_legacy_distinct_ids check (id <> canonical_evidence_id)
+);
+
 with ranked_evidence as (
-    select id,
+    select evidence.*,
+           first_value(id) over (
+               partition by judge_run_id, tier
+               order by created_at asc, id asc
+           ) as canonical_evidence_id,
            row_number() over (
                partition by judge_run_id, tier
-               order by sample_count desc,
-                        input_size desc,
-                        created_at desc,
-                        id asc
+               order by created_at asc, id asc
            ) as evidence_rank
-    from evaluation_evidence
+    from evaluation_evidence evidence
 )
+insert into evaluation_evidence_legacy_duplicate (
+    id, judge_run_id, tier, input_size, sample_count,
+    median_runtime_micros, created_at, canonical_evidence_id
+)
+select id, judge_run_id, tier, input_size, sample_count,
+       median_runtime_micros, created_at, canonical_evidence_id
+from ranked_evidence
+where evidence_rank > 1;
+
 delete from evaluation_evidence evidence
-using ranked_evidence ranked
-where evidence.id = ranked.id
-  and ranked.evidence_rank > 1;
+using evaluation_evidence_legacy_duplicate legacy
+where evidence.id = legacy.id;
 
 create unique index evaluation_evidence_run_tier_unique_idx
     on evaluation_evidence (judge_run_id, tier);

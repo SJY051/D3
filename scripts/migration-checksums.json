@@ -2,13 +2,13 @@
   "algorithm": "sha256",
   "files": {
     "services/battle-service/src/main/resources/db/migration/V1__create_battle_tables.sql": "e5ab21013c06ee182c08fd17d0b216191ff7c818e8ba9ea27628a31ba76c9581",
-    "services/battle-service/src/main/resources/db/migration/V2__normalize_judge_job_invariants.sql": "c894816f60a4be1a4d904bd4cbaabada6d69ccfef201372d0ba61c4a0e3b47dc",
+    "services/battle-service/src/main/resources/db/migration/V2__normalize_judge_job_invariants.sql": "3c932b4144dbd3ae613c57ace528f7c298585c3f72e2f47df5df6c940cede2c2",
     "services/community-service/src/main/resources/db/migration/V1__create_community_tables.sql": "0efcae33992a0869904ded0afc3f10b723bb3730af920a7734e9e696a89847a7",
-    "services/community-service/src/main/resources/db/migration/V2__normalize_match_projection_players.sql": "c5e53d7966254b883829d59c829a13f807fdadfbaa76623ef563df2c51b3b08a",
+    "services/community-service/src/main/resources/db/migration/V2__normalize_match_projection_players.sql": "f4582a2ac461f0a0093e51984d2f3c79b3dbe3fdf4377595480195299046bbbe",
     "services/identity-service/src/main/resources/db/migration/V1__create_identity_tables.sql": "2df6e59c98cffc0406f611ee19da4a939fc1147bf52f816e6d2d9589cb07f5de",
-    "services/identity-service/src/main/resources/db/migration/V2__strengthen_refresh_session_lineage.sql": "e95678c63b4d745357f7c2a91bc49f6c04611369dc0238128b9c4d2e3c0dee75",
+    "services/identity-service/src/main/resources/db/migration/V2__strengthen_refresh_session_lineage.sql": "bdd8f2150711ee13a0b95b496eaa02ffddb8e4c8cf2874bbbf293c4eb2100fcc",
     "services/judge-service/src/main/resources/db/migration/V1__create_judge_tables.sql": "e21b851a541cf2091c579926ee19cc1b0f6aa1305514f8c7fee1b28068616f04",
     "services/judge-service/src/main/resources/db/migration/V2__fence_started_provider_execution.sql": "44fdb3159fcc202ac363419b6956a3ea034bf5493e546aa12064ae54516077b1",
-    "services/judge-service/src/main/resources/db/migration/V3__strengthen_submission_evidence_invariants.sql": "ff32f7f26d01594254414f6f5c65cb906ff768a25b4f32b1e07176fb993b5d74"
+    "services/judge-service/src/main/resources/db/migration/V3__strengthen_submission_evidence_invariants.sql": "7eb8352b92399e1595bdd233bb4b0a4a3f7078f2d0b2da857ca34c23941064e4"
   }
 }

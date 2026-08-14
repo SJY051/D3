@@ -116,6 +116,16 @@ Table identity_db.refresh_session {
   }
 }
 
+Table identity_db.refresh_session_legacy_normalization {
+  session_id uuid [pk, note: 'Original refresh-session row retained in refresh_session after safe normalization']
+  user_id uuid [not null]
+  rotated_from_id uuid
+  revoked_at timestamptz
+  canonical_child_session_id uuid
+  normalization_reasons text [not null, note: 'PostgreSQL text[] audit of self, cross-user, duplicate-child, or chronology repair']
+  archived_at timestamptz [not null]
+}
+
 Table identity_db.outbox_event {
   id uuid [pk]
   aggregate_id uuid [not null]
@@ -190,6 +200,18 @@ Table battle_db.match_player {
   }
 }
 
+Table battle_db.match_player_legacy_accepted_pointer {
+  match_id uuid [not null]
+  player_user_id uuid [not null]
+  accepted_submission_id uuid [not null]
+  correlation_valid boolean [not null]
+  archived_at timestamptz [not null]
+
+  Indexes {
+    (match_id, player_user_id) [pk]
+  }
+}
+
 Table battle_db.judge_job_reference {
   submission_id uuid [pk, note: 'Stable logical Judge submission reference; no cross-database FK']
   match_id uuid [not null]
@@ -213,6 +235,22 @@ Table battle_db.judge_job_reference {
     `(last_judge_status IN ('QUEUED', 'RUNNING') AND evidence_version IS NULL AND last_result_at IS NULL) OR (last_judge_status NOT IN ('QUEUED', 'RUNNING') AND NULLIF(BTRIM(evidence_version), '') IS NOT NULL AND last_result_at IS NOT NULL)` [name: 'judge_job_reference_result_state_consistent']
     `last_result_at IS NULL OR last_result_at >= accepted_at` [name: 'judge_job_reference_result_after_acceptance']
   }
+}
+
+Table battle_db.judge_job_reference_legacy_duplicate {
+  submission_id uuid [pk]
+  match_id uuid [not null]
+  player_user_id uuid [not null]
+  mode text [not null]
+  command_id uuid [not null]
+  attempt_number int
+  last_judge_status text [not null]
+  evidence_version text
+  accepted_at timestamptz [not null]
+  last_result_at timestamptz
+  canonical_submission_id uuid [not null]
+  archive_reason text [not null, note: 'DUPLICATE_SUBMIT_ATTEMPT or DUPLICATE_ACCEPTED_SUBMIT']
+  archived_at timestamptz [not null]
 }
 
 Table battle_db.attack_event {
@@ -348,6 +386,18 @@ Table judge_db.evaluation_evidence {
   }
 }
 
+Table judge_db.evaluation_evidence_legacy_duplicate {
+  id uuid [pk]
+  judge_run_id uuid [not null]
+  tier text [not null]
+  input_size bigint [not null]
+  sample_count int [not null]
+  median_runtime_micros bigint [not null]
+  created_at timestamptz [not null]
+  canonical_evidence_id uuid [not null]
+  archived_at timestamptz [not null]
+}
+
 Table judge_db.outbox_event {
   id uuid [pk]
   aggregate_id uuid [not null]
@@ -365,6 +415,8 @@ Table judge_db.outbox_event {
 
 Ref: judge_db.judge_run.submission_id > judge_db.submission.id
 Ref: judge_db.evaluation_evidence.judge_run_id > judge_db.judge_run.id
+Ref: judge_db.evaluation_evidence_legacy_duplicate.judge_run_id > judge_db.judge_run.id
+Ref: judge_db.evaluation_evidence_legacy_duplicate.canonical_evidence_id > judge_db.evaluation_evidence.id
 
 Table community_db.post {
   id uuid [pk]
@@ -463,6 +515,20 @@ Table community_db.match_projection {
   checks {
     `player_one_user_id <> player_two_user_id` [name: 'match_projection_players_distinct']
   }
+}
+
+Table community_db.match_projection_rebuild_queue {
+  match_id uuid [pk, note: 'Projection removed from the active read model until authoritative event replay succeeds']
+  legacy_player_ids jsonb [not null]
+  result text [not null]
+  ranked boolean [not null]
+  score_summary jsonb
+  attack_summary jsonb
+  execution_summary jsonb
+  source_version bigint [not null]
+  projected_at timestamptz [not null]
+  quarantine_reason text [not null]
+  quarantined_at timestamptz [not null]
 }
 
 Table community_db.inbox_event {
