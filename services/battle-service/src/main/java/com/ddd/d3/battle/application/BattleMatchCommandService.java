@@ -3,6 +3,7 @@ package com.ddd.d3.battle.application;
 import com.ddd.d3.battle.domain.BattleMatch;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -75,7 +76,8 @@ public class BattleMatchCommandService {
 
         BattleMatch.Snapshot loaded = matches.findById(matchId)
                 .orElseThrow(BattleMatchNotFoundException::new);
-        BattleMatch match = BattleMatch.restore(loaded, clock);
+        Instant acceptedAt = clock.instant();
+        BattleMatch match = BattleMatch.restore(loaded, Clock.fixed(acceptedAt, clock.getZone()));
         long initialVersion = match.aggregateVersion();
         long expectedVersion = match.aggregateVersion();
         if (command instanceof BattleMatch.Surrender) {
@@ -106,7 +108,7 @@ public class BattleMatchCommandService {
                 descriptor.type(),
                 descriptor.fingerprint(),
                 committed.aggregateVersion(),
-                clock.instant()));
+                acceptedAt));
         return CommandExecution.accepted(committed);
     }
 
