@@ -38,23 +38,32 @@ public class JudgeSecurityConfiguration {
             @Value("${d3.security.jwk-set-uri}") String jwkSetUri,
             @Value("${d3.security.issuer}") String issuer,
             @Value("${d3.security.audience:judge-service}") String audience,
-            @Value("${d3.security.allowed-client-id:battle-service}") String allowedClientId) {
+            @Value("${d3.security.allowed-client-id:battle-service}") String allowedClientId,
+            @Value("${d3.security.allowed-token-use:service}") String allowedTokenUse) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+        decoder.setJwtValidator(judgeTokenValidator(issuer, audience, allowedClientId, allowedTokenUse));
+        return decoder;
+    }
+
+    static OAuth2TokenValidator<Jwt> judgeTokenValidator(
+            String issuer, String audience, String allowedClientId, String allowedTokenUse) {
         OAuth2TokenValidator<Jwt> issuerValidator = JwtValidators.createDefaultWithIssuer(issuer);
         OAuth2TokenValidator<Jwt> audienceValidator = new JwtClaimValidator<List<String>>(
                 "aud", audiences -> audiences != null && audiences.contains(audience));
         OAuth2TokenValidator<Jwt> clientValidator = new JwtClaimValidator<String>(
                 "client_id", allowedClientId::equals);
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                issuerValidator, audienceValidator, clientValidator));
-        return decoder;
+        OAuth2TokenValidator<Jwt> tokenUseValidator = new JwtClaimValidator<String>(
+                "token_use", allowedTokenUse::equals);
+        return new DelegatingOAuth2TokenValidator<>(
+                issuerValidator, audienceValidator, clientValidator, tokenUseValidator);
     }
 
     @Bean
     SecurityFilterChain judgeSecurityFilterChain(
             HttpSecurity http,
             ObjectMapper objectMapper,
-            @Value("${d3.security.allowed-client-id:battle-service}") String allowedClientId) throws Exception {
+            @Value("${d3.security.allowed-client-id:battle-service}") String allowedClientId,
+            @Value("${d3.security.allowed-token-use:service}") String allowedTokenUse) throws Exception {
         AuthenticationEntryPoint unauthorized = (request, response, exception) ->
                 writeError(response, request, objectMapper, 401, "UNAUTHORIZED", "service authentication is required");
         AccessDeniedHandler forbidden = (request, response, exception) ->
@@ -63,9 +72,9 @@ public class JudgeSecurityConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.POST, "/internal/v1/judge/submissions")
-                        .access(serviceAuthority("SCOPE_judge.submit", allowedClientId))
+                        .access(serviceAuthority("SCOPE_judge.submit", allowedClientId, allowedTokenUse))
                         .requestMatchers(HttpMethod.GET, "/internal/v1/judge/submissions/*/evidence")
-                        .access(serviceAuthority("SCOPE_judge.read", allowedClientId))
+                        .access(serviceAuthority("SCOPE_judge.read", allowedClientId, allowedTokenUse))
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(Customizer.withDefaults())
@@ -79,11 +88,12 @@ public class JudgeSecurityConfiguration {
     }
 
     private static AuthorizationManager<RequestAuthorizationContext> serviceAuthority(
-            String requiredAuthority, String allowedClientId) {
+            String requiredAuthority, String allowedClientId, String allowedTokenUse) {
         return (authentication, context) -> {
             var current = authentication.get();
             boolean granted = current.getPrincipal() instanceof Jwt jwt
                     && allowedClientId.equals(jwt.getClaimAsString("client_id"))
+                    && allowedTokenUse.equals(jwt.getClaimAsString("token_use"))
                     && current.getAuthorities().stream()
                             .anyMatch(authority -> requiredAuthority.equals(authority.getAuthority()));
             return new AuthorizationDecision(granted);

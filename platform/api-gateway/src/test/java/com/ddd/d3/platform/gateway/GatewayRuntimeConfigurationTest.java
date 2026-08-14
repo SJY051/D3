@@ -45,6 +45,9 @@ class GatewayRuntimeConfigurationTest {
 
         assertEquals(4, routes.size());
         assertEquals(URI.create("lb://identity-service"), routes.get("identity-api").getUri());
+        assertEquals(1, routes.get("identity-api").getFilters().size());
+        assertEquals("StripPrefix", routes.get("identity-api").getFilters().getFirst().getName());
+        assertEquals("1", routes.get("identity-api").getFilters().getFirst().getArgs().get("_genkey_0"));
         assertEquals(URI.create("lb://battle-service"), routes.get("battle-api").getUri());
         assertEquals(URI.create("lb:ws://battle-service"), routes.get("battle-websocket").getUri());
         assertEquals(URI.create("lb://community-service"), routes.get("community-api").getUri());
@@ -77,6 +80,24 @@ class GatewayRuntimeConfigurationTest {
     }
 
     @Test
+    void d3Id001AllowsOnlyCanonicalAnonymousSessionEntrypoints() throws Exception {
+        for (String path : new String[] {
+            "/api/v1/auth/register",
+            "/api/v1/auth/login",
+            "/api/v1/auth/refresh",
+            "/api/v1/auth/logout"
+        }) {
+            HttpResponse<String> response = post(path, "trace-anonymous");
+
+            assertEquals(503, response.statusCode(), path);
+        }
+
+        assertEquals(401, request("/api/v1/users/me", "trace-profile").statusCode());
+        assertEquals(401, patch("/api/v1/users/me", "trace-profile-patch").statusCode());
+        assertEquals(401, post("/api/v1/auth/probe", "trace-probe").statusCode());
+    }
+
+    @Test
     void d3Sec001AllowsOnlyTheConfiguredBrowserPreflight() throws Exception {
         HttpResponse<String> allowed = preflight("http://localhost:5173");
         HttpResponse<String> rejected = preflight("https://untrusted.example");
@@ -103,6 +124,24 @@ class GatewayRuntimeConfigurationTest {
             request.header(CORRELATION_HEADER, "invalid value with spaces");
         }
         return HttpClient.newHttpClient().send(request.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> post(String path, String correlationId) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:" + port + path))
+                .header(CORRELATION_HEADER, correlationId)
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> patch(String path, String correlationId) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:" + port + path))
+                .header(CORRELATION_HEADER, correlationId)
+                .method("PATCH", HttpRequest.BodyPublishers.noBody())
+                .build();
+        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<String> preflight(String origin) throws Exception {

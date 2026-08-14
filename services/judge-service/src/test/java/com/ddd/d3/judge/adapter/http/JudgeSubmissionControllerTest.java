@@ -74,6 +74,28 @@ class JudgeSubmissionControllerTest {
                         .content(requestJson("print(1)")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+        mockMvc.perform(post("/internal/v1/judge/submissions")
+                        .with(jwt().jwt(token -> token.claim("client_id", "battle-service"))
+                                .authorities(new SimpleGrantedAuthority("SCOPE_judge.submit")))
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Correlation-Id", "corr-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson("print(1)")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+        mockMvc.perform(post("/internal/v1/judge/submissions")
+                        .with(jwt().jwt(token -> token
+                                        .claim("client_id", "battle-service")
+                                        .claim("token_use", "user"))
+                                .authorities(new SimpleGrantedAuthority("SCOPE_judge.submit")))
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Correlation-Id", "corr-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson("print(1)")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 
     @Test
@@ -96,6 +118,27 @@ class JudgeSubmissionControllerTest {
                 .andExpect(jsonPath("$.status").value("QUEUED"));
 
         verify(evaluationScheduler).schedule(SUBMISSION_ID);
+    }
+
+    @Test
+    void d3Sec001RejectsAServiceTokenWithTheWrongEndpointScope() throws Exception {
+        mockMvc.perform(post("/internal/v1/judge/submissions")
+                        .with(serviceJwt("SCOPE_judge.read"))
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Correlation-Id", "corr-wrong-submit-scope")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson("print(1)")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+        mockMvc.perform(get("/internal/v1/judge/submissions/{submissionId}/evidence", SUBMISSION_ID)
+                        .with(serviceJwt("SCOPE_judge.submit"))
+                        .header("X-Correlation-Id", "corr-wrong-read-scope"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+        verify(submissionService, never()).accept(any());
+        verify(submissionService, never()).readEvidence(any());
     }
 
     @Test
@@ -230,7 +273,9 @@ class JudgeSubmissionControllerTest {
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor serviceJwt(String authority) {
-        return jwt().jwt(token -> token.claim("client_id", "battle-service"))
+        return jwt().jwt(token -> token
+                        .claim("client_id", "battle-service")
+                        .claim("token_use", "service"))
                 .authorities(new SimpleGrantedAuthority(authority));
     }
 

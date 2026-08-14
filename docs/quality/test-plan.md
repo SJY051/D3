@@ -14,7 +14,7 @@ Requirement: D3-QLT-001
 |---|---|---|---|---|
 | Domain unit | Match state, outcome, rating, energy | Active Battle lifecycle plus deterministic fake and real-Judge normalization slices; remaining requirement skeletons disabled | Deterministic examples, boundaries and clock control | PARTIAL PASS: active Judge/Battle slices plus remaining skips |
 | Adapter integration | PostgreSQL, Redis, Kafka, outbox/inbox | Forward-only service migrations run on PostgreSQL Testcontainers; Battle proves Redis TTL/lease coordination, two-user matching, per-player concurrent active-match fencing, idempotent match creation, legacy clock/result restoration, single-snapshot aggregate reads, optimistic lifecycle persistence and transactional command replay; Judge adds transactional outbox and producer behavior | Real-container transaction, uniqueness and retry evidence | PARTIAL PASS: ranked entry and command persistence plus Judge producer active; Battle terminal outbox and realtime adapters pending |
-| Contract | HTTP, events, WebSocket | Eleven parseable versioned documents; the original Battle event v1 is preserved and the closed participant snapshot is v2; Judge HTTP behavior and Battle ranked-queue auth/identity/error behavior have active tests | Producer/consumer compatibility and negative samples | PARTIAL PASS: Judge HTTP and Battle ranked queue active; WebSocket transport and Battle event consumers incomplete |
+| Contract | HTTP, events, WebSocket | Eleven parseable versioned documents; the original Battle event v1 is preserved and the closed participant snapshot is v2; Judge HTTP behavior, Battle ranked-queue auth/identity/error behavior and Gateway canonical Identity ingress have active tests | Producer/consumer compatibility and negative samples | PARTIAL PASS: Gateway route/auth and Judge service-token rejection are active; Identity session transport, WebSocket transport and Battle event consumers incomplete |
 | Browser | Ranked golden path and privacy | Skipped Playwright Scenario A | Two independent sessions with fake judge | SKIP: vertical slice absent |
 | Judge host smoke | Runtime mapping and host isolation | Bound zero-ingress host, pinned images, hardened startup and executable sanitized smoke | Real Judge0 cases for six pinned runtimes | PASS: six hello-world plus six deterministic cases; live outage injection NOT RUN |
 | Judge application smoke | Real adapter routing, credential and private connectivity | Local HTTP-fixture tests exercise the selectable real adapter path | judge-service calls the designated host over the bound private route for all six runtimes | NOT RUN: private service route PENDING |
@@ -40,6 +40,15 @@ For failures, retain the request or correlation ID and sanitized operational sig
 | Full application to designated Judge0 | NOT RUN | Requires the PENDING private Judge-service route and deployment egress binding; issue #14 host smoke is not a substitute |
 
 These rows summarize narrow test evidence. The issue #13 PR report remains authoritative for exact commands, revision, counts and any skipped scaffold tests.
+
+## Issue #27 authentication evidence
+
+| Slice | Current result | What it proves |
+|---|---|---|
+| Gateway canonical Identity ingress | PARTIAL PASS | `/api` is stripped once; register, login, refresh and refresh-cookie logout are anonymous while profile and undeclared auth paths still require authentication |
+| Judge machine-token validation | PASS | Issuer, Judge audience, Battle client, `token_use=service` and endpoint scope are all required; user-like, wrong-audience and wrong-client tokens fail closed |
+| Browser session cookie and key lifecycle | NOT RUN | Depends on the rebased issue #26 Identity implementation and must prove cookie flags, rotation/revocation and stable demo/deploy signing keys |
+| Identity issuance and Battle acquisition | NOT RUN | The short-lived service-token endpoint/client and positive Battle-to-Judge call remain to be integrated after issue #26 |
 
 ## Critical functional suites
 
