@@ -25,6 +25,7 @@ Review these surfaces when their implementation appears:
 | CORS | PASS in HTTP test | The configured browser origin receives a successful preflight, an untrusted origin is rejected, and methods and headers use an explicit allowlist |
 | Local listener isolation | PASS in configuration and helper test | `pnpm local:start` binds every Java child process to loopback by default; intentional non-loopback sharing requires an explicit operator override and separate discovery protection review |
 | Health exposure | PASS in full local preflight | Only health/info are public on secured scaffold services; health details are not exposed |
+| Battle realtime projection privacy | PASS in unit and contract tests; transport PENDING | Participant lookup returns not-found for outsiders; the closed v2 snapshot excludes opponent and winner UUIDs, source, literals, connection fencing generations and private incident references. The original open-payload v1 contract is preserved for compatibility but is not the privacy evidence. WebSocket credential transport and destination authorization remain issue #27/#15 work |
 
 ## Judge0 activation review
 

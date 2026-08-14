@@ -101,12 +101,31 @@ class BattleMatchTest {
     void d3Btl002TreatsAnEquivalentRepeatedStartAsAnIdempotentRetry() {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);
+        long acceptedVersion = match.aggregateVersion();
 
         match.handle(new BattleMatch.Start(Duration.ofMinutes(10)));
 
         assertEquals(BattleMatch.State.RUNNING, match.state());
+        assertEquals(acceptedVersion, match.aggregateVersion());
         assertEquals(START, match.startedAt());
         assertEquals(START.plus(Duration.ofMinutes(10)), match.matchDeadline());
+    }
+
+    @Test
+    void d3Btl002RestoresTheAuthoritativeSnapshotAndContinuesItsVersionSequence() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+        match.handle(new BattleMatch.Disconnect(PLAYER_ONE, 1));
+        BattleMatch.Snapshot snapshot = match.snapshot();
+
+        BattleMatch restored = BattleMatch.restore(snapshot, clock);
+
+        assertEquals(snapshot, restored.snapshot());
+        assertEquals(4, restored.aggregateVersion());
+        clock.advance(Duration.ofSeconds(30));
+        restored.handle(new BattleMatch.AdvanceTime());
+        assertEquals(5, restored.aggregateVersion());
+        assertEquals(PLAYER_TWO, restored.result().orElseThrow().winnerId());
     }
 
     @Test

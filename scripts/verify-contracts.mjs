@@ -20,8 +20,8 @@ function isHttpContract(label) {
 }
 
 const files = collectJson(contractsRoot);
-if (files.length !== 10) {
-  throw new Error(`Expected 10 contract documents, found ${files.length}`);
+if (files.length !== 11) {
+  throw new Error(`Expected 11 contract documents, found ${files.length}`);
 }
 
 const parsedContracts = [];
@@ -127,4 +127,97 @@ for (const privateField of ["sourceCode", "hiddenTests", "compilerCommand", "raw
   }
 }
 
-console.log(`contracts: PASS (${files.length} JSON documents, 6 compiled JSON Schemas, privacy and Judge v1 samples)`);
+const battleContract = parsedContracts.find(({ label }) => label.replaceAll("\\", "/") === "contracts/http/battle.openapi.json")?.contract;
+const joinRankedQueue = battleContract?.paths?.["/api/v1/battle/ranked/queue"]?.post;
+if (!joinRankedQueue) {
+  throw new Error("battle v1 ranked queue operation must be present");
+}
+if (joinRankedQueue.security?.[0]?.bearerAuth?.[0] !== "battle.play") {
+  throw new Error("battle v1 ranked queue must require battle.play authority");
+}
+const joinRequest = battleContract.components?.schemas?.RankedQueueJoinRequest;
+if (!joinRequest || joinRequest.additionalProperties !== false || Object.hasOwn(joinRequest.properties ?? {}, "playerId")) {
+  throw new Error("battle ranked queue request must be closed and derive player identity from JWT");
+}
+
+const battleEventV1 = ajv.getSchema("https://d3.local/contracts/websocket/battle-event.v1.schema.json");
+if (!battleEventV1) throw new Error("battle event v1 validator was not preserved");
+if (!battleEventV1({
+  type: "MATCH_STATE",
+  version: 1,
+  matchId: "11111111-1111-4111-8111-111111111111",
+  sequence: 3,
+  serverTime: "2026-08-14T00:00:00Z",
+  payload: {},
+})) {
+  throw new Error(`battle event v1 rejected its original shape: ${ajv.errorsText(battleEventV1.errors)}`);
+}
+const battleSnapshot = ajv.getSchema("https://d3.local/contracts/websocket/battle-event.v2.schema.json");
+if (!battleSnapshot) throw new Error("battle snapshot validator was not created");
+const battleSnapshotEvent = {
+  type: "MATCH_SNAPSHOT",
+  version: 2,
+  matchId: "11111111-1111-4111-8111-111111111111",
+  sequence: 4,
+  serverTime: "2026-08-14T00:00:00Z",
+  payload: {
+    state: "RUNNING",
+    startedAt: "2026-08-14T00:00:00Z",
+    matchDeadline: "2026-08-14T00:10:00Z",
+    self: {
+      playerId: "22222222-2222-4222-8222-222222222222",
+      ready: true,
+      connectionState: "CONNECTED",
+      reconnectDeadline: null,
+    },
+    opponent: {
+      ready: true,
+      connectionState: "DISCONNECTED",
+      reconnectDeadline: "2026-08-14T00:00:30Z",
+    },
+    result: null,
+  },
+};
+if (!battleSnapshot(battleSnapshotEvent)) {
+  throw new Error(`battle snapshot valid sample was rejected: ${ajv.errorsText(battleSnapshot.errors)}`);
+}
+for (const privateField of ["playerId", "activeConnectionGeneration", "incidentReference", "sourceCode", "literal"]) {
+  const unsafe = structuredClone(battleSnapshotEvent);
+  unsafe.payload.opponent[privateField] = "private";
+  if (battleSnapshot(unsafe)) {
+    throw new Error(`battle snapshot accepted private field: ${privateField}`);
+  }
+}
+const missingReconnectDeadline = structuredClone(battleSnapshotEvent);
+missingReconnectDeadline.payload.opponent.reconnectDeadline = null;
+if (battleSnapshot(missingReconnectDeadline)) {
+  throw new Error("battle snapshot accepted a disconnected player without a reconnect deadline");
+}
+const clientOwnedClock = structuredClone(battleSnapshotEvent);
+clientOwnedClock.payload.matchDeadline = null;
+if (battleSnapshot(clientOwnedClock)) {
+  throw new Error("battle snapshot accepted a running match without its server deadline");
+}
+const importedLegacyDraw = structuredClone(battleSnapshotEvent);
+importedLegacyDraw.payload.state = "FINISHED";
+importedLegacyDraw.payload.result = {
+  outcome: "DRAW",
+  winner: null,
+  reason: "LEGACY_IMPORT",
+  resolvedAt: "2026-08-14T00:10:00Z",
+};
+if (!battleSnapshot(importedLegacyDraw)) {
+  throw new Error(`battle snapshot rejected an imported legacy draw: ${ajv.errorsText(battleSnapshot.errors)}`);
+}
+const legacyDrawWithWinner = structuredClone(importedLegacyDraw);
+legacyDrawWithWinner.payload.result.winner = "SELF";
+if (battleSnapshot(legacyDrawWithWinner)) {
+  throw new Error("battle snapshot accepted a legacy draw with a winner");
+}
+const resultWithWinnerId = structuredClone(importedLegacyDraw);
+resultWithWinnerId.payload.result.winnerId = "22222222-2222-4222-8222-222222222222";
+if (battleSnapshot(resultWithWinnerId)) {
+  throw new Error("battle snapshot accepted an absolute winner identifier");
+}
+
+console.log(`contracts: PASS (${files.length} JSON documents, 7 compiled JSON Schemas, privacy, Judge v1, and Battle v1/v2 samples)`);

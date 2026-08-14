@@ -13,6 +13,7 @@ const requiredPaths = [
   "contracts/http/identity.openapi.json",
   "contracts/events/envelope.v1.schema.json",
   "contracts/websocket/battle-event.v1.schema.json",
+  "contracts/websocket/battle-event.v2.schema.json",
   "apps/web/src/app/AppRouter.tsx",
   "platform/api-gateway/build.gradle.kts",
   "services/identity-service/build.gradle.kts",
