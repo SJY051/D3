@@ -5,7 +5,12 @@ service_password="${D3_SERVICE_DB_PASSWORD:-local-only}"
 
 for service in identity battle judge community; do
   database="d3_${service}"
-  role="d3_${service}"
+  case "$service" in
+    identity) role="${IDENTITY_DB_USER:-d3_identity}" ;;
+    battle) role="${BATTLE_DB_USER:-d3_battle}" ;;
+    judge) role="${JUDGE_DB_USER:-d3_judge}" ;;
+    community) role="${COMMUNITY_DB_USER:-d3_community}" ;;
+  esac
 
   psql --set=ON_ERROR_STOP=1 \
     --username "$POSTGRES_USER" \
