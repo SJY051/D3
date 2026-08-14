@@ -12,6 +12,11 @@ const gradle = windows ? "gradlew.bat" : "./gradlew";
 const pnpm = windows ? "pnpm.cmd" : "pnpm";
 const children = [];
 let shuttingDown = false;
+let requestedExitCode;
+let finishRuntime;
+const runtimeFinished = new Promise((resolve) => {
+  finishRuntime = resolve;
+});
 
 const environment = resolveLocalEnvironment();
 
@@ -55,9 +60,15 @@ function start(name, command, args, env = environment) {
   child.name = name;
   children.push(child);
   child.once("exit", (code, signal) => {
-    if (!shuttingDown) {
+    const handleUnexpectedExit = () => {
+      if (shuttingDown) return;
       console.error(`local-start: ${name} exited early (${signal ?? code})`);
       void shutdown(1);
+    };
+    if (signal === "SIGINT" || signal === "SIGTERM") {
+      setImmediate(handleUnexpectedExit);
+    } else {
+      handleUnexpectedExit();
     }
   });
   return child;
@@ -88,7 +99,11 @@ async function waitForHealth(target, timeoutMillis = 60_000) {
 }
 
 async function shutdown(exitCode = 0) {
-  if (shuttingDown) return;
+  if (requestedExitCode === undefined || exitCode === 0) requestedExitCode = exitCode;
+  if (shuttingDown) {
+    process.exitCode = requestedExitCode;
+    return;
+  }
   shuttingDown = true;
   for (const child of children.toReversed()) {
     if (child.exitCode === null) child.kill("SIGTERM");
@@ -101,7 +116,8 @@ async function shutdown(exitCode = 0) {
       resolve();
     }, 5_000).unref();
   })));
-  process.exitCode = exitCode;
+  process.exitCode = requestedExitCode;
+  finishRuntime();
 }
 
 process.once("SIGINT", () => void shutdown(0));
@@ -123,7 +139,7 @@ try {
 
   run(process.execPath, ["scripts/demo-preflight.mjs"]);
   console.log("local-start: READY; press Ctrl+C to stop applications (infrastructure remains running)");
-  await new Promise(() => {});
+  await runtimeFinished;
 } catch (error) {
   console.error(`local-start: FAILED: ${error.message}`);
   await shutdown(1);

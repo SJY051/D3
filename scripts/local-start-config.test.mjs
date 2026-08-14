@@ -63,6 +63,16 @@ test("local runtime derives the Vite binding and health target from D3_WEB_URL",
   });
 });
 
+test("local runtime keeps the Gateway CORS origin aligned with the Web URL", () => {
+  const environment = resolveLocalEnvironment({
+    D3_WEB_URL: "http://localhost:5174",
+    D3_WEB_ORIGIN: "http://localhost:5173",
+  });
+
+  assert.equal(environment.D3_WEB_URL, "http://localhost:5174");
+  assert.equal(environment.D3_WEB_ORIGIN, "http://localhost:5174");
+});
+
 test("local runtime rejects a non-loopback Web origin", () => {
   assert.throws(
     () => resolveLocalWebServer({ D3_WEB_URL: "http://0.0.0.0:5173" }),
