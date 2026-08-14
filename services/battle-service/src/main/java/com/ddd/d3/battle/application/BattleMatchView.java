@@ -30,13 +30,15 @@ public record BattleMatchView(
 
     public enum Outcome {
         WIN,
+        DRAW,
         VOIDED
     }
 
     public enum ResolutionReason {
         SURRENDER,
         DISCONNECT_TIMEOUT,
-        PLATFORM_INCIDENT
+        PLATFORM_INCIDENT,
+        LEGACY_IMPORT
     }
 
     public record Participant(

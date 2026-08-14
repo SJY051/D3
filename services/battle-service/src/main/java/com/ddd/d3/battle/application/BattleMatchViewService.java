@@ -57,9 +57,11 @@ public final class BattleMatchViewService {
         if (result == null) {
             return null;
         }
-        BattleMatchView.Outcome outcome = result.outcome() == BattleMatch.Outcome.VOID
-                ? BattleMatchView.Outcome.VOIDED
-                : BattleMatchView.Outcome.WIN;
+        BattleMatchView.Outcome outcome = switch (result.outcome()) {
+            case WIN -> BattleMatchView.Outcome.WIN;
+            case DRAW -> BattleMatchView.Outcome.DRAW;
+            case VOID -> BattleMatchView.Outcome.VOIDED;
+        };
         return new BattleMatchView.Result(
                 outcome,
                 result.winnerId() == null ? null : UUID.fromString(result.winnerId()),

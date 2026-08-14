@@ -25,6 +25,7 @@ class RankedMatchmakingCoordinatorTest {
     private static final UUID PLAYER_TWO = new UUID(1, 2);
     private static final UUID TICKET_ONE = new UUID(2, 1);
     private static final UUID TICKET_TWO = new UUID(2, 2);
+    private static final UUID TICKET_THREE = new UUID(2, 3);
 
     @Test
     void d3Btl001CommitsAndRemovesOnePairThenReplaysTheTicketFromPostgres() {
@@ -45,6 +46,39 @@ class RankedMatchmakingCoordinatorTest {
         assertEquals(matched.matchId(), replayed.matchId());
         assertEquals(1, matches.created);
         assertEquals(List.of(), queue.entries);
+    }
+
+    @Test
+    void d3Btl001ReturnsTheActiveMatchForANewTicketFromAnAlreadyMatchedPlayer() {
+        FakeQueue queue = new FakeQueue();
+        FakeMatches matches = new FakeMatches();
+        RankedMatchmakingCoordinator coordinator = coordinator(queue, matches);
+        coordinator.join(TICKET_ONE, PLAYER_ONE, RankedMatchmaker.Language.JAVA);
+        RankedMatchmakingCoordinator.JoinResult matched =
+                coordinator.join(TICKET_TWO, PLAYER_TWO, RankedMatchmaker.Language.JAVA);
+
+        RankedMatchmakingCoordinator.JoinResult rejoined =
+                coordinator.join(TICKET_THREE, PLAYER_ONE, RankedMatchmaker.Language.JAVA);
+
+        assertEquals(RankedMatchmakingCoordinator.Status.MATCHED, rejoined.status());
+        assertEquals(matched.matchId(), rejoined.matchId());
+        assertEquals(List.of(), queue.entries);
+    }
+
+    @Test
+    void d3Btl001KeepsAnUnmatchedOpponentQueuedWhenAStalePlayerConflictsAtCommit() {
+        FakeQueue queue = new FakeQueue();
+        FakeMatches matches = new FakeMatches();
+        RankedMatchmakingCoordinator coordinator = coordinator(queue, matches);
+        coordinator.join(TICKET_ONE, PLAYER_ONE, RankedMatchmaker.Language.JAVA);
+        matches.conflictPlayerId = PLAYER_ONE;
+        matches.conflictMatchId = new UUID(3, 99);
+
+        RankedMatchmakingCoordinator.JoinResult result =
+                coordinator.join(TICKET_TWO, PLAYER_TWO, RankedMatchmaker.Language.JAVA);
+
+        assertEquals(RankedMatchmakingCoordinator.Status.QUEUED, result.status());
+        assertEquals(List.of(PLAYER_TWO), queue.entries.stream().map(RankedMatchmaker.Entry::playerId).toList());
     }
 
     @Test
@@ -145,24 +179,40 @@ class RankedMatchmakingCoordinatorTest {
 
     private static final class FakeMatches implements RankedMatchStore {
         private final Map<TicketOwner, UUID> tickets = new HashMap<>();
+        private final Map<UUID, UUID> activeMatches = new HashMap<>();
         private int created;
         private boolean failCreate;
+        private UUID conflictPlayerId;
+        private UUID conflictMatchId;
 
         @Override
         public RankedMatch create(RankedMatchmaker.Pair pair, Instant createdAt) {
             if (failCreate) {
                 throw new IllegalStateException("database unavailable");
             }
+            if (conflictPlayerId != null
+                    && (pair.playerOne().playerId().equals(conflictPlayerId)
+                            || pair.playerTwo().playerId().equals(conflictPlayerId))) {
+                activeMatches.put(conflictPlayerId, conflictMatchId);
+                throw new ActiveRankedMatchConflictException(conflictPlayerId, conflictMatchId);
+            }
             created++;
             UUID matchId = new UUID(3, created);
             tickets.put(new TicketOwner(pair.playerOne().ticketId(), pair.playerOne().playerId()), matchId);
             tickets.put(new TicketOwner(pair.playerTwo().ticketId(), pair.playerTwo().playerId()), matchId);
+            activeMatches.put(pair.playerOne().playerId(), matchId);
+            activeMatches.put(pair.playerTwo().playerId(), matchId);
             return new RankedMatch(matchId, new UUID(4, 1), pair.playerOne(), pair.playerTwo(), createdAt);
         }
 
         @Override
         public Optional<UUID> findMatchIdByTicket(UUID ticketId, UUID playerId) {
             return Optional.ofNullable(tickets.get(new TicketOwner(ticketId, playerId)));
+        }
+
+        @Override
+        public Optional<UUID> findActiveMatchIdByPlayer(UUID playerId) {
+            return Optional.ofNullable(activeMatches.get(playerId));
         }
 
         private record TicketOwner(UUID ticketId, UUID playerId) {}

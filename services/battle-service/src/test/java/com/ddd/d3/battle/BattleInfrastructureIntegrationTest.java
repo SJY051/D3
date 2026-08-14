@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ddd.d3.battle.application.RankedQueueConflictException;
+import com.ddd.d3.battle.application.ActiveRankedMatchConflictException;
 import com.ddd.d3.battle.application.RankedQueueStore;
 import com.ddd.d3.battle.application.OptimisticMatchConflictException;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
@@ -28,6 +29,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -81,7 +86,7 @@ class BattleInfrastructureIntegrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(4, migrations);
+        assertEquals(5, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -158,6 +163,75 @@ class BattleInfrastructureIntegrationTest {
                 .param("matchId", created.matchId())
                 .query(Integer.class)
                 .single());
+    }
+
+    @Test
+    void d3Btl001RejectsASecondActiveRankedMatchForOnePlayer() {
+        createProblem();
+        RankedMatchmaker.Entry first = rankedEntry(1, 11, 1_000, 1);
+        RankedMatchmaker.Entry second = rankedEntry(2, 22, 1_050, 2);
+        RankedMatchmaker.Entry replacementTicket = rankedEntry(3, 11, 1_000, 3);
+        RankedMatchmaker.Entry third = rankedEntry(4, 33, 1_025, 4);
+        JdbcRankedMatchStore store = new JdbcRankedMatchStore(
+                dataSource, new DataSourceTransactionManager(dataSource));
+        Instant createdAt = Instant.parse("2026-08-14T00:00:00Z");
+        store.create(new RankedMatchmaker.Pair(first, second), createdAt);
+
+        assertThrows(
+                ActiveRankedMatchConflictException.class,
+                () -> store.create(
+                        new RankedMatchmaker.Pair(replacementTicket, third),
+                        createdAt.plusSeconds(5)));
+        assertEquals(1, jdbc.sql("select count(*) from match where ranked = true")
+                .query(Integer.class)
+                .single());
+        assertEquals(1, jdbc.sql("select count(*) from match_player where user_id = :playerId")
+                .param("playerId", first.playerId())
+                .query(Integer.class)
+                .single());
+    }
+
+    @Test
+    void d3Btl001SerializesConcurrentAssignmentsForTheSameRankedPlayer() throws Exception {
+        createProblem();
+        RankedMatchmaker.Entry sharedFirstTicket = rankedEntry(1, 11, 1_000, 1);
+        RankedMatchmaker.Entry firstOpponent = rankedEntry(2, 22, 1_050, 2);
+        RankedMatchmaker.Entry sharedSecondTicket = rankedEntry(3, 11, 1_000, 3);
+        RankedMatchmaker.Entry secondOpponent = rankedEntry(4, 33, 1_025, 4);
+        JdbcRankedMatchStore store = new JdbcRankedMatchStore(
+                dataSource, new DataSourceTransactionManager(dataSource));
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Object> first = executor.submit(() -> attemptRankedMatchCreate(
+                    store,
+                    new RankedMatchmaker.Pair(sharedFirstTicket, firstOpponent),
+                    ready,
+                    start));
+            Future<Object> second = executor.submit(() -> attemptRankedMatchCreate(
+                    store,
+                    new RankedMatchmaker.Pair(sharedSecondTicket, secondOpponent),
+                    ready,
+                    start));
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+
+            List<Object> outcomes = List.of(
+                    first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+
+            assertEquals(1, outcomes.stream().filter(RankedMatchStore.RankedMatch.class::isInstance).count());
+            assertEquals(1, outcomes.stream().filter(ActiveRankedMatchConflictException.class::isInstance).count());
+            assertEquals(1, jdbc.sql("select count(*) from match where ranked = true")
+                    .query(Integer.class)
+                    .single());
+            assertEquals(1, jdbc.sql("select count(*) from match_player where user_id = :playerId")
+                    .param("playerId", sharedFirstTicket.playerId())
+                    .query(Integer.class)
+                    .single());
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -567,7 +641,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(3, applied);
+        assertEquals(4, applied);
         assertEquals(1, jdbc.sql("""
                         select count(*)
                         from judge_job_reference
@@ -711,7 +785,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(3, applied);
+        assertEquals(4, applied);
         assertEquals(1, jdbc.sql("select count(*) from match where id = :id")
                 .param("id", matchId)
                 .query(Integer.class)
@@ -738,6 +812,50 @@ class BattleInfrastructureIntegrationTest {
                 .param("matchId", matchId)
                 .param("playerId", UUID.randomUUID())
                 .update());
+    }
+
+    @Test
+    void d3Qlt001RestoresALegacyFinishedMatchWithAnExplicitImportedReason() {
+        migrateOnlyThrough("1");
+        UUID problemId = createProblem();
+        UUID matchId = UUID.randomUUID();
+        UUID playerOneId = UUID.randomUUID();
+        UUID playerTwoId = UUID.randomUUID();
+        LegacyFinishedMatch draw = insertLegacyFinishedMatch(problemId, "DRAW", null);
+        LegacyFinishedMatch voided = insertLegacyFinishedMatch(problemId, "VOIDED", null);
+        assertEquals(1, jdbc.sql("""
+                        insert into match (
+                            id, problem_id, ranked, status, result,
+                            server_started_at, deadline_at, finished_at, created_at
+                        ) values (
+                            :id, :problemId, true, 'FINISHED', 'PLAYER_ONE_WIN',
+                            now() - interval '10 minutes', now() - interval '1 minute',
+                            now(), now() - interval '11 minutes'
+                        )
+                        """)
+                .param("id", matchId)
+                .param("problemId", problemId)
+                .update());
+        addPlayer(matchId, playerOneId, 1);
+        addPlayer(matchId, playerTwoId, 2);
+        Flyway.configure().dataSource(dataSource).load().migrate();
+        JdbcBattleMatchRepository upgradedMatches = new JdbcBattleMatchRepository(
+                dataSource, new DataSourceTransactionManager(dataSource));
+
+        BattleMatch.Snapshot restored = upgradedMatches.findById(matchId).orElseThrow();
+        BattleMatch.Snapshot restoredDraw = upgradedMatches.findById(draw.matchId()).orElseThrow();
+        BattleMatch.Snapshot restoredVoid = upgradedMatches.findById(voided.matchId()).orElseThrow();
+
+        assertEquals(BattleMatch.State.FINISHED, restored.state());
+        assertEquals("WIN", restored.result().outcome().name());
+        assertEquals(playerOneId.toString(), restored.result().winnerId());
+        assertEquals("LEGACY_IMPORT", restored.result().reason().name());
+        assertEquals("DRAW", restoredDraw.result().outcome().name());
+        assertEquals(null, restoredDraw.result().winnerId());
+        assertEquals("LEGACY_IMPORT", restoredDraw.result().reason().name());
+        assertEquals("VOID", restoredVoid.result().outcome().name());
+        assertEquals("PLATFORM_INCIDENT", restoredVoid.result().reason().name());
+        assertEquals("legacy-import", restoredVoid.result().incidentReference());
     }
 
     @Test
@@ -805,13 +923,52 @@ class BattleInfrastructureIntegrationTest {
         return matchId;
     }
 
-    private int insertFinishedVoidMatch(UUID problemId, String voidReason) {
-        return jdbc.sql("""
+    private LegacyFinishedMatch insertLegacyFinishedMatch(UUID problemId, String result, String voidReason) {
+        LegacyFinishedMatch legacy = new LegacyFinishedMatch(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        assertEquals(1, jdbc.sql("""
                         insert into match (
                             id, problem_id, ranked, status, result, void_reason,
                             server_started_at, deadline_at, finished_at, created_at
                         ) values (
-                            :id, :problemId, true, 'FINISHED', 'VOIDED', :voidReason,
+                            :id, :problemId, true, 'FINISHED', :result, :voidReason,
+                            now() - interval '10 minutes', now() - interval '1 minute',
+                            now(), now() - interval '11 minutes'
+                        )
+                        """)
+                .param("id", legacy.matchId())
+                .param("problemId", problemId)
+                .param("result", result)
+                .param("voidReason", voidReason, Types.VARCHAR)
+                .update());
+        addPlayer(legacy.matchId(), legacy.playerOneId(), 1);
+        addPlayer(legacy.matchId(), legacy.playerTwoId(), 2);
+        return legacy;
+    }
+
+    private static Object attemptRankedMatchCreate(
+            JdbcRankedMatchStore store,
+            RankedMatchmaker.Pair pair,
+            CountDownLatch ready,
+            CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        if (!start.await(5, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("Concurrent ranked match start was not released");
+        }
+        try {
+            return store.create(pair, Instant.parse("2026-08-14T00:00:00Z"));
+        } catch (ActiveRankedMatchConflictException conflict) {
+            return conflict;
+        }
+    }
+
+    private int insertFinishedVoidMatch(UUID problemId, String voidReason) {
+        return jdbc.sql("""
+                        insert into match (
+                            id, problem_id, ranked, status, result, void_reason, resolution_reason,
+                            server_started_at, deadline_at, finished_at, created_at
+                        ) values (
+                            :id, :problemId, true, 'FINISHED', 'VOIDED', :voidReason, 'PLATFORM_INCIDENT',
                             now() - interval '2 minutes', now() + interval '1 minute',
                             now(), now() - interval '3 minutes'
                         )
@@ -881,6 +1038,8 @@ class BattleInfrastructureIntegrationTest {
         Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
         Flyway.configure().dataSource(dataSource).target(version).load().migrate();
     }
+
+    private record LegacyFinishedMatch(UUID matchId, UUID playerOneId, UUID playerTwoId) {}
 
     private int insertCompletedSubmit(UUID matchId, UUID playerId, int attemptNumber, String status) {
         return insertCompletedSubmit(UUID.randomUUID(), matchId, playerId, attemptNumber, status);

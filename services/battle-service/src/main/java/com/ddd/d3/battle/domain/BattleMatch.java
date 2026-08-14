@@ -26,6 +26,7 @@ public final class BattleMatch {
 
     public enum Outcome {
         WIN,
+        DRAW,
         VOID
     }
 
@@ -38,7 +39,8 @@ public final class BattleMatch {
     public enum ResolutionReason {
         SURRENDER,
         DISCONNECT_TIMEOUT,
-        PLATFORM_INCIDENT
+        PLATFORM_INCIDENT,
+        LEGACY_IMPORT
     }
 
     public sealed interface Command permits Ready, Start, BeginJudging, AdvanceTime, Disconnect,
@@ -498,17 +500,29 @@ public final class BattleMatch {
         Objects.requireNonNull(restoredResult.outcome(), "result outcome must not be null");
         Objects.requireNonNull(restoredResult.reason(), "result reason must not be null");
         Objects.requireNonNull(restoredResult.resolvedAt(), "result resolvedAt must not be null");
-        if (restoredResult.outcome() == Outcome.WIN) {
-            requireParticipant(restoredResult.winnerId());
-            if (restoredResult.incidentReference() != null
-                    || restoredResult.reason() == ResolutionReason.PLATFORM_INCIDENT) {
-                throw new IllegalArgumentException("winning result must have a player resolution reason");
+        switch (restoredResult.outcome()) {
+            case WIN -> {
+                requireParticipant(restoredResult.winnerId());
+                if (restoredResult.incidentReference() != null
+                        || restoredResult.reason() == ResolutionReason.PLATFORM_INCIDENT) {
+                    throw new IllegalArgumentException("winning result must have a player resolution reason");
+                }
             }
-        } else if (restoredResult.winnerId() != null
-                || restoredResult.incidentReference() == null
-                || restoredResult.incidentReference().isBlank()
-                || restoredResult.reason() != ResolutionReason.PLATFORM_INCIDENT) {
-            throw new IllegalArgumentException("void result requires only an incident reference");
+            case DRAW -> {
+                if (restoredResult.winnerId() != null
+                        || restoredResult.incidentReference() != null
+                        || restoredResult.reason() != ResolutionReason.LEGACY_IMPORT) {
+                    throw new IllegalArgumentException("legacy draw requires only the imported resolution reason");
+                }
+            }
+            case VOID -> {
+                if (restoredResult.winnerId() != null
+                        || restoredResult.incidentReference() == null
+                        || restoredResult.incidentReference().isBlank()
+                        || restoredResult.reason() != ResolutionReason.PLATFORM_INCIDENT) {
+                    throw new IllegalArgumentException("void result requires only an incident reference");
+                }
+            }
         }
     }
 

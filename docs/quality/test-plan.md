@@ -4,7 +4,7 @@ Owner: 최정민 and service owners
 
 Status: Executable local platform with partial Judge adapter evidence; product integration, load and chaos pending
 
-Last verified: 2026-08-14 against D3-QLT-001, issue #13 test sources, CI scaffold and Judge0 host boundary
+Last verified: 2026-08-14 against D3-QLT-001, issue #13 and #15 test sources, CI scaffold and Judge0 host boundary
 
 Requirement: D3-QLT-001
 
@@ -13,7 +13,7 @@ Requirement: D3-QLT-001
 | Layer | Primary risk | Current evidence | Completion evidence | Status |
 |---|---|---|---|---|
 | Domain unit | Match state, outcome, rating, energy | Active Battle lifecycle plus deterministic fake and real-Judge normalization slices; remaining requirement skeletons disabled | Deterministic examples, boundaries and clock control | PARTIAL PASS: active Judge/Battle slices plus remaining skips |
-| Adapter integration | PostgreSQL, Redis, Kafka, outbox/inbox | Forward-only service migrations run on PostgreSQL Testcontainers; Battle proves Redis TTL/lease coordination, two-user matching, idempotent match creation, upgrade backfill, optimistic lifecycle persistence and transactional command replay; Judge adds transactional outbox and producer behavior | Real-container transaction, uniqueness and retry evidence | PARTIAL PASS: ranked entry and command persistence plus Judge producer active; Battle terminal outbox and realtime adapters pending |
+| Adapter integration | PostgreSQL, Redis, Kafka, outbox/inbox | Forward-only service migrations run on PostgreSQL Testcontainers; Battle proves Redis TTL/lease coordination, two-user matching, per-player concurrent active-match fencing, idempotent match creation, legacy terminal-result restoration, optimistic lifecycle persistence and transactional command replay; Judge adds transactional outbox and producer behavior | Real-container transaction, uniqueness and retry evidence | PARTIAL PASS: ranked entry and command persistence plus Judge producer active; Battle terminal outbox and realtime adapters pending |
 | Contract | HTTP, events, WebSocket | Ten parseable versioned documents; Judge HTTP behavior and Battle ranked-queue auth/identity/error behavior have active tests | Producer/consumer compatibility and negative samples | PARTIAL PASS: Judge HTTP and Battle ranked queue active; WebSocket and Battle event consumers incomplete |
 | Browser | Ranked golden path and privacy | Skipped Playwright Scenario A | Two independent sessions with fake judge | SKIP: vertical slice absent |
 | Judge host smoke | Runtime mapping and host isolation | Bound zero-ingress host, pinned images, hardened startup and executable sanitized smoke | Real Judge0 cases for six pinned runtimes | PASS: six hello-world plus six deterministic cases; live outage injection NOT RUN |

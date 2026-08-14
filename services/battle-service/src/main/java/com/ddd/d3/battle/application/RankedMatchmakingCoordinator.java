@@ -53,6 +53,10 @@ public final class RankedMatchmakingCoordinator {
         if (committedMatch.isPresent()) {
             return new JoinResult(Status.MATCHED, committedMatch.orElseThrow(), null);
         }
+        Optional<UUID> activeMatch = matches.findActiveMatchIdByPlayer(playerId);
+        if (activeMatch.isPresent()) {
+            return new JoinResult(Status.MATCHED, activeMatch.orElseThrow(), null);
+        }
 
         Instant now = clock.instant();
         RankedQueueStore.Ticket ticket = new RankedQueueStore.Ticket(
@@ -67,10 +71,18 @@ public final class RankedMatchmakingCoordinator {
             List<RankedMatchmaker.Pair> pairs = matchmaker.pair(lease.activeEntries(), now);
             UUID joinedMatchId = null;
             for (RankedMatchmaker.Pair pair : pairs) {
-                RankedMatchStore.RankedMatch match = matches.create(pair, now);
-                lease.remove(List.of(pair.playerOne(), pair.playerTwo()));
-                if (contains(pair, playerId)) {
-                    joinedMatchId = match.matchId();
+                try {
+                    RankedMatchStore.RankedMatch match = matches.create(pair, now);
+                    lease.remove(List.of(pair.playerOne(), pair.playerTwo()));
+                    if (contains(pair, playerId)) {
+                        joinedMatchId = match.matchId();
+                    }
+                } catch (ActiveRankedMatchConflictException conflict) {
+                    RankedMatchmaker.Entry staleEntry = entryFor(pair, conflict.playerId());
+                    lease.remove(List.of(staleEntry));
+                    if (conflict.playerId().equals(playerId)) {
+                        joinedMatchId = conflict.matchId();
+                    }
                 }
             }
             return joinedMatchId == null
@@ -82,6 +94,16 @@ public final class RankedMatchmakingCoordinator {
     private static boolean contains(RankedMatchmaker.Pair pair, UUID playerId) {
         return pair.playerOne().playerId().equals(playerId)
                 || pair.playerTwo().playerId().equals(playerId);
+    }
+
+    private static RankedMatchmaker.Entry entryFor(RankedMatchmaker.Pair pair, UUID playerId) {
+        if (pair.playerOne().playerId().equals(playerId)) {
+            return pair.playerOne();
+        }
+        if (pair.playerTwo().playerId().equals(playerId)) {
+            return pair.playerTwo();
+        }
+        throw new IllegalStateException("Active ranked match conflict did not name a paired player");
     }
 
     private static Duration requirePositive(Duration duration, String name) {

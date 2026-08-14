@@ -1,7 +1,8 @@
 package com.ddd.d3.battle.infrastructure.persistence;
 
-import com.ddd.d3.battle.application.RankedMatchStore;
+import com.ddd.d3.battle.application.ActiveRankedMatchConflictException;
 import com.ddd.d3.battle.application.NoActiveRankedProblemException;
+import com.ddd.d3.battle.application.RankedMatchStore;
 import com.ddd.d3.battle.domain.RankedMatchmaker;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
@@ -51,10 +52,22 @@ public final class JdbcRankedMatchStore implements RankedMatchStore {
                 .optional();
     }
 
+    @Override
+    public Optional<UUID> findActiveMatchIdByPlayer(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId must not be null");
+        return activeAssignment(playerId).map(ActiveAssignment::matchId);
+    }
+
     private RankedMatch createInsideTransaction(UUID matchId, RankedMatchmaker.Pair pair, Instant createdAt) {
+        lockPlayerAssignments(pair);
         Optional<RankedMatch> existing = findExisting(matchId, pair);
         if (existing.isPresent()) {
             return existing.orElseThrow();
+        }
+        Optional<ActiveAssignment> activeAssignment = activeAssignment(pair);
+        if (activeAssignment.isPresent()) {
+            ActiveAssignment conflict = activeAssignment.orElseThrow();
+            throw new ActiveRankedMatchConflictException(conflict.playerId(), conflict.matchId());
         }
 
         UUID problemId = jdbc.sql("""
@@ -91,7 +104,9 @@ public final class JdbcRankedMatchStore implements RankedMatchStore {
         Optional<ExistingMatch> match = jdbc.sql("""
                         select problem_id, created_at
                         from match
-                        where id = :matchId and ranked = true and status = 'LOBBY'
+                        where id = :matchId
+                          and ranked = true
+                          and status in ('LOBBY', 'READY', 'RUNNING', 'JUDGING')
                 """)
                 .param("matchId", matchId)
                 .query((resultSet, rowNumber) -> new ExistingMatch(
@@ -123,6 +138,51 @@ public final class JdbcRankedMatchStore implements RankedMatchStore {
                 pair.playerOne(),
                 pair.playerTwo(),
                 existing.createdAt()));
+    }
+
+    private void lockPlayerAssignments(RankedMatchmaker.Pair pair) {
+        List<UUID> playerIds = List.of(pair.playerOne().playerId(), pair.playerTwo().playerId()).stream()
+                .sorted()
+                .toList();
+        for (UUID playerId : playerIds) {
+            jdbc.sql("select pg_advisory_xact_lock(hashtextextended(cast(:playerId as text), 0))")
+                    .param("playerId", playerId)
+                    .query((resultSet, rowNumber) -> Boolean.TRUE)
+                    .single();
+        }
+    }
+
+    private Optional<ActiveAssignment> activeAssignment(RankedMatchmaker.Pair pair) {
+        return jdbc.sql("""
+                        select player.user_id as player_id, player.match_id
+                        from match_player player
+                        join match battle_match on battle_match.id = player.match_id
+                        where (player.user_id = :playerOneId or player.user_id = :playerTwoId)
+                          and battle_match.ranked = true
+                          and battle_match.status in ('LOBBY', 'READY', 'RUNNING', 'JUDGING')
+                        order by player.user_id, player.match_id
+                        limit 1
+                        """)
+                .param("playerOneId", pair.playerOne().playerId())
+                .param("playerTwoId", pair.playerTwo().playerId())
+                .query(ActiveAssignment.class)
+                .optional();
+    }
+
+    private Optional<ActiveAssignment> activeAssignment(UUID playerId) {
+        return jdbc.sql("""
+                        select player.user_id as player_id, player.match_id
+                        from match_player player
+                        join match battle_match on battle_match.id = player.match_id
+                        where player.user_id = :playerId
+                          and battle_match.ranked = true
+                          and battle_match.status in ('LOBBY', 'READY', 'RUNNING', 'JUDGING')
+                        order by battle_match.created_at, player.match_id
+                        limit 1
+                        """)
+                .param("playerId", playerId)
+                .query(ActiveAssignment.class)
+                .optional();
     }
 
     private void insertPlayer(UUID matchId, RankedMatchmaker.Entry player, int seat) {
@@ -172,4 +232,6 @@ public final class JdbcRankedMatchStore implements RankedMatchStore {
     private record ExistingMatch(UUID problemId, Instant createdAt) {}
 
     private record ExistingPlayer(UUID userId, int seat, String languageKey, UUID queueTicketId) {}
+
+    private record ActiveAssignment(UUID playerId, UUID matchId) {}
 }

@@ -17,4 +17,6 @@ public interface RankedMatchStore {
     RankedMatch create(RankedMatchmaker.Pair pair, Instant createdAt);
 
     Optional<UUID> findMatchIdByTicket(UUID ticketId, UUID playerId);
+
+    Optional<UUID> findActiveMatchIdByPlayer(UUID playerId);
 }

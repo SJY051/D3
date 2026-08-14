@@ -77,4 +77,33 @@ class BattleSnapshotMessageV1Test {
         assertTrue(message.path("payload").path("result").path("winnerId").isNull());
         assertFalse(message.path("payload").path("result").has("incidentReference"));
     }
+
+    @Test
+    void d3Qlt001SerializesAnImportedLegacyDrawWithoutInventingAWinner() throws Exception {
+        BattleMatchView view = new BattleMatchView(
+                MATCH_ID,
+                2,
+                NOW,
+                BattleMatchView.State.FINISHED,
+                NOW.minusSeconds(60),
+                NOW.plusSeconds(540),
+                new BattleMatchView.Participant(
+                        PLAYER_ONE, true, BattleMatchView.ConnectionState.CONNECTED, null),
+                new BattleMatchView.Participant(
+                        PLAYER_TWO, true, BattleMatchView.ConnectionState.CONNECTED, null),
+                new BattleMatchView.Result(
+                        BattleMatchView.Outcome.DRAW,
+                        null,
+                        BattleMatchView.ResolutionReason.LEGACY_IMPORT,
+                        NOW));
+
+        JsonNode result = objectMapper.readTree(
+                        objectMapper.writeValueAsString(BattleSnapshotMessageV1.from(view)))
+                .path("payload")
+                .path("result");
+
+        assertEquals("DRAW", result.path("outcome").asText());
+        assertTrue(result.path("winnerId").isNull());
+        assertEquals("LEGACY_IMPORT", result.path("reason").asText());
+    }
 }

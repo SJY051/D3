@@ -187,5 +187,21 @@ clientOwnedClock.payload.matchDeadline = null;
 if (battleSnapshot(clientOwnedClock)) {
   throw new Error("battle snapshot accepted a running match without its server deadline");
 }
+const importedLegacyDraw = structuredClone(battleSnapshotEvent);
+importedLegacyDraw.payload.state = "FINISHED";
+importedLegacyDraw.payload.result = {
+  outcome: "DRAW",
+  winnerId: null,
+  reason: "LEGACY_IMPORT",
+  resolvedAt: "2026-08-14T00:10:00Z",
+};
+if (!battleSnapshot(importedLegacyDraw)) {
+  throw new Error(`battle snapshot rejected an imported legacy draw: ${ajv.errorsText(battleSnapshot.errors)}`);
+}
+const legacyDrawWithWinner = structuredClone(importedLegacyDraw);
+legacyDrawWithWinner.payload.result.winnerId = "22222222-2222-4222-8222-222222222222";
+if (battleSnapshot(legacyDrawWithWinner)) {
+  throw new Error("battle snapshot accepted a legacy draw with a winner");
+}
 
 console.log(`contracts: PASS (${files.length} JSON documents, 6 compiled JSON Schemas, privacy, Judge v1, and Battle v1 samples)`);

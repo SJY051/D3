@@ -167,14 +167,14 @@ Table battle_db.match {
   deadline_at timestamptz
   finished_at timestamptz
   void_reason text
-  resolution_reason text [note: 'SURRENDER, DISCONNECT_TIMEOUT, or PLATFORM_INCIDENT for currently implemented terminal paths']
+  resolution_reason text [note: 'SURRENDER, DISCONNECT_TIMEOUT, PLATFORM_INCIDENT, or LEGACY_IMPORT for preserved pre-V3 terminal rows']
   aggregate_version bigint [not null, default: 0]
   created_at timestamptz [not null]
 }
 
 Table battle_db.match_player {
   match_id uuid [not null]
-  user_id uuid [not null, note: 'Logical identity contract reference; no cross-database FK']
+  user_id uuid [not null, note: 'Logical identity contract reference; no cross-database FK. PostgreSQL advisory locks fence concurrent active ranked assignment per user.']
   seat smallint [not null, note: '1 is PLAYER_ONE and 2 is PLAYER_TWO']
   language_key text [not null]
   connection_state text [not null, note: 'CONNECTING, CONNECTED, or DISCONNECTED']

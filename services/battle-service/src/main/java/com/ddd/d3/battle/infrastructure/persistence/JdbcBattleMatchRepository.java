@@ -180,6 +180,8 @@ public final class JdbcBattleMatchRepository implements BattleMatchRepository {
                     BattleMatch.Outcome.WIN, playerOneId, reason, row.finishedAt(), null);
             case "PLAYER_TWO_WIN" -> new BattleMatch.Result(
                     BattleMatch.Outcome.WIN, playerTwoId, reason, row.finishedAt(), null);
+            case "DRAW" -> new BattleMatch.Result(
+                    BattleMatch.Outcome.DRAW, null, reason, row.finishedAt(), null);
             case "VOIDED" -> new BattleMatch.Result(
                     BattleMatch.Outcome.VOID, null, reason, row.finishedAt(), row.voidReason());
             default -> throw new IllegalStateException("Unsupported BattleMatch result: " + row.result());
@@ -193,6 +195,9 @@ public final class JdbcBattleMatchRepository implements BattleMatchRepository {
         }
         if (result.outcome() == BattleMatch.Outcome.VOID) {
             return "VOIDED";
+        }
+        if (result.outcome() == BattleMatch.Outcome.DRAW) {
+            return "DRAW";
         }
         if (snapshot.playerOneId().equals(result.winnerId())) {
             return "PLAYER_ONE_WIN";

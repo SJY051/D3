@@ -119,14 +119,14 @@
       "type": "object",
       "required": ["outcome", "winnerId", "reason", "resolvedAt"],
       "properties": {
-        "outcome": { "enum": ["WIN", "VOIDED"] },
+        "outcome": { "enum": ["WIN", "DRAW", "VOIDED"] },
         "winnerId": {
           "oneOf": [
             { "type": "string", "format": "uuid" },
             { "type": "null" }
           ]
         },
-        "reason": { "enum": ["SURRENDER", "DISCONNECT_TIMEOUT", "PLATFORM_INCIDENT"] },
+        "reason": { "enum": ["SURRENDER", "DISCONNECT_TIMEOUT", "PLATFORM_INCIDENT", "LEGACY_IMPORT"] },
         "resolvedAt": { "type": "string", "format": "date-time" }
       },
       "additionalProperties": false,
@@ -143,9 +143,21 @@
             }
           },
           "else": {
-            "properties": {
-              "winnerId": { "type": "string", "format": "uuid" },
-              "reason": { "enum": ["SURRENDER", "DISCONNECT_TIMEOUT"] }
+            "if": {
+              "properties": { "outcome": { "const": "DRAW" } },
+              "required": ["outcome"]
+            },
+            "then": {
+              "properties": {
+                "winnerId": { "type": "null" },
+                "reason": { "const": "LEGACY_IMPORT" }
+              }
+            },
+            "else": {
+              "properties": {
+                "winnerId": { "type": "string", "format": "uuid" },
+                "reason": { "enum": ["SURRENDER", "DISCONNECT_TIMEOUT", "LEGACY_IMPORT"] }
+              }
             }
           }
         }
