@@ -31,19 +31,11 @@ create table refresh_session (
     user_id uuid not null references user_account(id),
     token_hash text not null unique,
     expires_at timestamptz not null,
-    rotated_from_id uuid,
+    rotated_from_id uuid references refresh_session(id),
     revoked_at timestamptz,
     created_at timestamptz not null,
     constraint refresh_session_token_hash_not_blank check (btrim(token_hash) <> ''),
-    constraint refresh_session_expiry_after_creation check (expires_at > created_at),
-    constraint refresh_session_revocation_after_creation
-        check (revoked_at is null or revoked_at >= created_at),
-    constraint refresh_session_identity_unique unique (id, user_id),
-    constraint refresh_session_rotated_parent_unique unique (rotated_from_id),
-    constraint refresh_session_not_self_rotated
-        check (rotated_from_id is null or rotated_from_id <> id),
-    constraint refresh_session_parent_same_user_fk
-        foreign key (rotated_from_id, user_id) references refresh_session(id, user_id)
+    constraint refresh_session_expiry_after_creation check (expires_at > created_at)
 );
 
 create index refresh_session_user_expiry_idx on refresh_session (user_id, expires_at);

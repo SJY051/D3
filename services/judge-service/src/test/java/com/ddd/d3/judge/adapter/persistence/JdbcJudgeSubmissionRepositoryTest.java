@@ -45,12 +45,13 @@ class JdbcJudgeSubmissionRepositoryTest {
     private static final Instant COMPLETED_AT = Instant.parse("2026-08-13T12:00:01Z");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private DriverManagerDataSource dataSource;
     private JdbcClient jdbc;
     private JdbcJudgeSubmissionRepository repository;
 
     @BeforeEach
     void migrateAndReset() {
-        var dataSource = new DriverManagerDataSource(
+        dataSource = new DriverManagerDataSource(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
         Flyway.configure().dataSource(dataSource).load().migrate();
@@ -214,8 +215,57 @@ class JdbcJudgeSubmissionRepositoryTest {
         assertEquals(0, jdbc.sql("select count(*) from judge_run").query(Integer.class).single());
     }
 
+    @Test
+    void d3Qlt001UpgradesExistingJudgeEvidenceWithoutChangingV1OrV2() {
+        migrateOnlyThrough("2");
+        UUID submissionId = UUID.randomUUID();
+        UUID judgeRunId = UUID.randomUUID();
+        insertRawSubmission(submissionId, "RUN", null);
+        assertEquals(1, jdbc.sql("update submission set status = 'ACCEPTED' where id = :id")
+                .param("id", submissionId)
+                .update());
+        assertEquals(1, jdbc.sql("""
+                        insert into judge_run (
+                            id, submission_id, adapter_version, runtime_version, status,
+                            passed_count, total_count, completed_at, correlation_id
+                        ) values (
+                            :id, :submissionId, 'legacy-adapter', 'legacy-runtime', 'ACCEPTED',
+                            1, 1, now(), 'corr-upgrade'
+                        )
+                        """)
+                .param("id", judgeRunId)
+                .param("submissionId", submissionId)
+                .update());
+        assertEquals(1, jdbc.sql("""
+                        insert into evaluation_evidence (
+                            id, judge_run_id, tier, input_size, sample_count,
+                            median_runtime_micros, created_at
+                        ) values (
+                            :id, :judgeRunId, 'SMALL', 100, 3, 700, now()
+                        )
+                        """)
+                .param("id", UUID.randomUUID())
+                .param("judgeRunId", judgeRunId)
+                .update());
+
+        int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
+
+        assertEquals(1, applied);
+        assertEquals(1, jdbc.sql("select count(*) from submission where id = :id")
+                .param("id", submissionId)
+                .query(Integer.class)
+                .single());
+        assertEquals(1, jdbc.sql("select count(*) from evaluation_evidence where judge_run_id = :id")
+                .param("id", judgeRunId)
+                .query(Integer.class)
+                .single());
+    }
+
     private int insertRawSubmission(String mode, Integer attemptNumber) {
-        UUID rowId = UUID.randomUUID();
+        return insertRawSubmission(UUID.randomUUID(), mode, attemptNumber);
+    }
+
+    private int insertRawSubmission(UUID rowId, String mode, Integer attemptNumber) {
         return jdbc.sql("""
                         insert into submission (
                             id, idempotency_key, user_id, match_id, problem_id, problem_version,
@@ -236,6 +286,11 @@ class JdbcJudgeSubmissionRepositoryTest {
                 .param("attemptNumber", attemptNumber, java.sql.Types.INTEGER)
                 .param("fingerprint", "fingerprint-" + rowId)
                 .update();
+    }
+
+    private void migrateOnlyThrough(String version) {
+        Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
+        Flyway.configure().dataSource(dataSource).target(version).load().migrate();
     }
 
     private static JudgeSubmission queuedSubmission() {

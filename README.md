@@ -29,7 +29,7 @@ Last verified: 2026-08-14 against repository commands, paths, scaffold evidence 
 | Web | React 라우트 셸과 WF-01~08 매핑 | 구조만 존재 |
 | Backend | 4개 도메인 서비스와 3개 플랫폼 앱; Judge HTTP·비동기 평가·outbox 경로 | Judge 부분 구현; 나머지 수직 경로 미구현 |
 | Contracts | HTTP 4개, event 5개, WebSocket 1개 문서 | Judge HTTP v1 활성; Battle consumer 등은 미구현 |
-| Data | 서비스별 PostgreSQL 소유권, 논리 ERD와 Flyway V1 스키마 | 네 서비스 migration PASS; 서비스 간 DB 공유 없음 |
+| Data | 서비스별 PostgreSQL 소유권, 논리 ERD와 forward-only Flyway 체인 | 네 서비스 fresh-install/upgrade migration PASS; 서비스 간 DB 공유 없음 |
 | Local infra | PostgreSQL, Redis, Kafka, Config, Discovery, Gateway, 네 서비스와 Web | 전체 로컬 기동 및 dependency preflight PASS |
 | Quality | 요구사항 스캐폴드, Gateway/config 테스트와 서비스별 컨테이너 연결 테스트 | 로컬 플랫폼 PASS; 제품 브라우저 시나리오는 NOT RUN/SKIP |
 | Cloud/Judge0 | 전용 zero-ingress Judge0 호스트와 고정 6개 런타임; real adapter 코드 경로 | 호스트 PASS; 애플리케이션 사설 연결 PENDING/NOT RUN |

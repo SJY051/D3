@@ -11,6 +11,8 @@ These rules make PostgreSQL behavior explicit for a team coming from MySQL or Ma
 - Use unquoted lowercase `snake_case` identifiers. PostgreSQL folds unquoted names to lowercase; quoted mixed-case names become permanently quote-sensitive.
 - Use `text` unless a length limit is a real domain invariant, `boolean` for flags, exact `numeric` for decimal quantities, and `timestamptz` for instants. Persist durations as explicit numeric units.
 - Keep ORM schema mutation disabled. `spring.jpa.hibernate.ddl-auto=validate`; Flyway is the only schema writer.
+- Treat an applied migration as immutable, including migrations used only by local persistent volumes. Evolve an existing schema with the next versioned migration and prove both fresh installation and upgrade from the previous version; never rewrite history to make the final schema look cleaner.
+- Register every migration in `scripts/migration-checksums.json`; `pnpm verify:migrations` rejects modified history and migration files missing from the manifest. Add the next migration and its checksum together. A checksum change for an existing entry requires an explicit recovery review and is not the normal schema-change path.
 - Encode invariants with `not null`, `unique`, foreign-key, and `check` constraints. PostgreSQL has no `add constraint if not exists`; write forward-only, reviewable migrations instead of vendor-specific guesses.
 - Use stable UUID aggregate IDs in public contracts. Prefer a pinned time-ordered UUID implementation if adopted by the whole team; do not add an unreviewed database extension merely to change ID format during the prototype.
 - Use `jsonb` only for genuinely variable metadata with a versioned reader. Frequently filtered or constrained fields stay typed columns.

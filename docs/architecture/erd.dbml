@@ -1,6 +1,6 @@
 // D³ logical ERD — D3-DOC-001
 // Owner: service owners
-// Status: logical baseline with service-owned Flyway V1 migrations active
+// Status: logical baseline with service-owned forward-only Flyway chains active
 // Last verified: 2026-08-14 against the event contracts, MVP specification and service boundaries
 //
 // Each schema below represents a separately owned PostgreSQL database, not a

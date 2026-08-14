@@ -47,8 +47,7 @@ create table profile_projection (
 
 create table match_projection (
     match_id uuid primary key,
-    player_one_user_id uuid not null,
-    player_two_user_id uuid not null,
+    player_ids jsonb not null,
     result text not null,
     ranked boolean not null,
     score_summary jsonb,
@@ -56,8 +55,8 @@ create table match_projection (
     execution_summary jsonb,
     source_version bigint not null,
     projected_at timestamptz not null,
-    constraint match_projection_players_distinct
-        check (player_one_user_id <> player_two_user_id),
+    constraint match_projection_players_are_two_seats
+        check (jsonb_typeof(player_ids) = 'array' and jsonb_array_length(player_ids) = 2),
     constraint match_projection_result_supported
         check (result in ('PLAYER_ONE_WIN', 'PLAYER_TWO_WIN', 'DRAW', 'VOIDED')),
     constraint match_projection_source_version_non_negative check (source_version >= 0)

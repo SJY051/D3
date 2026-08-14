@@ -30,29 +30,11 @@ create table match (
     constraint match_result_supported
         check (result is null or result in ('PLAYER_ONE_WIN', 'PLAYER_TWO_WIN', 'DRAW', 'VOIDED')),
     constraint match_terminal_result_consistent check ((status = 'FINISHED') = (result is not null)),
-    constraint match_terminal_finish_time_consistent check ((status = 'FINISHED') = (finished_at is not null)),
-    constraint match_clock_state_consistent check (
-        (status in ('LOBBY', 'READY') and server_started_at is null and deadline_at is null)
-        or (status in ('RUNNING', 'JUDGING', 'FINISHED')
-            and server_started_at is not null and deadline_at is not null)
-    ),
-    constraint match_start_after_creation check (
-        server_started_at is null or server_started_at >= created_at
-    ),
     constraint match_deadline_after_start check (
         deadline_at is null or (server_started_at is not null and deadline_at > server_started_at)
     ),
-    constraint match_finish_after_creation check (
-        finished_at is null
-        or (
-            finished_at >= created_at
-            and (server_started_at is null or finished_at >= server_started_at)
-        )
-    ),
-    constraint match_void_reason_consistent check (
-        (result is not distinct from 'VOIDED' and nullif(btrim(void_reason), '') is not null)
-        or (result is distinct from 'VOIDED' and void_reason is null)
-    ),
+    constraint match_finish_after_creation check (finished_at is null or finished_at >= created_at),
+    constraint match_void_reason_consistent check (result = 'VOIDED' or void_reason is null),
     constraint match_aggregate_version_non_negative check (aggregate_version >= 0)
 );
 
@@ -63,6 +45,7 @@ create table match_player (
     language_key text not null,
     connection_state text not null,
     reconnect_deadline_at timestamptz,
+    accepted_submission_id uuid,
     attempts integer not null default 0,
     score numeric,
     speed_score_component numeric,
@@ -79,9 +62,6 @@ create table match_player (
     constraint match_player_language_not_blank check (btrim(language_key) <> ''),
     constraint match_player_connection_state_supported
         check (connection_state in ('CONNECTED', 'DISCONNECTED')),
-    constraint match_player_reconnect_deadline_consistent check (
-        (connection_state = 'DISCONNECTED') = (reconnect_deadline_at is not null)
-    ),
     constraint match_player_attempts_non_negative check (attempts >= 0)
 );
 
@@ -93,18 +73,13 @@ create table judge_job_reference (
     player_user_id uuid not null,
     mode text not null,
     command_id uuid not null unique,
-    attempt_number integer,
+    attempt_number integer not null,
     last_judge_status text not null,
     evidence_version text,
     accepted_at timestamptz not null,
     last_result_at timestamptz,
-    constraint judge_job_reference_player_fk
-        foreign key (match_id, player_user_id) references match_player(match_id, user_id),
     constraint judge_job_reference_mode_supported check (mode in ('RUN', 'SUBMIT')),
-    constraint judge_job_reference_attempt_matches_mode check (
-        (mode = 'RUN' and attempt_number is null)
-        or (mode = 'SUBMIT' and attempt_number is not null and attempt_number > 0)
-    ),
+    constraint judge_job_reference_attempt_non_negative check (attempt_number >= 0),
     constraint judge_job_reference_status_supported check (
         last_judge_status in (
             'QUEUED',
@@ -117,41 +92,11 @@ create table judge_job_reference (
             'MEMORY_LIMIT',
             'PLATFORM_FAILURE'
         )
-    ),
-    constraint judge_job_reference_result_state_consistent check (
-        (
-            last_judge_status in ('QUEUED', 'RUNNING')
-            and evidence_version is null
-            and last_result_at is null
-        )
-        or (
-            last_judge_status in (
-                'ACCEPTED',
-                'WRONG_ANSWER',
-                'COMPILATION_ERROR',
-                'RUNTIME_ERROR',
-                'TIME_LIMIT',
-                'MEMORY_LIMIT',
-                'PLATFORM_FAILURE'
-            )
-            and nullif(btrim(evidence_version), '') is not null
-            and last_result_at is not null
-        )
-    ),
-    constraint judge_job_reference_result_after_acceptance
-        check (last_result_at is null or last_result_at >= accepted_at)
+    )
 );
 
 create index judge_job_reference_match_player_attempt_idx
     on judge_job_reference (match_id, player_user_id, mode, attempt_number);
-
-create unique index judge_job_reference_submit_attempt_unique_idx
-    on judge_job_reference (match_id, player_user_id, attempt_number)
-    where mode = 'SUBMIT';
-
-create unique index judge_job_reference_one_accepted_submit_idx
-    on judge_job_reference (match_id, player_user_id)
-    where mode = 'SUBMIT' and last_judge_status = 'ACCEPTED';
 
 create table attack_event (
     id uuid primary key,
@@ -163,10 +108,6 @@ create table attack_event (
     resolution text not null,
     energy_cost integer not null,
     occurred_at timestamptz not null,
-    constraint attack_event_actor_fk
-        foreign key (match_id, actor_user_id) references match_player(match_id, user_id),
-    constraint attack_event_target_fk
-        foreign key (match_id, target_user_id) references match_player(match_id, user_id),
     constraint attack_event_sequence_unique unique (match_id, sequence),
     constraint attack_event_sequence_positive check (sequence > 0),
     constraint attack_event_distinct_players check (actor_user_id <> target_user_id),

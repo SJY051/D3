@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.util.Set;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -21,13 +21,15 @@ class CommunityDatabaseMigrationTest {
     @Container
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17.10-alpine");
 
-    static JdbcClient jdbc;
-    static int migrations;
+    JdbcClient jdbc;
+    DriverManagerDataSource dataSource;
+    int migrations;
 
-    @BeforeAll
-    static void migrateSchema() {
-        var dataSource = new DriverManagerDataSource(
+    @BeforeEach
+    void migrateSchema() {
+        dataSource = new DriverManagerDataSource(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
         migrations = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
         jdbc = JdbcClient.create(dataSource);
     }
@@ -39,7 +41,7 @@ class CommunityDatabaseMigrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(1, migrations);
+        assertEquals(2, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -64,18 +66,39 @@ class CommunityDatabaseMigrationTest {
         UUID playerTwoId = UUID.randomUUID();
         UUID matchId = UUID.randomUUID();
         assertEquals(1, insertMatchProjection(matchId, playerOneId, playerTwoId));
+        assertEquals(new PlayerSeats(playerOneId, playerTwoId), readPlayerSeats(matchId));
+    }
 
-        PlayerSeats persistedPlayers = jdbc.sql("""
-                        select player_one_user_id, player_two_user_id
-                        from match_projection
-                        where match_id = :matchId
+    @Test
+    void d3Qlt001UpgradesAndPreservesAnExistingSeatOrderedProjection() {
+        migrateOnlyThrough("1");
+        UUID matchId = UUID.randomUUID();
+        UUID playerOneId = UUID.randomUUID();
+        UUID playerTwoId = UUID.randomUUID();
+        assertEquals(1, jdbc.sql("""
+                        insert into match_projection (
+                            match_id, player_ids, result, ranked, source_version, projected_at
+                        ) values (
+                            :matchId, cast(:playerIds as jsonb), 'DRAW', true, 1, now()
+                        )
                         """)
                 .param("matchId", matchId)
-                .query((resultSet, rowNumber) -> new PlayerSeats(
-                        resultSet.getObject("player_one_user_id", UUID.class),
-                        resultSet.getObject("player_two_user_id", UUID.class)))
-                .single();
-        assertEquals(new PlayerSeats(playerOneId, playerTwoId), persistedPlayers);
+                .param("playerIds", "[\"" + playerOneId + "\",\"" + playerTwoId + "\"]")
+                .update());
+
+        int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
+
+        assertEquals(1, applied);
+        assertEquals(new PlayerSeats(playerOneId, playerTwoId), readPlayerSeats(matchId));
+        assertEquals(0, jdbc.sql("""
+                        select count(*)
+                        from information_schema.columns
+                        where table_schema = 'public'
+                          and table_name = 'match_projection'
+                          and column_name = 'player_ids'
+                        """)
+                .query(Integer.class)
+                .single());
     }
 
     private int insertMatchProjection(UUID playerOneId, UUID playerTwoId) {
@@ -96,6 +119,24 @@ class CommunityDatabaseMigrationTest {
                 .param("playerOneId", playerOneId)
                 .param("playerTwoId", playerTwoId)
                 .update();
+    }
+
+    private PlayerSeats readPlayerSeats(UUID matchId) {
+        return jdbc.sql("""
+                        select player_one_user_id, player_two_user_id
+                        from match_projection
+                        where match_id = :matchId
+                        """)
+                .param("matchId", matchId)
+                .query((resultSet, rowNumber) -> new PlayerSeats(
+                        resultSet.getObject("player_one_user_id", UUID.class),
+                        resultSet.getObject("player_two_user_id", UUID.class)))
+                .single();
+    }
+
+    private void migrateOnlyThrough(String version) {
+        Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
+        Flyway.configure().dataSource(dataSource).target(version).load().migrate();
     }
 
     private record PlayerSeats(UUID playerOneId, UUID playerTwoId) {}

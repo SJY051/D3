@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.util.Set;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -21,13 +21,15 @@ class IdentityDatabaseMigrationTest {
     @Container
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17.10-alpine");
 
-    static JdbcClient jdbc;
-    static int migrations;
+    JdbcClient jdbc;
+    DriverManagerDataSource dataSource;
+    int migrations;
 
-    @BeforeAll
-    static void migrateSchema() {
-        var dataSource = new DriverManagerDataSource(
+    @BeforeEach
+    void migrateSchema() {
+        dataSource = new DriverManagerDataSource(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
         migrations = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
         jdbc = JdbcClient.create(dataSource);
     }
@@ -39,7 +41,7 @@ class IdentityDatabaseMigrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(1, migrations);
+        assertEquals(2, migrations);
         assertEquals(
                 Set.of("flyway_schema_history", "user_account", "login_identity", "refresh_session", "outbox_event"),
                 tables);
@@ -86,6 +88,33 @@ class IdentityDatabaseMigrationTest {
                 .param("userId", userId)
                 .param("tokenHash", "revoked-" + UUID.randomUUID())
                 .update());
+    }
+
+    @Test
+    void d3Qlt001UpgradesAnExistingRefreshLineageWithoutChangingV1() {
+        migrateOnlyThrough("1");
+        UUID firstUserId = createUser("upgrade-first");
+        UUID secondUserId = createUser("upgrade-second");
+        UUID parentSessionId = createRefreshSession(firstUserId, null);
+        UUID childSessionId = createRefreshSession(firstUserId, parentSessionId);
+
+        int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
+
+        assertEquals(1, applied);
+        assertEquals(parentSessionId, jdbc.sql("""
+                        select rotated_from_id
+                        from refresh_session
+                        where id = :childSessionId
+                        """)
+                .param("childSessionId", childSessionId)
+                .query(UUID.class)
+                .single());
+        assertThrows(DataIntegrityViolationException.class, () -> createRefreshSession(secondUserId, parentSessionId));
+    }
+
+    private void migrateOnlyThrough(String version) {
+        Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
+        Flyway.configure().dataSource(dataSource).target(version).load().migrate();
     }
 
     private UUID createUser(String prefix) {

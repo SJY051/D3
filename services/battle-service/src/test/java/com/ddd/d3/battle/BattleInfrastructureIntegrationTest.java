@@ -12,7 +12,7 @@ import java.util.UUID;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -37,13 +37,15 @@ class BattleInfrastructureIntegrationTest {
     static final KafkaContainer KAFKA = new KafkaContainer(
             DockerImageName.parse("apache/kafka:4.1.2").asCompatibleSubstituteFor("apache/kafka"));
 
-    static JdbcClient jdbc;
-    static int migrations;
+    JdbcClient jdbc;
+    DriverManagerDataSource dataSource;
+    int migrations;
 
-    @BeforeAll
-    static void migrateSchema() {
-        var dataSource = new DriverManagerDataSource(
+    @BeforeEach
+    void migrateSchema() {
+        dataSource = new DriverManagerDataSource(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
         migrations = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
         jdbc = JdbcClient.create(dataSource);
     }
@@ -55,7 +57,7 @@ class BattleInfrastructureIntegrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(1, migrations);
+        assertEquals(2, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -237,6 +239,60 @@ class BattleInfrastructureIntegrationTest {
     }
 
     @Test
+    void d3Qlt001UpgradesExistingJudgeCorrelationsWithoutChangingV1() {
+        migrateOnlyThrough("1");
+        UUID matchId = createRunningMatch();
+        UUID playerId = UUID.randomUUID();
+        addPlayer(matchId, playerId, 1);
+        addPlayer(matchId, UUID.randomUUID(), 2);
+        UUID runSubmissionId = insertLegacyRun(matchId, playerId);
+        UUID acceptedSubmissionId = UUID.randomUUID();
+        insertCompletedSubmit(acceptedSubmissionId, matchId, playerId, 1, "ACCEPTED");
+        assertEquals(1, jdbc.sql("""
+                        update match_player
+                        set accepted_submission_id = :submissionId
+                        where match_id = :matchId and user_id = :playerId
+                        """)
+                .param("submissionId", acceptedSubmissionId)
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .update());
+
+        int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
+
+        assertEquals(1, applied);
+        assertEquals(1, jdbc.sql("""
+                        select count(*)
+                        from judge_job_reference
+                        where submission_id = :submissionId and attempt_number is null
+                        """)
+                .param("submissionId", runSubmissionId)
+                .query(Integer.class)
+                .single());
+        assertEquals(acceptedSubmissionId, jdbc.sql("""
+                        select submission_id
+                        from judge_job_reference
+                        where match_id = :matchId
+                          and player_user_id = :playerId
+                          and mode = 'SUBMIT'
+                          and last_judge_status = 'ACCEPTED'
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .query(UUID.class)
+                .single());
+        assertEquals(0, jdbc.sql("""
+                        select count(*)
+                        from information_schema.columns
+                        where table_schema = 'public'
+                          and table_name = 'match_player'
+                          and column_name = 'accepted_submission_id'
+                        """)
+                .query(Integer.class)
+                .single());
+    }
+
+    @Test
     void d3Btl004KeepsAttackActorsAndTargetsInsideTheMatch() {
         UUID matchId = createRunningMatch();
         UUID playerId = UUID.randomUUID();
@@ -329,6 +385,30 @@ class BattleInfrastructureIntegrationTest {
                 .param("commandId", UUID.randomUUID())
                 .param("attemptNumber", attemptNumber, Types.INTEGER)
                 .update();
+    }
+
+    private UUID insertLegacyRun(UUID matchId, UUID playerId) {
+        UUID submissionId = UUID.randomUUID();
+        assertEquals(1, jdbc.sql("""
+                        insert into judge_job_reference (
+                            submission_id, match_id, player_user_id, mode, command_id,
+                            attempt_number, last_judge_status, accepted_at
+                        ) values (
+                            :submissionId, :matchId, :playerId, 'RUN', :commandId,
+                            0, 'QUEUED', now()
+                        )
+                        """)
+                .param("submissionId", submissionId)
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .param("commandId", UUID.randomUUID())
+                .update());
+        return submissionId;
+    }
+
+    private void migrateOnlyThrough(String version) {
+        Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
+        Flyway.configure().dataSource(dataSource).target(version).load().migrate();
     }
 
     private int insertCompletedSubmit(UUID matchId, UUID playerId, int attemptNumber, String status) {
