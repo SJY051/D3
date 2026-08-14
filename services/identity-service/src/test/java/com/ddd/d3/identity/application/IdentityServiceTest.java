@@ -100,6 +100,7 @@ class IdentityServiceTest {
     private static final class InMemoryIdentityRepository implements IdentityRepository {
 
         private final Map<String, Account> accountsByEmail = new HashMap<>();
+        private final Map<UUID, Account> accountsById = new HashMap<>();
         private final Map<String, String> handles = new HashMap<>();
         private final Map<UUID, RefreshSession> sessionsById = new HashMap<>();
         private final Map<String, UUID> sessionIdByTokenHash = new HashMap<>();
@@ -116,12 +117,18 @@ class IdentityServiceTest {
         @Override
         public void saveAccount(Account account) {
             accountsByEmail.put(account.email(), account);
+            accountsById.put(account.id(), account);
             handles.put(account.handle(), account.email());
         }
 
         @Override
         public Optional<Account> findAccountByEmail(String email) {
             return Optional.ofNullable(accountsByEmail.get(email));
+        }
+
+        @Override
+        public Optional<Account> findAccountById(UUID id) {
+            return Optional.ofNullable(accountsById.get(id));
         }
 
         @Override

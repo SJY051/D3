@@ -14,6 +14,8 @@ public interface IdentityRepository {
 
     Optional<Account> findAccountByEmail(String email);
 
+    Optional<Account> findAccountById(UUID id);
+
     void saveSession(RefreshSession session);
 
     Optional<RefreshSession> findSessionByTokenHash(String tokenHash);

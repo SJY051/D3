@@ -1,5 +1,6 @@
 package com.ddd.d3.identity.config;
 
+import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -43,6 +44,14 @@ public final class SigningKey {
 
     public JWKSource<SecurityContext> jwkSource() {
         return new ImmutableJWKSet<>(new JWKSet(rsaKey));
+    }
+
+    public RSAPublicKey publicKey() {
+        try {
+            return rsaKey.toRSAPublicKey();
+        } catch (JOSEException exception) {
+            throw new IllegalStateException("public key is unavailable", exception);
+        }
     }
 
     /** The public half only, in the JWKS JSON shape judge-service fetches. */

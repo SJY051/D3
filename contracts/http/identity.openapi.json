@@ -2,10 +2,170 @@
   "openapi": "3.1.0",
   "info": {
     "title": "D3 Identity API",
-    "version": "0.0.0-scaffold",
-    "description": "No operations are implemented in the scaffold."
+    "version": "1.0.0",
+    "description": "Local email/password identity: registration, login, rotating refresh sessions, logout, and authenticated profile (D3-ID-001)."
   },
-  "x-requirements": ["D3-ID-001"],
-  "paths": {}
+  "x-requirements": ["D3-ID-001", "D3-SEC-001"],
+  "paths": {
+    "/v1/auth/register": {
+      "post": {
+        "summary": "Register a local account",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {"schema": {"$ref": "#/components/schemas/RegisterRequest"}}
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RegisterResponse"}}}
+          },
+          "400": {"$ref": "#/components/responses/Error"},
+          "409": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/v1/auth/login": {
+      "post": {
+        "summary": "Sign in and open a refresh session",
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoginRequest"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Access token and rotating refresh token",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TokenResponse"}}}
+          },
+          "400": {"$ref": "#/components/responses/Error"},
+          "401": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "summary": "Rotate the refresh session and mint a new access token",
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RefreshRequest"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "New access token and rotated refresh token",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TokenResponse"}}}
+          },
+          "400": {"$ref": "#/components/responses/Error"},
+          "401": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "summary": "Revoke a refresh session",
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RefreshRequest"}}}
+        },
+        "responses": {
+          "204": {"description": "Session revoked"},
+          "400": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/v1/profile/me": {
+      "get": {
+        "summary": "The authenticated caller's public profile",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Profile",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProfileResponse"}}}
+          },
+          "401": {"$ref": "#/components/responses/Error"},
+          "404": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/.well-known/jwks.json": {
+      "get": {
+        "summary": "Public signing keys for access-token verification",
+        "responses": {
+          "200": {
+            "description": "JSON Web Key Set",
+            "content": {"application/json": {"schema": {"type": "object"}}}
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+    },
+    "responses": {
+      "Error": {
+        "description": "Versioned error",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}
+      }
+    },
+    "schemas": {
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["email", "handle", "displayName", "password"],
+        "properties": {
+          "email": {"type": "string", "format": "email"},
+          "handle": {"type": "string", "maxLength": 39},
+          "displayName": {"type": "string", "maxLength": 80},
+          "password": {"type": "string", "minLength": 8, "maxLength": 200}
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": {"type": "string", "format": "email"},
+          "password": {"type": "string"}
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "required": ["refreshToken"],
+        "properties": {"refreshToken": {"type": "string"}}
+      },
+      "RegisterResponse": {
+        "type": "object",
+        "required": ["userId"],
+        "properties": {"userId": {"type": "string", "format": "uuid"}}
+      },
+      "TokenResponse": {
+        "type": "object",
+        "required": ["userId", "accessToken", "refreshToken"],
+        "properties": {
+          "userId": {"type": "string", "format": "uuid"},
+          "accessToken": {"type": "string"},
+          "refreshToken": {"type": "string"}
+        }
+      },
+      "ProfileResponse": {
+        "type": "object",
+        "required": ["userId", "handle", "email", "displayName"],
+        "properties": {
+          "userId": {"type": "string", "format": "uuid"},
+          "handle": {"type": "string"},
+          "email": {"type": "string", "format": "email"},
+          "displayName": {"type": "string"}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["code", "message", "correlationId"],
+        "properties": {
+          "code": {"type": "string"},
+          "message": {"type": "string"},
+          "correlationId": {"type": "string"}
+        }
+      }
+    }
+  }
 }
-

@@ -63,6 +63,17 @@ public final class JdbcIdentityRepository implements IdentityRepository {
     }
 
     @Override
+    public Optional<Account> findAccountById(UUID id) {
+        return jdbcClient.sql("""
+                        select id, handle, email, password_hash, display_name, status, created_at
+                        from user_account where id = :id
+                        """)
+                .param("id", id)
+                .query(this::mapAccount)
+                .optional();
+    }
+
+    @Override
     public void saveSession(RefreshSession session) {
         jdbcClient.sql("""
                         insert into refresh_session (
