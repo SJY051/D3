@@ -80,6 +80,24 @@ class BattleInfrastructureIntegrationTest {
                 .param("problemId", problemId)
                 .update());
 
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
+                        insert into match (
+                            id, problem_id, ranked, status, result, void_reason, finished_at, created_at
+                        ) values (:id, :problemId, true, 'FINISHED', 'VOIDED', null, now(), now())
+                        """)
+                .param("id", UUID.randomUUID())
+                .param("problemId", problemId)
+                .update());
+
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
+                        insert into match (
+                            id, problem_id, ranked, status, result, void_reason, finished_at, created_at
+                        ) values (:id, :problemId, true, 'FINISHED', 'VOIDED', '   ', now(), now())
+                        """)
+                .param("id", UUID.randomUUID())
+                .param("problemId", problemId)
+                .update());
+
         assertEquals(1, jdbc.sql("""
                         insert into match (
                             id, problem_id, ranked, status, result, void_reason, finished_at, created_at

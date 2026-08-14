@@ -35,7 +35,8 @@ create table match (
     ),
     constraint match_finish_after_creation check (finished_at is null or finished_at >= created_at),
     constraint match_void_reason_consistent check (
-        void_reason is null or result is not distinct from 'VOIDED'
+        (result is not distinct from 'VOIDED' and nullif(btrim(void_reason), '') is not null)
+        or (result is distinct from 'VOIDED' and void_reason is null)
     ),
     constraint match_aggregate_version_non_negative check (aggregate_version >= 0)
 );

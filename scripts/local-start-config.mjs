@@ -29,3 +29,25 @@ export function resolveLocalDependencyComposeArgs() {
     "kafka",
   ];
 }
+
+export function resolveLocalWebServer(source = process.env) {
+  const url = new URL(source.D3_WEB_URL ?? "http://localhost:5173");
+  if (
+    url.protocol !== "http:"
+    || !["localhost", "127.0.0.1"].includes(url.hostname)
+    || url.username !== ""
+    || url.password !== ""
+    || !["", "/"].includes(url.pathname)
+    || url.search !== ""
+    || url.hash !== ""
+  ) {
+    throw new Error("D3_WEB_URL must be an HTTP loopback origin");
+  }
+
+  return {
+    name: "web",
+    health: url.origin,
+    host: "127.0.0.1",
+    port: url.port || "80",
+  };
+}

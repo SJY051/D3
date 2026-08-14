@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   resolveLocalDependencyComposeArgs,
   resolveLocalEnvironment,
+  resolveLocalWebServer,
 } from "./local-start-config.mjs";
 
 test("local runtime binds every Java application to loopback by default", () => {
@@ -51,4 +52,20 @@ test("local runtime waits for every Compose dependency to become healthy", () =>
     "redis",
     "kafka",
   ]);
+});
+
+test("local runtime derives the Vite binding and health target from D3_WEB_URL", () => {
+  assert.deepEqual(resolveLocalWebServer({ D3_WEB_URL: "http://localhost:5174" }), {
+    name: "web",
+    health: "http://localhost:5174",
+    host: "127.0.0.1",
+    port: "5174",
+  });
+});
+
+test("local runtime rejects a non-loopback Web origin", () => {
+  assert.throws(
+    () => resolveLocalWebServer({ D3_WEB_URL: "http://0.0.0.0:5173" }),
+    /must be an HTTP loopback origin/,
+  );
 });
