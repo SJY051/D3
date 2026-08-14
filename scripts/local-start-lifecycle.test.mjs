@@ -6,6 +6,7 @@ import {
   createChildFailureReporter,
   createChildCompletionTracker,
   hasChildExited,
+  isChildSpawnFailure,
   mergeRequestedExitCode,
   StartupCancelledError,
 } from "./local-start-lifecycle.mjs";
@@ -64,9 +65,14 @@ test("local runtime reports only the first asynchronous child failure", () => {
 
 test("local runtime marks a spawn-error child complete without an exit event", () => {
   const tracker = createChildCompletionTracker();
-  const child = { exitCode: null, signalCode: null };
+  const child = { pid: undefined, exitCode: null, signalCode: null };
 
   assert.equal(tracker.hasCompleted(child), false);
   tracker.markCompleted(child);
   assert.equal(tracker.hasCompleted(child), true);
+});
+
+test("local runtime distinguishes spawn failure from an error on a running child", () => {
+  assert.equal(isChildSpawnFailure({ pid: undefined }), true);
+  assert.equal(isChildSpawnFailure({ pid: 42 }), false);
 });

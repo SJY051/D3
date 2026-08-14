@@ -10,6 +10,7 @@ import {
   assertSynchronousRunCompleted,
   createChildCompletionTracker,
   createChildFailureReporter,
+  isChildSpawnFailure,
   mergeRequestedExitCode,
   StartupCancelledError,
 } from "./local-start-lifecycle.mjs";
@@ -81,9 +82,10 @@ function start(name, command, args, env = environment) {
     }
   });
   child.once("error", (error) => {
-    childCompletion.markCompleted(child);
+    const spawnFailed = isChildSpawnFailure(child);
+    if (spawnFailed) childCompletion.markCompleted(child);
     reportFailure({
-      detail: `failed to start (${error.code ?? "unknown error"})`,
+      detail: `${spawnFailed ? "failed to start" : "process error"} (${error.code ?? "unknown error"})`,
       defer: false,
     });
   });

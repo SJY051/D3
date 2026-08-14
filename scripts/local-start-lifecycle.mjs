@@ -41,6 +41,10 @@ export function hasChildExited(child) {
   return child.exitCode != null || child.signalCode != null;
 }
 
+export function isChildSpawnFailure(child) {
+  return child.pid == null;
+}
+
 export function mergeRequestedExitCode(currentExitCode, nextExitCode) {
   if (currentExitCode === undefined || currentExitCode === 0) return nextExitCode;
   return currentExitCode;
