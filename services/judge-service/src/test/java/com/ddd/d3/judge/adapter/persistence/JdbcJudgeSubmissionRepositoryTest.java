@@ -220,6 +220,8 @@ class JdbcJudgeSubmissionRepositoryTest {
         migrateOnlyThrough("2");
         UUID submissionId = UUID.randomUUID();
         UUID judgeRunId = UUID.randomUUID();
+        UUID weakerEvidenceId = UUID.fromString("77777777-7777-4777-8777-777777777777");
+        UUID representativeEvidenceId = UUID.fromString("88888888-8888-4888-8888-888888888888");
         insertRawSubmission(submissionId, "RUN", null);
         assertEquals(1, jdbc.sql("update submission set status = 'ACCEPTED' where id = :id")
                 .param("id", submissionId)
@@ -236,15 +238,20 @@ class JdbcJudgeSubmissionRepositoryTest {
                 .param("id", judgeRunId)
                 .param("submissionId", submissionId)
                 .update());
-        assertEquals(1, jdbc.sql("""
+        assertEquals(2, jdbc.sql("""
                         insert into evaluation_evidence (
                             id, judge_run_id, tier, input_size, sample_count,
                             median_runtime_micros, created_at
                         ) values (
-                            :id, :judgeRunId, 'SMALL', 100, 3, 700, now()
+                            :weakerId, :judgeRunId, 'SMALL', 100, 3, 700,
+                            timestamptz '2026-08-13 00:00:00+00'
+                        ), (
+                            :representativeId, :judgeRunId, 'SMALL', 200, 5, 900,
+                            timestamptz '2026-08-12 00:00:00+00'
                         )
                         """)
-                .param("id", UUID.randomUUID())
+                .param("weakerId", weakerEvidenceId)
+                .param("representativeId", representativeEvidenceId)
                 .param("judgeRunId", judgeRunId)
                 .update());
 
@@ -257,6 +264,22 @@ class JdbcJudgeSubmissionRepositoryTest {
                 .single());
         assertEquals(1, jdbc.sql("select count(*) from evaluation_evidence where judge_run_id = :id")
                 .param("id", judgeRunId)
+                .query(Integer.class)
+                .single());
+        assertEquals(representativeEvidenceId, jdbc.sql("""
+                        select id
+                        from evaluation_evidence
+                        where judge_run_id = :judgeRunId and tier = 'SMALL'
+                        """)
+                .param("judgeRunId", judgeRunId)
+                .query(UUID.class)
+                .single());
+        assertEquals(5, jdbc.sql("""
+                        select sample_count
+                        from evaluation_evidence
+                        where judge_run_id = :judgeRunId and tier = 'SMALL'
+                        """)
+                .param("judgeRunId", judgeRunId)
                 .query(Integer.class)
                 .single());
     }

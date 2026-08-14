@@ -9,6 +9,6 @@
     "services/identity-service/src/main/resources/db/migration/V2__strengthen_refresh_session_lineage.sql": "e95678c63b4d745357f7c2a91bc49f6c04611369dc0238128b9c4d2e3c0dee75",
     "services/judge-service/src/main/resources/db/migration/V1__create_judge_tables.sql": "e21b851a541cf2091c579926ee19cc1b0f6aa1305514f8c7fee1b28068616f04",
     "services/judge-service/src/main/resources/db/migration/V2__fence_started_provider_execution.sql": "44fdb3159fcc202ac363419b6956a3ea034bf5493e546aa12064ae54516077b1",
-    "services/judge-service/src/main/resources/db/migration/V3__strengthen_submission_evidence_invariants.sql": "386031ceeecea7f6d654be718df5f95f3ae8a07eb818ef90d8a597889f87a408"
+    "services/judge-service/src/main/resources/db/migration/V3__strengthen_submission_evidence_invariants.sql": "ff32f7f26d01594254414f6f5c65cb906ff768a25b4f32b1e07176fb993b5d74"
   }
 }
