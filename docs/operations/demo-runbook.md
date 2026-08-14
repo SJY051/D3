@@ -39,7 +39,7 @@ Credentials stay outside the repository and recording. Seeded demo identities mu
 |---|---|---|---|
 | Reviewed WF-01~08 | 최정민 | UI review is recorded before styled acceptance | Review required |
 | Scenario A | Service owners | Two browsers complete ranked flow without database edits | Blocked: behavior not implemented |
-| Scenarios B and C | Battle/Judge owners | Reconnect, surrender and incident void are deterministic | Blocked: behavior not implemented |
+| Scenarios B and C | Battle/Judge owners | Reconnect, surrender and incident void are deterministic | PARTIAL PASS: deterministic domain and autonomous reconnect-expiry tests pass; live two-browser evidence NOT RUN |
 | Six language runtimes | Judge owner | Versioned smoke cases pass on designated host | PASS for host: pinned Judge0 CE 1.13.1 matrix and 12/12 language cases |
 | Judge application route | 윤서진 | judge-service reaches the designated host through the source-SG-only path and repeats the sanitized six-runtime smoke | NOT RUN: private route and deployment egress PENDING |
 | Observability | 윤서진 | Health, correlation and failure views are identified | Local health and ingress correlation PASS; dashboards pending |
