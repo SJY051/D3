@@ -371,6 +371,12 @@ class BattleMatchTest {
 
         assertEquals(BattleMatch.State.JUDGING, match.state());
         assertTrue(match.result().isEmpty());
+
+        match.handle(new BattleMatch.Reconnect(PLAYER_ONE, 2));
+
+        assertEquals(BattleMatch.State.JUDGING, match.state());
+        assertTrue(match.result().isEmpty());
+        assertFalse(match.isDisconnected(PLAYER_ONE));
     }
 
     @Test

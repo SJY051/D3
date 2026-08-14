@@ -93,6 +93,13 @@ class BattleDeadlineServiceTest {
         assertEquals(BattleMatch.State.JUDGING, matches.saved.state());
         assertEquals(null, matches.saved.result());
         assertEquals(List.of(MATCH_ID), published);
+
+        BattleMatch restored = BattleMatch.restore(
+                matches.saved,
+                Clock.fixed(NOW.plusSeconds(30), ZoneOffset.UTC));
+        restored.handle(new BattleMatch.Reconnect(PLAYER_ONE.toString(), 2));
+        assertEquals(BattleMatch.State.JUDGING, restored.state());
+        assertEquals(null, restored.snapshot().result());
     }
 
     @Test

@@ -282,11 +282,13 @@ public final class BattleMatch {
         }
 
         Instant now = clock.instant();
-        Optional<String> expiredPlayer = reconnectDeadlines.entrySet().stream()
-                .filter(entry -> !now.isBefore(entry.getValue()))
-                .min(Comparator.comparing(Map.Entry<String, Instant>::getValue)
-                        .thenComparing(Map.Entry::getKey))
-                .map(Map.Entry::getKey);
+        Optional<String> expiredPlayer = state == State.RUNNING
+                ? reconnectDeadlines.entrySet().stream()
+                        .filter(entry -> !now.isBefore(entry.getValue()))
+                        .min(Comparator.comparing(Map.Entry<String, Instant>::getValue)
+                                .thenComparing(Map.Entry::getKey))
+                        .map(Map.Entry::getKey)
+                : Optional.empty();
         Instant reconnectDeadline = expiredPlayer.map(reconnectDeadlines::get).orElse(null);
         boolean matchDeadlineExpired = state == State.RUNNING && !now.isBefore(matchDeadline);
         if (matchDeadlineExpired
