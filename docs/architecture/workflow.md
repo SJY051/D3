@@ -2,7 +2,7 @@
 
 Owner: 최정민
 
-Status: Target logical baseline; implementation evidence pending
+Status: Target logical baseline; Judge boundary partially implemented
 
 Last verified: 2026-08-14 against `docs/specs/d3-mvp.md` and versioned contract stubs
 
@@ -126,7 +126,9 @@ stateDiagram-v2
 
 Judge HTTP v1 defines the synchronous acceptance response, stable submission ID, idempotency conflict, mapped-runtime unavailable state, and a Judge-owned privacy-safe evidence read. Battle must still durably map the accepted submission ID to match, player, attempt, `RUN`/`SUBMIT` mode and stable command ID before acknowledging the browser command. Each distinct `RUN` uses a new command ID without incrementing the submission attempt; a retry reuses its command ID. `submission.judged.v1` remains a bounded completion notification, after which Battle reads the persisted correctness and repeated size-tier runtime summary without receiving source, hidden cases, compiler commands, or raw diagnostics.
 
-The contract, deterministic fake adapter, and issue #14 six-language Judge0 runtime matrix are active. Durable Judge persistence, asynchronous processing/outbox publication, authenticated HTTP handlers, the real Judge0 adapter, and Battle consumption remain incomplete under issue #13. Scenario A cannot claim a working Judge flow until those application pieces are integrated and evidenced.
+The versioned Judge contract, service-authenticated HTTP handlers, deterministic local fake, durable PostgreSQL submission/evidence storage, fenced asynchronous processing, transactional outbox, Kafka producer, and selectable real Judge0 adapter path are implemented under issue #13. Narrow tests cover the fake and real normalization paths, request and execution limits, privacy-safe evidence, idempotent acceptance, stale-claim fencing, and producer publication. This is **PARTIAL PASS** evidence for the Judge-owned segment only.
+
+Issue #14 separately provides **PASS** evidence for the dedicated Judge0 CE 1.13.1 host and its pinned six-language runtime matrix. The judge-service-to-host request over the intended private AWS path is **NOT RUN**, and the source-security-group-only route remains **PENDING**. Battle correlation, judged-event consumption, submission locking, outcome calculation, and incident voiding remain issue #15/#16 work. Scenario A cannot claim a working Judge flow until those application pieces are integrated and evidenced.
 
 The current `match.finished.v1` contains only match ID, result, ranked flag, and seat-ordered player IDs; its schema now defines index 0 as `PLAYER_ONE` and index 1 as `PLAYER_TWO`, so a basic winner projection is unambiguous. `rating.changed.v1` provides current rating/RP and an unconstrained tier string, but no independently defined division, leaderboard, language, or peak data; division display remains blocked until a compatible structured representation or new versioned boundary is approved. `user-profile.changed.v1` provides handle but not display name. None of those schemas carries the score composition, attempts, attack history, or execution summary represented by the target record model.
 

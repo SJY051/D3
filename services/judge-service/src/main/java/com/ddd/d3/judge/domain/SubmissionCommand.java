@@ -34,7 +34,7 @@ public record SubmissionCommand(
             throw new IllegalArgumentException("sourceCode must not be blank");
         }
         if (sourceCode.getBytes(StandardCharsets.UTF_8).length > MAX_SOURCE_BYTES) {
-            throw new IllegalArgumentException("sourceCode exceeds the 65536-byte limit");
+            throw new PrivatePayloadTooLargeException("sourceCode", MAX_SOURCE_BYTES);
         }
         if (correlationId.isBlank()) {
             throw new IllegalArgumentException("correlationId must not be blank");

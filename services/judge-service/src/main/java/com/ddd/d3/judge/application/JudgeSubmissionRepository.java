@@ -1,6 +1,7 @@
 package com.ddd.d3.judge.application;
 
 import com.ddd.d3.judge.domain.JudgeSubmission;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -8,6 +9,8 @@ public interface JudgeSubmissionRepository {
     Optional<JudgeSubmission> findByIdempotencyKey(UUID idempotencyKey);
 
     Optional<JudgeSubmission> findById(UUID submissionId);
+
+    List<UUID> findPendingEvaluationIds(int maximumCount);
 
     /**
      * Atomically inserts by idempotency key or returns the already committed submission.
@@ -22,5 +25,5 @@ public interface JudgeSubmissionRepository {
     JudgeSubmission completeEvaluation(JudgeSubmission submission);
 
     /** Returns a failed worker claim to QUEUED so a transport retry can resume it. */
-    void releaseEvaluationClaim(UUID submissionId);
+    void releaseEvaluationClaim(UUID submissionId, UUID evaluationClaimId);
 }

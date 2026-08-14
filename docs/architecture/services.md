@@ -2,7 +2,7 @@
 
 Owner: 윤서진
 
-Status: Initial baseline
+Status: Judge boundary partially implemented; remaining services at baseline
 
 Last verified: 2026-08-14 against the MVP system constraints and public contract inventory
 
@@ -29,9 +29,11 @@ Gateway authentication does not replace service authorization. Every domain serv
 
 ## Contract activation state
 
-Judge HTTP v1 now defines idempotent `RUN`/`SUBMIT` acceptance with a stable submission ID and a bounded evidence read containing the minimum correctness and repeated size-tier runtime summary required by Battle. `submission.judged.v1` remains the completion notification; Battle retains the accepted submission-to-mode correlation and reads the persisted safe evidence by submission ID. The domain seam and deterministic fake adapter validate this boundary without treating fake execution as real-Judge evidence.
+Judge HTTP v1 has service-authenticated `RUN`/`SUBMIT` handlers, idempotent acceptance with a stable submission ID, and a bounded evidence read containing the minimum correctness and repeated size-tier runtime summary required by Battle. Judge persists the private command and safe evidence in its PostgreSQL database, fences asynchronous evaluation claims, and commits the terminal evidence with a `submission.judged.v1` outbox record before Kafka publication. Public responses and events omit source, hidden cases, provider credentials, compiler commands, and raw diagnostics.
 
-Durable PostgreSQL acceptance, asynchronous processing, outbox publication, service-authenticated HTTP handlers, and Battle consumer integration remain implementation work in issue #13. Until those paths have container-backed and producer/consumer evidence, the contract is approved but the end-to-end Judge flow is not complete.
+The deterministic fake is the local default and provides repeatable normalized-result evidence without representing host execution as live. An explicitly selected real adapter maps the six supported language keys to pinned Judge0 runtime IDs, applies fixed resource and network options, and normalizes provider results behind the same application seam. The real adapter path has narrow HTTP and normalization tests; judge-service-to-AWS execution over the intended private route is **NOT RUN**.
+
+Issue #13 therefore provides partial vertical-slice evidence, not an end-to-end Judge claim. The source-security-group-only AWS path and designated-host application smoke remain **PENDING**, and Battle still must persist its accepted submission correlation and consume judged results under issue #15. Scenario A remains incomplete until those integrations have producer/consumer and live-path evidence.
 
 The current v1 event inventory is sufficient for a basic match projection, but not the complete P0 public rating projection. `match.finished.v1` defines seat-ordered player IDs, but omits score composition, attempts, attack history, and execution evidence. `rating.changed.v1` has an unconstrained tier string and omits an independently defined division as well as leaderboard position, language statistics, and peak tier. `user-profile.changed.v1` omits display name. Consequently, division display requires a compatible structured representation or new versioned boundary, and the target enriched Community projection fields in `erd.dbml` cannot all be populated from the current schemas.
 

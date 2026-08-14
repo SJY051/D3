@@ -87,9 +87,19 @@ public final class JudgeSubmissionService {
             SafeEvaluationEvidence evidence = SafeEvaluationEvidence.from(claimed, result);
             return repository.completeEvaluation(claimed.complete(evidence)).evidence();
         } catch (RuntimeException exception) {
-            repository.releaseEvaluationClaim(submissionId);
+            repository.releaseEvaluationClaim(submissionId, claimed.evaluationClaimId());
             throw exception;
         }
+    }
+
+    public SafeEvaluationEvidence readEvidence(UUID submissionId) {
+        Objects.requireNonNull(submissionId, "submissionId");
+        JudgeSubmission submission = repository.findById(submissionId)
+                .orElseThrow(() -> new SubmissionNotFoundException(submissionId));
+        if (submission.evidence() == null) {
+            throw new EvidenceNotReadyException(submissionId);
+        }
+        return submission.evidence();
     }
 
     private static String fingerprint(SubmissionCommand command) {

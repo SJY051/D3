@@ -19,6 +19,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -234,6 +235,15 @@ class JudgeSubmissionServiceTest {
         }
 
         @Override
+        public List<UUID> findPendingEvaluationIds(int maximumCount) {
+            return submissions.values().stream()
+                    .filter(submission -> submission.status() == JudgeStatus.QUEUED)
+                    .map(JudgeSubmission::id)
+                    .limit(maximumCount)
+                    .toList();
+        }
+
+        @Override
         public JudgeSubmission insertOrGet(JudgeSubmission submission) {
             UUID storedId = submissionIdsByIdempotencyKey.computeIfAbsent(
                     submission.command().idempotencyKey(), ignored -> submission.id());
@@ -246,7 +256,7 @@ class JudgeSubmissionServiceTest {
             var claimed = new AtomicReference<JudgeSubmission>();
             submissions.computeIfPresent(submissionId, (ignored, current) -> {
                 if (current.status() == JudgeStatus.QUEUED) {
-                    JudgeSubmission running = current.startEvaluation();
+                    JudgeSubmission running = current.startEvaluation(UUID.randomUUID());
                     claimed.set(running);
                     return running;
                 }
@@ -258,7 +268,9 @@ class JudgeSubmissionServiceTest {
         @Override
         public JudgeSubmission completeEvaluation(JudgeSubmission submission) {
             submissions.compute(submission.id(), (ignored, current) -> {
-                if (current == null || current.status() != JudgeStatus.RUNNING) {
+                if (current == null
+                        || current.status() != JudgeStatus.RUNNING
+                        || !Objects.equals(current.evaluationClaimId(), submission.evaluationClaimId())) {
                     throw new IllegalStateException("submission is not claimed for evaluation");
                 }
                 return submission;
@@ -268,9 +280,12 @@ class JudgeSubmissionServiceTest {
         }
 
         @Override
-        public void releaseEvaluationClaim(UUID submissionId) {
+        public void releaseEvaluationClaim(UUID submissionId, UUID evaluationClaimId) {
             submissions.computeIfPresent(submissionId, (ignored, current) ->
-                    current.status() == JudgeStatus.RUNNING ? current.requeueEvaluation() : current);
+                    current.status() == JudgeStatus.RUNNING
+                                    && Objects.equals(current.evaluationClaimId(), evaluationClaimId)
+                            ? current.requeueEvaluation()
+                            : current);
         }
     }
 }

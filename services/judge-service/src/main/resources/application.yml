@@ -11,8 +11,34 @@ spring:
     username: ${JUDGE_DB_USER:d3_judge}
     password: ${JUDGE_DB_PASSWORD:local-only}
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${D3_JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+  kafka:
+    bootstrap-servers: ${D3_KAFKA_HOST:localhost}:${D3_KAFKA_PORT:9092}
+
+d3:
+  security:
+    jwk-set-uri: ${D3_JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+    issuer: ${D3_JWT_ISSUER:http://localhost:8081}
+    audience: ${D3_JWT_JUDGE_AUDIENCE:judge-service}
+    allowed-client-id: ${D3_JWT_JUDGE_CLIENT_ID:battle-service}
+  judge0:
+    base-url: ${JUDGE0_BASE_URL:http://localhost:2358}
+    allowed-origin: ${JUDGE0_ALLOWED_ORIGIN:http://localhost:2358}
+    authentication-header: ${JUDGE0_AUTH_HEADER:X-Auth-Token}
+    authentication-token: ${JUDGE0_AUTH_TOKEN:}
+    connect-timeout: 2s
+    request-timeout: 10s
+    poll-interval: 100ms
+    poll-timeout: 30s
+  judge:
+    adapter: ${D3_JUDGE_ADAPTER:}
 
 eureka:
   client:

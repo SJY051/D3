@@ -1,7 +1,7 @@
 # Security review boundary
 
 Owner: 윤서진  
-Status: Baseline checklist  
+Status: Baseline checklist; Judge application review partially evidenced
 Requirement: D3-SEC-001
 
 Review these surfaces when their implementation appears:
@@ -17,7 +17,7 @@ Review these surfaces when their implementation appears:
 
 ## Judge0 activation review
 
-Last verified: 2026-08-14 against issue #14 and the bound AWS resources
+Last verified: 2026-08-14 against issue #13 implementation, issue #14 and the bound AWS resources
 
 | Control | Result | Evidence boundary |
 |---|---|---|
@@ -28,11 +28,22 @@ Last verified: 2026-08-14 against issue #14 and the bound AWS resources
 | Provenance | PASS | Judge0 CE `1.13.1`, release SHA-256 and all Compose images pinned in [`infra/judge/README.md`](../../infra/judge/README.md) |
 | Privileged runtime containment | PASS with residual risk | Official server/worker containers require privileged mode; host is dedicated, zero-ingress, SSM-only, and contains no application workload |
 | Submission network and resource limits | PASS | Network opt-in rejected, executed outbound socket blocked, request ceilings rejected, and configured defaults plus per-request CPU/wall/memory/process/stack/file boundaries exercised |
-| Submission body-size limits | PENDING | Judge0 CE 1.13.1 has no source/stdin/expected-output field ceiling; issue #13 must validate explicit application limits before provider access |
-| Source and diagnostic privacy | PASS for runtime | Hardened startup overlays, rotated bootstrap secrets, sanitized smoke, and zero post-smoke secret/source log matches; real adapter review remains issue #13 work |
+| Submission body-size limits | PASS at application boundary | Judge0 CE 1.13.1 has no field ceiling; issue #13 rejects the bounded HTTP body and UTF-8 source/stdin/expected-output fields before provider access, with negative tests |
+| Source and diagnostic privacy | PASS in bounded tests; live path NOT RUN | Host smoke found zero post-smoke secret/source log matches; application tests keep source, hidden input, credentials and raw provider diagnostics out of public responses and events |
 | Private service path | PENDING | Current public subnet is zero-ingress for bootstrap; source-SG-only Judge-service route is not bound |
 
-Host activation does not waive application review. Unresolved private-path, adapter authorization, option-allowlist, or source-logging findings block real Judge service integration.
+## Judge application review
+
+| Control | Result | Evidence boundary |
+|---|---|---|
+| Service authentication and authorization | PASS in HTTP tests | JWT issuer, Judge audience, Battle service caller identity and endpoint scopes are required; anonymous, user-scope and wrong-service callers are rejected |
+| Provider destination and credential handling | PARTIAL PASS | The adapter accepts one exact configured origin, sends one configured authentication header, bounds provider responses and exposes no credential; deployment egress restriction remains PENDING |
+| Execution option allowlist | PASS in adapter tests | Six language mappings and fixed CPU, wall-time, memory, process/thread, stack, file-size and disabled-network options are asserted before provider access |
+| Durable idempotency and recovery | PASS in container tests | PostgreSQL enforces one command key and request fingerprint; an opaque evaluation claim token fences stale workers; terminal evidence and outbox insertion share one transaction |
+| Public response and event privacy | PASS in serialization tests | Safe evidence and `submission.judged.v1` omit source, hidden cases, compiler commands, provider credentials and raw diagnostics |
+| Real judge-service to AWS Judge0 call | NOT RUN | The real adapter path exists, but its intended source-security-group-only route is not bound; retain issue #14 host smoke as separate evidence |
+
+Host activation does not waive application review. The private route and deployment egress control remain PENDING and block a claim of real Judge service integration. Complete a final targeted diff review before issue #13 merge; unresolved Critical or High findings block merge.
 
 Unresolved Critical or High findings block merge. Record an inapplicable result with evidence rather than suppressing the scanner or weakening a test.
 
