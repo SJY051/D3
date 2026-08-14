@@ -62,6 +62,7 @@ public final class IdentityService {
         requireText(rawPassword, "password");
         Account account = repository.findAccountByEmail(email)
                 .filter(candidate -> passwordEncoder.matches(rawPassword, candidate.passwordHash()))
+                .filter(Account::isActive)
                 .orElseThrow(InvalidCredentialsException::new);
         return issueSession(account.id(), null);
     }
@@ -75,7 +76,10 @@ public final class IdentityService {
             repository.revokeAllSessions(current.userId(), clock.instant());
             throw new RefreshTokenRejectedException();
         }
-        repository.revokeSession(current.id(), clock.instant());
+        if (!repository.revokeSession(current.id(), clock.instant())) {
+            // Lost a concurrent rotation of the same token: exactly one caller may consume it, so reject this one.
+            throw new RefreshTokenRejectedException();
+        }
         return issueSession(current.userId(), current.id());
     }
 

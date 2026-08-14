@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -110,14 +111,40 @@ class IdentityControllerTest {
 
     @Test
     void d3Id001ProfileReturnsTheAuthenticatedAccount() throws Exception {
-        when(identityRepository.findAccountById(USER_ID)).thenReturn(Optional.of(new Account(
-                USER_ID, "dev", "dev@d3.dev", "hash", "Dev", Account.ACTIVE, Instant.parse("2026-08-14T00:00:00Z"))));
+        when(identityRepository.findAccountById(USER_ID)).thenReturn(Optional.of(account(Account.ACTIVE)));
 
-        mockMvc.perform(get("/v1/profile/me").with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
+        mockMvc.perform(get("/v1/profile/me").with(profileToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(USER_ID.toString()))
                 .andExpect(jsonPath("$.handle").value("dev"))
                 .andExpect(jsonPath("$.email").value("dev@d3.dev"));
+    }
+
+    @Test
+    void d3Sec001RejectsAProfileTokenWithoutTheProfileScope() throws Exception {
+        mockMvc.perform(get("/v1/profile/me")
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString()))
+                                .authorities(new SimpleGrantedAuthority("SCOPE_other"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void d3Sec001DoesNotServeADisabledAccount() throws Exception {
+        when(identityRepository.findAccountById(USER_ID)).thenReturn(Optional.of(account("DISABLED")));
+
+        mockMvc.perform(get("/v1/profile/me").with(profileToken()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_FOUND"));
+    }
+
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor profileToken() {
+        return jwt().jwt(token -> token.subject(USER_ID.toString()))
+                .authorities(new SimpleGrantedAuthority("SCOPE_identity.profile"));
+    }
+
+    private static Account account(String status) {
+        return new Account(USER_ID, "dev", "dev@d3.dev", "hash", "Dev", status, Instant.parse("2026-08-14T00:00:00Z"));
     }
 
     @Test

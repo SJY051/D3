@@ -8,10 +8,15 @@ import com.ddd.d3.identity.config.SigningKey;
 import com.nimbusds.jose.jwk.JWKSet;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Clock;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 
@@ -46,6 +51,28 @@ class AccessTokenIssuerTest {
         NimbusJwtDecoder decoder = decoderFromPublishedJwks(SigningKey.generate());
 
         assertThrows(JwtException.class, () -> decoder.decode(foreignToken));
+    }
+
+    @Test
+    void d3Sec001RejectsATokenWithTheWrongAudience() {
+        SigningKey signingKey = SigningKey.generate();
+        String wrongAudience = new AccessTokenIssuer(
+                        new NimbusJwtEncoder(signingKey.jwkSource()), "http://localhost:8081", "someone-else", CLOCK)
+                .issue(UUID.fromString("00000000-0000-4000-8000-000000000003"));
+
+        NimbusJwtDecoder decoder = validatingDecoder(signingKey, "http://localhost:8081", "d3-user");
+
+        assertThrows(JwtException.class, () -> decoder.decode(wrongAudience));
+    }
+
+    /** Mirrors IdentitySecurityConfiguration: signature plus issuer, timestamp, and audience validation. */
+    private static NimbusJwtDecoder validatingDecoder(SigningKey signingKey, String issuer, String audience) {
+        NimbusJwtDecoder decoder = decoderFromPublishedJwks(signingKey);
+        OAuth2TokenValidator<Jwt> audienceValidator = new JwtClaimValidator<List<String>>(
+                "aud", audiences -> audiences != null && audiences.contains(audience));
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefaultWithIssuer(issuer), audienceValidator));
+        return decoder;
     }
 
     private static NimbusJwtDecoder decoderFromPublishedJwks(SigningKey signingKey) {

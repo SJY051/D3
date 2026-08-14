@@ -59,11 +59,13 @@ final class InMemoryIdentityRepository implements IdentityRepository {
     }
 
     @Override
-    public void revokeSession(UUID sessionId, Instant revokedAt) {
+    public boolean revokeSession(UUID sessionId, Instant revokedAt) {
         RefreshSession current = sessionsById.get(sessionId);
-        if (current != null) {
-            sessionsById.put(sessionId, revoked(current, revokedAt));
+        if (current == null || current.revokedAt() != null) {
+            return false;
         }
+        sessionsById.put(sessionId, revoked(current, revokedAt));
+        return true;
     }
 
     @Override

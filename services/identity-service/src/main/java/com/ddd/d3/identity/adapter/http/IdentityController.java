@@ -65,6 +65,7 @@ public final class IdentityController {
     @GetMapping("/v1/profile/me")
     public ProfileResponse me(@AuthenticationPrincipal Jwt jwt) {
         Account account = identityRepository.findAccountById(UUID.fromString(jwt.getSubject()))
+                .filter(Account::isActive)
                 .orElseThrow(AccountNotFoundException::new);
         return new ProfileResponse(account.id(), account.handle(), account.email(), account.displayName());
     }

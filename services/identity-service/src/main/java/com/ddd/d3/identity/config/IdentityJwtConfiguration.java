@@ -24,8 +24,8 @@ public class IdentityJwtConfiguration {
     @Bean
     AccessTokenIssuer accessTokenIssuer(
             JwtEncoder jwtEncoder,
-            @Value("${d3.security.issuer:http://localhost:8081}") String issuer,
-            @Value("${d3.security.access-audience:d3-user}") String audience) {
+            @Value("${D3_JWT_ISSUER:http://localhost:8081}") String issuer,
+            @Value("${D3_JWT_USER_AUDIENCE:d3-user}") String audience) {
         return new AccessTokenIssuer(jwtEncoder, issuer, audience, Clock.systemUTC());
     }
 }

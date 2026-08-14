@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.ddd.d3.identity.application.DuplicateAccountException;
 import com.ddd.d3.identity.application.IdentityService;
 import com.ddd.d3.identity.application.RefreshTokenRejectedException;
 import com.ddd.d3.identity.application.SessionToken;
@@ -13,10 +14,16 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -69,12 +76,53 @@ class JdbcIdentityRepositoryTest {
     }
 
     @Test
-    void d3Id001EnforcesUniqueEmailAtTheDatabase() {
-        Account first = account("dev@d3.dev", "dev");
-        Account duplicate = account("dev@d3.dev", "other");
-        repository.saveAccount(first);
+    void d3Id001MapsAUniqueEmailViolationToADomainConflict() {
+        repository.saveAccount(account("dev@d3.dev", "dev"));
 
-        assertThrows(DataIntegrityViolationException.class, () -> repository.saveAccount(duplicate));
+        assertThrows(DuplicateAccountException.class, () -> repository.saveAccount(account("dev@d3.dev", "other")));
+    }
+
+    @Test
+    void d3Sec001ConcurrentRefreshOfOneTokenIssuesExactlyOneNewSession() throws Exception {
+        service.register("dev@d3.dev", "dev", "Dev", PASSWORD);
+        SessionToken issued = service.login("dev@d3.dev", PASSWORD);
+
+        AtomicInteger accepted = new AtomicInteger();
+        AtomicInteger rejected = new AtomicInteger();
+        CountDownLatch start = new CountDownLatch(1);
+        Callable<Void> refresh = () -> {
+            start.await(5, TimeUnit.SECONDS);
+            try {
+                service.refresh(issued.refreshToken());
+                accepted.incrementAndGet();
+            } catch (RefreshTokenRejectedException rejectedException) {
+                rejected.incrementAndGet();
+            }
+            return null;
+        };
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            Future<Void> one = executor.submit(refresh);
+            Future<Void> two = executor.submit(refresh);
+            start.countDown();
+            one.get(5, TimeUnit.SECONDS);
+            two.get(5, TimeUnit.SECONDS);
+        }
+
+        assertEquals(1, accepted.get());
+        assertEquals(1, rejected.get());
+        // The original token is spent and only the single winning rotation is live.
+        assertEquals(1, activeSessionCount());
+    }
+
+    @Test
+    void d3Sec001DisabledAccountCannotLogIn() {
+        repository.saveAccount(new Account(
+                UUID.randomUUID(), "dev", "dev@d3.dev", encoded(PASSWORD), "Dev", "DISABLED", CLOCK.instant()));
+
+        assertThrows(
+                com.ddd.d3.identity.application.InvalidCredentialsException.class,
+                () -> service.login("dev@d3.dev", PASSWORD));
     }
 
     @Test
@@ -98,6 +146,10 @@ class JdbcIdentityRepositoryTest {
     private static Account account(String email, String handle) {
         return new Account(
                 UUID.randomUUID(), handle, email, "hash", "Name", Account.ACTIVE, CLOCK.instant());
+    }
+
+    private static String encoded(String rawPassword) {
+        return new BCryptPasswordEncoder().encode(rawPassword);
     }
 
     private long sessionCount() {

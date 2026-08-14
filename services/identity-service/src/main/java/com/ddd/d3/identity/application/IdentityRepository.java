@@ -20,7 +20,8 @@ public interface IdentityRepository {
 
     Optional<RefreshSession> findSessionByTokenHash(String tokenHash);
 
-    void revokeSession(UUID sessionId, Instant revokedAt);
+    /** @return true if this call revoked a still-active session; false if it was already revoked (lost the race). */
+    boolean revokeSession(UUID sessionId, Instant revokedAt);
 
     void revokeAllSessions(UUID userId, Instant revokedAt);
 }

@@ -13,4 +13,8 @@ public record Account(
         Instant createdAt) {
 
     public static final String ACTIVE = "ACTIVE";
+
+    public boolean isActive() {
+        return ACTIVE.equals(status);
+    }
 }

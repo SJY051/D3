@@ -1,5 +1,6 @@
 package com.ddd.d3.identity.adapter.persistence;
 
+import com.ddd.d3.identity.application.DuplicateAccountException;
 import com.ddd.d3.identity.application.IdentityRepository;
 import com.ddd.d3.identity.domain.Account;
 import com.ddd.d3.identity.domain.RefreshSession;
@@ -10,6 +11,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 public final class JdbcIdentityRepository implements IdentityRepository {
@@ -32,23 +34,28 @@ public final class JdbcIdentityRepository implements IdentityRepository {
 
     @Override
     public void saveAccount(Account account) {
-        jdbcClient.sql("""
-                        insert into user_account (
-                            id, handle, email, password_hash, display_name, status,
-                            created_at, updated_at
-                        ) values (
-                            :id, :handle, :email, :passwordHash, :displayName, :status,
-                            :createdAt, :createdAt
-                        )
-                        """)
-                .param("id", account.id())
-                .param("handle", account.handle())
-                .param("email", account.email())
-                .param("passwordHash", account.passwordHash())
-                .param("displayName", account.displayName())
-                .param("status", account.status())
-                .param("createdAt", Timestamp.from(account.createdAt()))
-                .update();
+        try {
+            jdbcClient.sql("""
+                            insert into user_account (
+                                id, handle, email, password_hash, display_name, status,
+                                created_at, updated_at
+                            ) values (
+                                :id, :handle, :email, :passwordHash, :displayName, :status,
+                                :createdAt, :createdAt
+                            )
+                            """)
+                    .param("id", account.id())
+                    .param("handle", account.handle())
+                    .param("email", account.email())
+                    .param("passwordHash", account.passwordHash())
+                    .param("displayName", account.displayName())
+                    .param("status", account.status())
+                    .param("createdAt", Timestamp.from(account.createdAt()))
+                    .update();
+        } catch (DuplicateKeyException conflict) {
+            // A concurrent registration won the email/handle unique constraint.
+            throw new DuplicateAccountException();
+        }
     }
 
     @Override
@@ -104,14 +111,14 @@ public final class JdbcIdentityRepository implements IdentityRepository {
     }
 
     @Override
-    public void revokeSession(UUID sessionId, Instant revokedAt) {
-        jdbcClient.sql("""
+    public boolean revokeSession(UUID sessionId, Instant revokedAt) {
+        return jdbcClient.sql("""
                         update refresh_session set revoked_at = :revokedAt
                         where id = :id and revoked_at is null
                         """)
                 .param("revokedAt", Timestamp.from(revokedAt))
                 .param("id", sessionId)
-                .update();
+                .update() == 1;
     }
 
     @Override
