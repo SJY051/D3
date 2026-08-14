@@ -79,4 +79,19 @@ class CommunityControllerTest {
 
         verify(service, never()).createPublicPost(any(), any(), any());
     }
+
+    @Test
+    void d3Sec001AppliesTheBodyLimitToEncodedPostPaths() throws Exception {
+        String oversized = "{\"markdown\":\"" + "x".repeat(CommunityRequestSizeFilter.MAX_REQUEST_BYTES) + "\"}";
+
+        mockMvc.perform(post("/v1/community/posts")
+                        .with(request -> {
+                            request.setRequestURI("/v1/community/%70osts");
+                            return request;
+                        })
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(oversized))
+                .andExpect(status().isPayloadTooLarge());
+    }
 }

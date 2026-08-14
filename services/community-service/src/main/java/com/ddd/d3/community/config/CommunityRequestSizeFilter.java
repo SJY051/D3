@@ -15,6 +15,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UriUtils;
 import tools.jackson.databind.ObjectMapper;
 
 public final class CommunityRequestSizeFilter extends OncePerRequestFilter {
@@ -32,7 +33,7 @@ public final class CommunityRequestSizeFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String requestUri = request.getRequestURI();
         String contextPath = request.getContextPath();
-        String path = stripMatrixParameters(requestUri.substring(contextPath.length()));
+        String path = stripMatrixParameters(UriUtils.decode(requestUri.substring(contextPath.length()), StandardCharsets.UTF_8));
         return !("POST".equals(request.getMethod()) && POST_PATH.equals(path));
     }
 
