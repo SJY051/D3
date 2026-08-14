@@ -8,7 +8,8 @@ import {
 } from "./local-start-config.mjs";
 import {
   assertSynchronousRunCompleted,
-  hasChildExited,
+  createChildCompletionTracker,
+  createChildFailureReporter,
   mergeRequestedExitCode,
   StartupCancelledError,
 } from "./local-start-lifecycle.mjs";
@@ -17,6 +18,7 @@ const windows = process.platform === "win32";
 const gradle = windows ? "gradlew.bat" : "./gradlew";
 const pnpm = windows ? "pnpm.cmd" : "pnpm";
 const children = [];
+const childCompletion = createChildCompletionTracker();
 let shuttingDown = false;
 let requestedExitCode;
 let shutdownTask;
@@ -66,17 +68,31 @@ function start(name, command, args, env = environment) {
   const child = spawn(command, args, { cwd: process.cwd(), env, stdio: "inherit" });
   child.name = name;
   children.push(child);
-  child.once("exit", (code, signal) => {
-    const handleUnexpectedExit = () => {
+  const reportFailure = createChildFailureReporter(({ detail, defer }) => {
+    const handleUnexpectedFailure = () => {
       if (shuttingDown) return;
-      console.error(`local-start: ${name} exited early (${signal ?? code})`);
+      console.error(`local-start: ${name} ${detail}`);
       void shutdown(1);
     };
-    if (signal === "SIGINT" || signal === "SIGTERM") {
-      setImmediate(handleUnexpectedExit);
+    if (defer) {
+      setImmediate(handleUnexpectedFailure);
     } else {
-      handleUnexpectedExit();
+      handleUnexpectedFailure();
     }
+  });
+  child.once("error", (error) => {
+    childCompletion.markCompleted(child);
+    reportFailure({
+      detail: `failed to start (${error.code ?? "unknown error"})`,
+      defer: false,
+    });
+  });
+  child.once("exit", (code, signal) => {
+    childCompletion.markCompleted(child);
+    reportFailure({
+      detail: `exited early (${signal ?? code})`,
+      defer: signal === "SIGINT" || signal === "SIGTERM",
+    });
   });
   return child;
 }
@@ -135,13 +151,13 @@ async function shutdown(exitCode = 0) {
   startupAbort.abort();
   shutdownTask = (async () => {
     for (const child of children.toReversed()) {
-      if (!hasChildExited(child)) child.kill("SIGTERM");
+      if (!childCompletion.hasCompleted(child)) child.kill("SIGTERM");
     }
     await Promise.all(children.map((child) => new Promise((resolve) => {
-      if (hasChildExited(child)) return resolve();
+      if (childCompletion.hasCompleted(child)) return resolve();
       child.once("exit", resolve);
       setTimeout(() => {
-        if (!hasChildExited(child)) child.kill("SIGKILL");
+        if (!childCompletion.hasCompleted(child)) child.kill("SIGKILL");
         resolve();
       }, 5_000).unref();
     })));

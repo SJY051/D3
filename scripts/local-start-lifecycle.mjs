@@ -15,6 +15,28 @@ export function assertSynchronousRunCompleted(result, command) {
   if (result.status !== 0) throw new Error(`${command} exited with ${result.status}`);
 }
 
+export function createChildFailureReporter(onFailure) {
+  let reported = false;
+  return (failure) => {
+    if (reported) return false;
+    reported = true;
+    onFailure(failure);
+    return true;
+  };
+}
+
+export function createChildCompletionTracker() {
+  const completed = new WeakSet();
+  return {
+    markCompleted(child) {
+      completed.add(child);
+    },
+    hasCompleted(child) {
+      return completed.has(child) || hasChildExited(child);
+    },
+  };
+}
+
 export function hasChildExited(child) {
   return child.exitCode != null || child.signalCode != null;
 }

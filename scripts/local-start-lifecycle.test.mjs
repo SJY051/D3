@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   assertSynchronousRunCompleted,
+  createChildFailureReporter,
+  createChildCompletionTracker,
   hasChildExited,
   mergeRequestedExitCode,
   StartupCancelledError,
@@ -49,4 +51,22 @@ test("local runtime recognizes both normal and signal child completion", () => {
   assert.equal(hasChildExited({ exitCode: null, signalCode: "SIGKILL" }), true);
   assert.equal(hasChildExited({ exitCode: null, signalCode: "SIGTERM" }), true);
   assert.equal(hasChildExited({ exitCode: null, signalCode: null }), false);
+});
+
+test("local runtime reports only the first asynchronous child failure", () => {
+  const failures = [];
+  const report = createChildFailureReporter((failure) => failures.push(failure));
+
+  assert.equal(report({ kind: "error", detail: "ENOENT" }), true);
+  assert.equal(report({ kind: "exit", detail: "1" }), false);
+  assert.deepEqual(failures, [{ kind: "error", detail: "ENOENT" }]);
+});
+
+test("local runtime marks a spawn-error child complete without an exit event", () => {
+  const tracker = createChildCompletionTracker();
+  const child = { exitCode: null, signalCode: null };
+
+  assert.equal(tracker.hasCompleted(child), false);
+  tracker.markCompleted(child);
+  assert.equal(tracker.hasCompleted(child), true);
 });
