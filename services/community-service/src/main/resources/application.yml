@@ -10,10 +10,6 @@ spring:
     url: ${COMMUNITY_DB_URL:jdbc:postgresql://localhost:5432/d3_community}
     username: ${COMMUNITY_DB_USER:d3_community}
     password: ${COMMUNITY_DB_PASSWORD:local-only}
-  jpa:
-    hibernate:
-      ddl-auto: validate
-
 eureka:
   client:
     service-url:
