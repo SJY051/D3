@@ -20,6 +20,8 @@ spring:
               uri: lb://identity-service
               predicates:
                 - Path=/api/v1/auth/**,/api/v1/users/**
+              filters:
+                - StripPrefix=1
             - id: battle-api
               uri: lb://battle-service
               predicates:

@@ -2,7 +2,7 @@
 
 - Owner: 윤서진 (development lead)
 - Status: Active operating baseline
-- Last verified: 2026-08-14 against `origin/main` at `4e39072`, live GitHub state and AWS schedule group `d3-judge0-20260814-16`
+- Last verified: 2026-08-14 against `origin/main` at `3bde910`, live GitHub state and AWS schedule group `d3-judge0-20260814-16`
 - Scope: M-01 through M-10 and D3-QLT-001
 - Target: freeze a demonstrable release candidate on 2026-08-19 and present it on 2026-08-20
 
@@ -34,6 +34,7 @@ local sign-in
 | --- | --- | --- | --- |
 | [#25](https://github.com/SJY051/D3/pull/25) | `david3123123` | **MERGED** | Windows에서 계약 검증 경로를 정규화하는 단일 목적 수정이다. CI 5/5 통과 후 코멘트를 남기고 2026-08-14에 squash merge했다. Merge commit: `bf8db818753b6645eafc2573bfb181047bd3b5f4`. |
 | [#23](https://github.com/SJY051/D3/pull/23) | `SJY051` | **MERGED** | 플랫폼·DB migration 기반을 CI 5/5와 미해결 review thread 0건으로 마감하고 2026-08-14에 squash merge했다. Merge commit: `2f71323cc1eae59687ff3feae2b6d0b3ecd85b6f`. 병합을 막지 않은 legacy canonicalization P2는 [#32](https://github.com/SJY051/D3/issues/32)로 분리했다. |
+| [#34](https://github.com/SJY051/D3/pull/34) | `SJY051` | **MERGED** | P0 delivery control을 최신 main과 동기화하고 기존 review thread 3건을 해결했다. CI 5/5와 미해결 review thread 0건 후 2026-08-14에 squash merge했다. Merge commit: `3bde9100d1a87ff6a15fec0b5884acc9752c46cc`. |
 | [#26](https://github.com/SJY051/D3/pull/26) | `GledoubleN` | **REBASE BLOCKED** | 기존 CI 5/5는 성공했지만 최신 `main`과 충돌한다. #23과 #33의 forward-only migrations와 security chain을 보존하도록 rebase한 뒤 6.2의 통합 게이트를 재검증해야 한다. |
 | [#28](https://github.com/SJY051/D3/pull/28) | `david3123123` | **REBASE AND INTEGRATION REVIEW** | 임시 golden-path UI의 기존 CI 5/5는 성공했지만 최신 `main`보다 뒤처져 있다. rebase 후 실제 API adapter 경계와 P1 mock 비노출을 확인하고 #18의 부분 구현으로만 병합 판단한다. |
 | [#33](https://github.com/SJY051/D3/pull/33) | `SJY051` | **MERGED — PARTIAL #15** | legacy lifecycle/result 정규화, 단일-snapshot read, single-active-match fencing, viewer-relative v2 snapshot을 회귀 테스트로 보강했다. 최신 CI 5/5와 미해결 review thread 0건 후 2026-08-14에 squash merge했다. Merge commit: `4e390722d44f2d04c9a2b4020e62392c04edf9c7`. 마지막 non-blocking P2 세 건은 [#35](https://github.com/SJY051/D3/issues/35)로 이관했다. WebSocket/auth/Judge 연결과 두 세션 증거는 후속이며 #15 전체 완료로 표시하지 않는다. |
@@ -67,7 +68,7 @@ local sign-in
 | --- | --- | --- | --- | --- | --- | --- |
 | F0 Platform and migrations | [#11](https://github.com/SJY051/D3/issues/11), PR #23 / 기반 전체 | **윤서진** | 팀원 리뷰 | 완료 | 과거 checksum 보존, fresh install와 upgrade path, Compose/runtime preflight, CI와 bot/human review | **병합 완료** (`2f71323`) |
 | F1 Identity sessions | [#12](https://github.com/SJY051/D3/issues/12), PR #26 / M-01 | **임수혁** (`GledoubleN`) | 윤서진 통합 리뷰 | 즉시 rebase | #23/#33 기반 rebase, forward-only migration, 단일 security chain, Gateway path/anonymous allowlist, Gateway 경유 E2E | **충돌 해결 필요** |
-| F2 Cross-service auth and contracts | [#27](https://github.com/SJY051/D3/issues/27) / D3-SEC-001 | **윤서진** | 임수혁 지원 | 즉시 | Battle service token 발급·검증, canonical route, browser session transport, negative authorization evidence | 이슈 준비 완료, 미구현 |
+| F2 Cross-service auth and contracts | [#27](https://github.com/SJY051/D3/issues/27) / D3-SEC-001 | **윤서진** | 임수혁 지원 | 즉시 | Battle service token 발급·검증, canonical route, browser session transport, negative authorization evidence | **부분 구현**: Gateway canonical ingress와 Judge `token_use=service` negative evidence PASS; cookie/key lifecycle, Identity issuance, Battle acquisition PENDING |
 | B1 Ranked realtime lifecycle | [#15](https://github.com/SJY051/D3/issues/15), PR #33 / M-02, M-03 | **윤서진** | 임수혁 backend 지원 | #33 기반 병합 완료 | 두 client 매칭, server clock, reconnect, surrender, incident void, authenticated WS, Judge correlation | **부분 기반 병합** (`4e39072`): Battle 70 PASS, scaffold 7 SKIP, CI 5/5; authenticated WebSocket fan-out, Judge correlation과 두 세션 증거 PENDING |
 | B2 Outcome, rating and attack | [#16](https://github.com/SJY051/D3/issues/16) / M-05, M-06, M-07 | **윤서진** | 최정민 acceptance example 검토 | 계산식 테스트는 즉시 | versioned scoring, exactly-once rating/RP, reversible attack, result outbox, repeatable examples | 미구현 |
 | J0 Judge boundary | [#13](https://github.com/SJY051/D3/issues/13), [#14](https://github.com/SJY051/D3/issues/14) / M-04 | **윤서진** | 팀원 smoke 지원 | 완료 | app-to-host private-path smoke는 배포 통합 시 별도 증거로 남김 | 기반 완료; AWS host healthy, power schedule 5개 enabled, app/Judge0 smoke 대기 |
@@ -91,7 +92,7 @@ local sign-in
 - `POST /api/v1/auth/logout`
 - `GET/PATCH /api/v1/users/me`
 
-Gateway는 외부 `/api` prefix를 제거하고 Identity의 `/v1/...` 경로로 전달한다. register, login, refresh는 anonymous allowlist에 포함하고, logout 정책은 refresh credential 유무만으로 처리할지 access token도 요구할지 #26에서 명시한다. 그 외 API는 Gateway와 각 service 모두에서 인증·인가한다.
+Gateway는 외부 `/api` prefix를 정확히 한 번 제거하고 Identity의 `/v1/...` 경로로 전달한다. register, login, refresh는 anonymous allowlist에 포함한다. logout도 만료된 access token 없이 세션을 폐기할 수 있도록 Gateway에서는 익명 통과시키되, Identity가 rotating refresh cookie를 요구하고 폐기 결과를 idempotent하게 처리한다. 그 외 API는 Gateway와 각 service 모두에서 인증·인가한다.
 
 ### 5.2 Browser session transport
 
@@ -107,7 +108,8 @@ Battle은 사용자 access token을 Judge로 전달하지 않는다. Identity가
 
 - audience: `judge-service`
 - scope: 필요한 호출에 따라 `judge.submit` 또는 `judge.read`
-- client identity: `client_id` 또는 `azp`가 `battle-service`
+- client identity: `client_id`가 `battle-service`
+- service discriminator: `token_use`가 `service`
 - Judge negative test: 동일 audience/scope처럼 보여도 user token은 거부
 - key rotation과 clock skew는 Identity/Judge 양쪽 설정으로 명시
 
@@ -264,7 +266,7 @@ priority score = 3G + 2D + 2E + R - C
 
 ## 10. Immediate assignment queue
 
-1. **임수혁 (`GledoubleN`):** PR #26을 `4e39072` 이후 최신 `main`에 rebase하고 V1을 다시 쓰지 않은 채 migration/security 충돌을 해결한다. 재검증 전 기존 CI 성공을 현재 통과 증거로 재사용하지 않는다.
+1. **임수혁 (`GledoubleN`):** PR #26을 `3bde910` 이후 최신 `main`에 rebase하고 V1을 다시 쓰지 않은 채 migration/security 충돌을 해결한다. 재검증 전 기존 CI 성공을 현재 통과 증거로 재사용하지 않는다.
 2. **윤서진:** 매일 23:55 정지와 다음 운영일 09:00 시작 결과를 확인하고, Judge0 6-runtime smoke를 별도 증거로 남긴다.
 3. **윤서진:** #27에서 canonical Identity ingress, browser refresh transport, Battle-to-Judge service-token claim과 negative test 계약을 고정한다.
 4. **윤서진:** #33 병합 기반 위에서 #27 계약을 먼저 고정한 뒤 #15의 WebSocket transport/auth/fan-out과 Battle-to-Judge correlation을 후속 PR로 연결한다. #35는 정상 golden path가 막히지 않는 한 이 통합 뒤에 처리한다.

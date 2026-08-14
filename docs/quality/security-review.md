@@ -20,7 +20,7 @@ Review these surfaces when their implementation appears:
 | Control | Result | Evidence boundary |
 |---|---|---|
 | Browser ingress inventory | PASS in configuration test | Gateway exposes explicit Identity, Battle HTTP/WebSocket and Community routes; Judge has no browser route |
-| Authentication default | PARTIAL PASS | Gateway rejects unauthenticated API traffic and domain scaffolds deny non-health requests; live Identity JWT issuance and service authorization remain issue #12/#15 work |
+| Authentication default | PARTIAL PASS | Gateway allows only the four canonical session operations anonymously, strips the external `/api` prefix once, and rejects unauthenticated profile or undeclared auth paths. Identity cookie/session behavior and live user-token issuance remain issue #12/#27 work |
 | Correlation identifier | PASS in HTTP test | A bounded safe identifier is preserved and an invalid value is replaced before propagation; responses expose the effective identifier |
 | CORS | PASS in HTTP test | The configured browser origin receives a successful preflight, an untrusted origin is rejected, and methods and headers use an explicit allowlist |
 | Local listener isolation | PASS in configuration and helper test | `pnpm local:start` binds every Java child process to loopback by default; intentional non-loopback sharing requires an explicit operator override and separate discovery protection review |
@@ -48,7 +48,7 @@ Last verified: 2026-08-14 against issue #13 implementation, issue #14 and the bo
 
 | Control | Result | Evidence boundary |
 |---|---|---|
-| Service authentication and authorization | PASS in HTTP tests | JWT issuer, Judge audience, Battle service caller identity and endpoint scopes are required; anonymous, user-scope and wrong-service callers are rejected |
+| Service authentication and authorization | PASS in HTTP and validator tests | JWT issuer, Judge audience, `client_id=battle-service`, `token_use=service` and endpoint scopes are required; anonymous, user-scope, user-token, wrong-audience and wrong-service callers are rejected. Identity issuance and Battle acquisition remain PENDING |
 | Provider destination and credential handling | PARTIAL PASS | The adapter accepts one exact configured origin, sends one configured authentication header, bounds provider responses and exposes no credential; deployment egress restriction remains PENDING |
 | Execution option allowlist | PASS in adapter tests | Six language mappings and fixed CPU, wall-time, memory, process/thread, stack, file-size and disabled-network options are asserted before provider access |
 | Durable idempotency and recovery | PASS in container tests | PostgreSQL enforces one command key and request fingerprint; an opaque evaluation claim token fences stale workers; terminal evidence and outbox insertion share one transaction |
