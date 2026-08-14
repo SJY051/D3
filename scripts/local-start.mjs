@@ -82,7 +82,7 @@ function start(name, command, args, env = environment) {
       handleUnexpectedFailure();
     }
   });
-  child.once("error", (error) => {
+  child.on("error", (error) => {
     const spawnFailed = isChildSpawnFailure(child);
     if (spawnFailed) childCompletion.markCompleted(child);
     reportFailure({

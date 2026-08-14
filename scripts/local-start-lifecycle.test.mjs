@@ -113,8 +113,12 @@ test("local runtime reports cleanup failure when a child never exits", async () 
     pid: 42,
     exitCode: null,
     signalCode: null,
+    unrefCalls: 0,
     kill() {
       return false;
+    },
+    unref() {
+      this.unrefCalls += 1;
     },
   });
 
@@ -122,4 +126,5 @@ test("local runtime reports cleanup failure when a child never exits", async () 
     terminateChild(child, tracker, { gracefulMillis: 1, forcedMillis: 1 }),
     /fixture did not exit after SIGKILL/,
   );
+  assert.equal(child.unrefCalls, 1);
 });

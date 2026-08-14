@@ -72,6 +72,11 @@ export function terminateChild(
       if (settled) return;
       settled = true;
       cleanup();
+      try {
+        child.unref();
+      } catch {
+        // Cleanup still fails closed even if the handle cannot be released.
+      }
       reject(new Error(`${child.name ?? "child"} did not exit after SIGKILL`));
     };
     const handleExit = () => finish();
