@@ -4,8 +4,10 @@ import com.ddd.d3.battle.application.BattleMatchViewService;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -53,6 +55,12 @@ final class BattleWebSocketSessionRegistry {
         sessions.values().stream()
                 .filter(registration -> registration.matchId.equals(matchId))
                 .forEach(this::sendLatestQuietly);
+    }
+
+    Set<UUID> activeMatchIds() {
+        return sessions.values().stream()
+                .map(registration -> registration.matchId)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     void close(WebSocketSession session, CloseStatus status) {
