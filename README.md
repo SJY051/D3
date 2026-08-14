@@ -93,7 +93,7 @@ Vite가 출력한 로컬 주소에서 `/feed`, `/practice`, `/ranked` 등의 구
 pnpm local:start
 ```
 
-이 명령은 공용 인프라 기동, 애플리케이션 JAR 빌드, Config·Discovery 선행 기동, Web·Gateway·도메인 서비스 기동과 `demo:preflight`까지 순서대로 수행합니다. 모든 로컬 JVM은 기본적으로 `127.0.0.1`에만 바인딩되고 Eureka에도 같은 loopback 주소를 광고합니다. `READY` 후 `Ctrl+C`는 애플리케이션 프로세스를 종료하고 데이터 컨테이너는 유지합니다. 인프라는 필요할 때 `docker compose -f infra/compose.yaml stop`으로 중지합니다.
+이 명령은 공용 인프라가 healthy가 될 때까지 기다리고, 애플리케이션 JAR 빌드, Config·Discovery 선행 기동, Web·Gateway·도메인 서비스 기동과 `demo:preflight`까지 순서대로 수행합니다. 네 서비스의 JDBC URL은 공통 `D3_POSTGRES_HOST`와 `D3_POSTGRES_PORT`에서 생성됩니다. 모든 로컬 JVM은 기본적으로 `127.0.0.1`에만 바인딩되고 Eureka에도 같은 loopback 주소를 광고합니다. `READY` 후 `Ctrl+C`는 애플리케이션 프로세스를 종료하고 데이터 컨테이너는 유지합니다. 인프라는 필요할 때 `docker compose -f infra/compose.yaml stop`으로 중지합니다.
 
 judge-service는 로컬에서 결정론적 fake adapter를 기본으로 사용하며, 이는 API·영속성·이벤트 개발용이지 실제 코드 실행 증거가 아닙니다. real Judge0 adapter는 명시적으로 선택하고 사설 연결 preflight를 통과한 환경에서만 live 증거로 기록합니다. 로그인부터 결과 투영까지의 제품 시나리오는 아직 제공하지 않습니다.
 

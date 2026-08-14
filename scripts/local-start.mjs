@@ -1,7 +1,10 @@
 import { existsSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 
-import { resolveLocalEnvironment } from "./local-start-config.mjs";
+import {
+  resolveLocalDependencyComposeArgs,
+  resolveLocalEnvironment,
+} from "./local-start-config.mjs";
 
 const windows = process.platform === "win32";
 const gradle = windows ? "gradlew.bat" : "./gradlew";
@@ -104,7 +107,7 @@ process.once("SIGINT", () => void shutdown(0));
 process.once("SIGTERM", () => void shutdown(0));
 
 try {
-  run("docker", ["compose", "-f", "infra/compose.yaml", "up", "-d", "postgres", "redis", "kafka"]);
+  run("docker", resolveLocalDependencyComposeArgs());
   run(gradle, ["bootJar", "--no-configuration-cache"]);
 
   platform.forEach(startJava);
