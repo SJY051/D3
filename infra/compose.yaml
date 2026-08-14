@@ -8,6 +8,10 @@ services:
       POSTGRES_USER: ${D3_POSTGRES_ADMIN_USER:-d3_admin}
       POSTGRES_PASSWORD: ${D3_POSTGRES_ADMIN_PASSWORD:-local-admin}
       D3_SERVICE_DB_PASSWORD: ${D3_SERVICE_DB_PASSWORD:-local-only}
+      IDENTITY_DB_USER: ${IDENTITY_DB_USER:-d3_identity}
+      BATTLE_DB_USER: ${BATTLE_DB_USER:-d3_battle}
+      JUDGE_DB_USER: ${JUDGE_DB_USER:-d3_judge}
+      COMMUNITY_DB_USER: ${COMMUNITY_DB_USER:-d3_community}
     ports:
       - "127.0.0.1:${D3_POSTGRES_PORT:-5432}:5432"
     volumes:

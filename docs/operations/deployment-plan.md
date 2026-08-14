@@ -2,7 +2,7 @@
 
 Owner: 윤서진
 
-Status: Local baseline; developer account and isolated Judge0 host bound; application cloud resources and pipeline pending
+Status: Local runtime active; developer account and isolated Judge0 host bound; application cloud resources and pipeline pending
 
 Last verified: 2026-08-14 against the Compose model, CI scaffold, assigned account and Judge0 host boundary
 
@@ -10,7 +10,7 @@ Related: [cloud architecture](../architecture/cloud.md), [AWS CLI developer prof
 
 ## Deployment truth
 
-The assigned account `811221506617`, Seoul region and lead developer IAM login are confirmed. A dedicated, zero-ingress Judge0 EC2 host is bound and tracked in [`infra/judge/README.md`](../../infra/judge/README.md); its activation is separate from application deployment. The current GitHub Actions workflow validates the repository; it does not build or publish container images and does not deploy. ECR, ECS, RDS, ElastiCache, MSK, OIDC and Terraform state remain `UNKNOWN` until IAM, quota and service bindings are reviewed. The sequence below is the gated target, not evidence of an active application pipeline.
+The assigned account `811221506617`, Seoul region and lead developer IAM login are confirmed. A dedicated, zero-ingress Judge0 EC2 host is bound and tracked in [`infra/judge/README.md`](../../infra/judge/README.md); its activation is separate from application deployment. `pnpm local:start` has started the full local runtime and produced a green dependency preflight. The current GitHub Actions workflow validates the repository; it does not build or publish container images and does not deploy. ECR, ECS, RDS, ElastiCache, MSK, OIDC and Terraform state remain `UNKNOWN` until IAM, quota and service bindings are reviewed. The sequence below is the gated target, not evidence of an active application pipeline.
 
 ## Local profiles
 

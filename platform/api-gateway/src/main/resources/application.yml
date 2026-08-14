@@ -6,6 +6,41 @@ spring:
     name: api-gateway
   config:
     import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${D3_JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: identity-api
+              uri: lb://identity-service
+              predicates:
+                - Path=/api/v1/auth/**,/api/v1/users/**
+            - id: battle-api
+              uri: lb://battle-service
+              predicates:
+                - Path=/api/v1/battle/**
+            - id: battle-websocket
+              uri: lb:ws://battle-service
+              predicates:
+                - Path=/ws/v1/battle/**
+            - id: community-api
+              uri: lb://community-service
+              predicates:
+                - Path=/api/v1/community/**
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowed-origins:
+                  - ${D3_WEB_ORIGIN:http://localhost:5173}
+                allowed-methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+                allowed-headers: [Authorization, Content-Type, X-Correlation-Id, Idempotency-Key]
+                exposed-headers: [X-Correlation-Id]
+                allow-credentials: true
 
 eureka:
   client:
@@ -13,6 +48,11 @@ eureka:
       defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
 
 management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
   endpoints:
     web:
       exposure:

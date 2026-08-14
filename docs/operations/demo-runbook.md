@@ -2,9 +2,9 @@
 
 Owner: 최정민
 
-Status: Rehearsal baseline; live sequence blocked by Scenario A
+Status: Local start baseline active; live sequence blocked by Scenario A
 
-Last verified: 2026-08-13 against D3-UX-002 and the current preflight script
+Last verified: 2026-08-14 against D3-UX-002 and the executable local start/preflight path
 
 Requirement: D3-UX-002
 
@@ -42,7 +42,7 @@ Credentials stay outside the repository and recording. Seeded demo identities mu
 | Scenarios B and C | Battle/Judge owners | Reconnect, surrender and incident void are deterministic | Blocked: behavior not implemented |
 | Six language runtimes | Judge owner | Versioned smoke cases pass on designated host | PASS for host: pinned Judge0 CE 1.13.1 matrix and 12/12 language cases |
 | Judge application route | 윤서진 | judge-service reaches the designated host through the source-SG-only path and repeats the sanitized six-runtime smoke | NOT RUN: private route and deployment egress PENDING |
-| Observability | 윤서진 | Health, correlation and failure views are identified | Baseline only |
+| Observability | 윤서진 | Health, correlation and failure views are identified | Local health and ingress correlation PASS; dashboards pending |
 | Deployment target | 윤서진 | Environment and rollback owner are bound | AWS `UNKNOWN`; local fallback planned |
 | Backup recording | 최정민 | Same build and real services are visibly labeled | Not recorded |
 
@@ -50,17 +50,17 @@ All gates required by the chosen live path must be green before announcing demo 
 
 ## Start and preflight
 
-The exact full-stack start command remains pending until the vertical slice defines its deployable profile. On the frozen environment:
+On the frozen local environment:
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm verify:scaffold
 ./gradlew build
 docker compose -f infra/compose.yaml config --quiet
-pnpm demo:preflight
+pnpm local:start
 ```
 
-`pnpm demo:preflight` requires Web, discovery, config, gateway, four domain services, PostgreSQL, Redis, Kafka, and the adapter selected for that build. The deterministic fake is the local-development default; the primary presentation must explicitly select and verify real Judge0. Preflight prints one JSON object per target and exits non-zero when any required target is unavailable. Archive the terminal output with the revision; a `NOT READY` result blocks the live path.
+`pnpm local:start` runs `demo:preflight` after all local processes become healthy. Preflight requires Web, discovery, config, gateway, four domain services, PostgreSQL, Redis, Kafka, and the adapter selected for that build. The deterministic fake is the local-development default; the primary presentation must explicitly select and verify real Judge0. Archive the terminal output with the revision; a `NOT READY` result blocks the live path.
 
 Before opening the browser, confirm:
 

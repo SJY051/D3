@@ -11,7 +11,10 @@ These rules make PostgreSQL behavior explicit for a team coming from MySQL or Ma
 - Use unquoted lowercase `snake_case` identifiers. PostgreSQL folds unquoted names to lowercase; quoted mixed-case names become permanently quote-sensitive.
 - Use `text` unless a length limit is a real domain invariant, `boolean` for flags, exact `numeric` for decimal quantities, and `timestamptz` for instants. Persist durations as explicit numeric units.
 - Keep ORM schema mutation disabled. `spring.jpa.hibernate.ddl-auto=validate`; Flyway is the only schema writer.
+- Treat an applied migration as immutable, including migrations used only by local persistent volumes. Evolve an existing schema with the next versioned migration and prove both fresh installation and upgrade from the previous version; never rewrite history to make the final schema look cleaner.
+- Register every migration in `scripts/migration-checksums.json`; `pnpm verify:migrations` rejects modified history and migration files missing from the manifest. Add the next migration and its checksum together. A checksum change for an existing entry requires an explicit recovery review and is not the normal schema-change path.
 - Encode invariants with `not null`, `unique`, foreign-key, and `check` constraints. PostgreSQL has no `add constraint if not exists`; write forward-only, reviewable migrations instead of vendor-specific guesses.
+- When a stronger constraint cannot be inferred safely for every legacy row, add it `NOT VALID` only with an upgrade test proving legacy preservation and new-write enforcement. Record the validation debt and close it with a later cleanup plus `validate constraint`; `NOT VALID` is not permission to skip enforcement for new data.
 - Use stable UUID aggregate IDs in public contracts. Prefer a pinned time-ordered UUID implementation if adopted by the whole team; do not add an unreviewed database extension merely to change ID format during the prototype.
 - Use `jsonb` only for genuinely variable metadata with a versioned reader. Frequently filtered or constrained fields stay typed columns.
 
@@ -32,3 +35,7 @@ These rules make PostgreSQL behavior explicit for a team coming from MySQL or Ma
 - Application roles are never superusers. Grant only their own database/schema privileges and keep migration credentials separate from runtime credentials in deployed environments.
 
 Every schema PR includes the Flyway migration, ownership and privacy impact, expected query shapes, required indexes, rollback/forward-fix note, and a PostgreSQL-backed integration test.
+
+## PR #23 pre-merge recovery note
+
+The Identity V2, Battle V2, Community V2 and Judge V3 files were introduced on the unmerged `chore/11-local-vertical-slice` branch and were not released to `main` or a shared application database. Automated review found that their first drafts could not upgrade every V1-valid shape without failure or loss, so this same PR rebinds those four checksums to the reviewed archive/quarantine transitions before release. A local volume that already applied an earlier branch-only draft is disposable review state and must be recreated; do not use `flyway repair` to bless the obsolete checksum. After merge, these rebound checksums become immutable under the normal rule above.

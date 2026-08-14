@@ -1,7 +1,7 @@
 # Security review boundary
 
 Owner: 윤서진  
-Status: Baseline checklist; Judge application review partially evidenced
+Status: Local ingress and Judge application review partially evidenced
 Requirement: D3-SEC-001
 
 Review these surfaces when their implementation appears:
@@ -14,6 +14,17 @@ Review these surfaces when their implementation appears:
 - event producer trust, schema validation, replay, outbox/inbox idempotency, and correlation data;
 - environment files, GitHub Actions permissions, container provenance, Terraform state, and AWS IAM;
 - Markdown rendering, code blocks, uploads if activated, and administrator operations.
+
+## Local platform ingress review
+
+| Control | Result | Evidence boundary |
+|---|---|---|
+| Browser ingress inventory | PASS in configuration test | Gateway exposes explicit Identity, Battle HTTP/WebSocket and Community routes; Judge has no browser route |
+| Authentication default | PARTIAL PASS | Gateway rejects unauthenticated API traffic and domain scaffolds deny non-health requests; live Identity JWT issuance and service authorization remain issue #12/#15 work |
+| Correlation identifier | PASS in HTTP test | A bounded safe identifier is preserved and an invalid value is replaced before propagation; responses expose the effective identifier |
+| CORS | PASS in HTTP test | The configured browser origin receives a successful preflight, an untrusted origin is rejected, and methods and headers use an explicit allowlist |
+| Local listener isolation | PASS in configuration and helper test | `pnpm local:start` binds every Java child process to loopback by default; intentional non-loopback sharing requires an explicit operator override and separate discovery protection review |
+| Health exposure | PASS in full local preflight | Only health/info are public on secured scaffold services; health details are not exposed |
 
 ## Judge0 activation review
 

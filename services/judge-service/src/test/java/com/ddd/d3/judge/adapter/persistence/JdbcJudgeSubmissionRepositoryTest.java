@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -44,12 +45,13 @@ class JdbcJudgeSubmissionRepositoryTest {
     private static final Instant COMPLETED_AT = Instant.parse("2026-08-13T12:00:01Z");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private DriverManagerDataSource dataSource;
     private JdbcClient jdbc;
     private JdbcJudgeSubmissionRepository repository;
 
     @BeforeEach
     void migrateAndReset() {
-        var dataSource = new DriverManagerDataSource(
+        dataSource = new DriverManagerDataSource(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
         Flyway.configure().dataSource(dataSource).load().migrate();
@@ -176,6 +178,197 @@ class JdbcJudgeSubmissionRepositoryTest {
 
         JudgeSubmission recovered = repository.claimForEvaluation(SUBMISSION_ID).orElseThrow();
         assertTrue(recovered.evaluationStartedAt() != null);
+    }
+
+    @Test
+    void d3Jdg001RejectsAttemptNumbersThatDoNotMatchTheSubmissionMode() {
+        assertThrows(DataIntegrityViolationException.class, () -> insertRawSubmission("SUBMIT", null));
+        assertThrows(DataIntegrityViolationException.class, () -> insertRawSubmission("RUN", 1));
+
+        assertEquals(1, insertRawSubmission("RUN", null));
+    }
+
+    @Test
+    void d3Btl003StoresAtMostOneRuntimeMeasurementPerSizeTier() {
+        repository.insertOrGet(queuedSubmission());
+        JudgeSubmission running = repository.claimForEvaluation(SUBMISSION_ID).orElseThrow();
+        running = repository.markEvaluationStarted(SUBMISSION_ID, running.evaluationClaimId());
+        SafeEvaluationEvidence duplicateTierEvidence = new SafeEvaluationEvidence(
+                SUBMISSION_ID,
+                JudgeStatus.ACCEPTED,
+                SubmissionMode.SUBMIT,
+                JudgeLanguage.PYTHON3,
+                UUID.fromString("55555555-5555-4555-8555-555555555555"),
+                1,
+                3,
+                3,
+                List.of(
+                        new RuntimeMeasurement("SMALL", 100, 3, 700),
+                        new RuntimeMeasurement("SMALL", 100, 3, 710)),
+                "judge0-ce-1.13.1",
+                "Python 3.8.1",
+                "judge-evidence-v1",
+                COMPLETED_AT);
+
+        JudgeSubmission completed = running.complete(duplicateTierEvidence);
+        assertThrows(DataIntegrityViolationException.class, () -> repository.completeEvaluation(completed));
+        assertEquals(0, jdbc.sql("select count(*) from judge_run").query(Integer.class).single());
+    }
+
+    @Test
+    void d3Qlt001UpgradesExistingJudgeEvidenceWithoutChangingV1OrV2() {
+        migrateOnlyThrough("2");
+        UUID submissionId = UUID.randomUUID();
+        UUID legacyNullAttemptSubmissionId = UUID.randomUUID();
+        UUID judgeRunId = UUID.randomUUID();
+        UUID weakerEvidenceId = UUID.fromString("77777777-7777-4777-8777-777777777777");
+        UUID representativeEvidenceId = UUID.fromString("88888888-8888-4888-8888-888888888888");
+        insertRawSubmission(submissionId, "RUN", null);
+        insertRawSubmission(legacyNullAttemptSubmissionId, "SUBMIT", null);
+        assertEquals(1, jdbc.sql("update submission set status = 'ACCEPTED' where id = :id")
+                .param("id", submissionId)
+                .update());
+        assertEquals(1, jdbc.sql("""
+                        insert into judge_run (
+                            id, submission_id, adapter_version, runtime_version, status,
+                            passed_count, total_count, completed_at, correlation_id
+                        ) values (
+                            :id, :submissionId, 'legacy-adapter', 'legacy-runtime', 'ACCEPTED',
+                            1, 1, now(), 'corr-upgrade'
+                        )
+                        """)
+                .param("id", judgeRunId)
+                .param("submissionId", submissionId)
+                .update());
+        assertEquals(2, jdbc.sql("""
+                        insert into evaluation_evidence (
+                            id, judge_run_id, tier, input_size, sample_count,
+                            median_runtime_micros, created_at
+                        ) values (
+                            :weakerId, :judgeRunId, 'SMALL', 100, 3, 700,
+                            timestamptz '2026-08-13 00:00:00+00'
+                        ), (
+                            :representativeId, :judgeRunId, 'SMALL', 200, 5, 900,
+                            timestamptz '2026-08-12 00:00:00+00'
+                        )
+                        """)
+                .param("weakerId", weakerEvidenceId)
+                .param("representativeId", representativeEvidenceId)
+                .param("judgeRunId", judgeRunId)
+                .update());
+
+        int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
+
+        assertEquals(1, applied);
+        assertEquals(1, jdbc.sql("select count(*) from submission where id = :id")
+                .param("id", submissionId)
+                .query(Integer.class)
+                .single());
+        assertEquals(1, jdbc.sql("select count(*) from evaluation_evidence where judge_run_id = :id")
+                .param("id", judgeRunId)
+                .query(Integer.class)
+                .single());
+        assertEquals(representativeEvidenceId, jdbc.sql("""
+                        select id
+                        from evaluation_evidence
+                        where judge_run_id = :judgeRunId and tier = 'SMALL'
+                        """)
+                .param("judgeRunId", judgeRunId)
+                .query(UUID.class)
+                .single());
+        assertEquals(5, jdbc.sql("""
+                        select sample_count
+                        from evaluation_evidence
+                        where judge_run_id = :judgeRunId and tier = 'SMALL'
+                        """)
+                .param("judgeRunId", judgeRunId)
+                .query(Integer.class)
+                .single());
+        assertEquals(weakerEvidenceId, jdbc.sql("""
+                        select id
+                        from evaluation_evidence_legacy_duplicate
+                        where judge_run_id = :judgeRunId and tier = 'SMALL'
+                        """)
+                .param("judgeRunId", judgeRunId)
+                .query(UUID.class)
+                .single());
+        assertEquals(representativeEvidenceId, jdbc.sql("""
+                        select canonical_evidence_id
+                        from evaluation_evidence_legacy_duplicate
+                        where id = :id
+                        """)
+                .param("id", weakerEvidenceId)
+                .query(UUID.class)
+                .single());
+        assertEquals(700L, jdbc.sql("""
+                        select median_runtime_micros
+                        from evaluation_evidence_legacy_duplicate
+                        where id = :id
+                        """)
+                .param("id", weakerEvidenceId)
+                .query(Long.class)
+                .single());
+        assertEquals(1, jdbc.sql("""
+                        select attempt_number
+                        from submission
+                        where id = :id
+                        """)
+                .param("id", legacyNullAttemptSubmissionId)
+                .query(Integer.class)
+                .single());
+        assertEquals(1, jdbc.sql("""
+                        select normalized_attempt_number
+                        from submission_legacy_attempt_normalization
+                        where submission_id = :id and legacy_attempt_number is null
+                        """)
+                .param("id", legacyNullAttemptSubmissionId)
+                .query(Integer.class)
+                .single());
+        assertEquals(true, jdbc.sql("""
+                        select convalidated
+                        from pg_constraint
+                        where conname = 'submission_attempt_mode'
+                        """)
+                .query(Boolean.class)
+                .single());
+        assertEquals(
+                1,
+                repository.findById(legacyNullAttemptSubmissionId)
+                        .orElseThrow()
+                        .command()
+                        .attemptNumber());
+    }
+
+    private int insertRawSubmission(String mode, Integer attemptNumber) {
+        return insertRawSubmission(UUID.randomUUID(), mode, attemptNumber);
+    }
+
+    private int insertRawSubmission(UUID rowId, String mode, Integer attemptNumber) {
+        return jdbc.sql("""
+                        insert into submission (
+                            id, idempotency_key, user_id, match_id, problem_id, problem_version,
+                            mode, language_key, source_code, attempt_number, correlation_id,
+                            request_fingerprint, status, accepted_at
+                        ) values (
+                            :id, :idempotencyKey, :userId, :matchId, :problemId, 1,
+                            :mode, 'JAVA', 'fixture', :attemptNumber, 'corr-fixture',
+                            :fingerprint, 'QUEUED', now()
+                        )
+                        """)
+                .param("id", rowId)
+                .param("idempotencyKey", UUID.randomUUID())
+                .param("userId", UUID.randomUUID())
+                .param("matchId", UUID.randomUUID())
+                .param("problemId", UUID.randomUUID())
+                .param("mode", mode)
+                .param("attemptNumber", attemptNumber, java.sql.Types.INTEGER)
+                .param("fingerprint", "fingerprint-" + rowId)
+                .update();
+    }
+
+    private void migrateOnlyThrough(String version) {
+        Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
+        Flyway.configure().dataSource(dataSource).target(version).load().migrate();
     }
 
     private static JudgeSubmission queuedSubmission() {

@@ -2,7 +2,7 @@
 
 Owner: 윤서진
 
-Status: Judge boundary partially implemented; remaining services at baseline
+Status: Local platform active; Judge boundary partially implemented
 
 Last verified: 2026-08-14 against the MVP system constraints and public contract inventory
 
@@ -19,7 +19,7 @@ Gateway authentication does not replace service authorization. Every domain serv
 
 ## Communication rules
 
-- Battle requests judge job acceptance synchronously through a versioned client boundary, then persists the returned stable submission ID with its match, player, attempt, `RUN`/`SUBMIT` mode and stable command ID before acknowledging acceptance. Distinct `RUN` commands receive distinct command IDs without incrementing the submission attempt; retries reuse the original ID.
+- Battle requests judge job acceptance synchronously through a versioned client boundary, then persists the returned stable submission ID with its match, player, attempt, `RUN`/`SUBMIT` mode and stable command ID before acknowledging acceptance. The job row is the sole accepted-submission correlation: only a positive-attempt `SUBMIT` may become accepted, and at most one accepted submit exists per match player. Distinct `RUN` commands receive distinct command IDs without incrementing the submission attempt; retries reuse the original ID.
 - Judge publishes `submission.judged.v1` after durable evaluation.
 - Battle publishes `match.finished.v1` and `rating.changed.v1` from an outbox after committing the result.
 - Battle commits each player's named speed, dynamic-efficiency and submission-discipline score components plus the calculation/weight version atomically with the final total and result; later configuration changes never rewrite that historical explanation.
@@ -28,6 +28,10 @@ Gateway authentication does not replace service authorization. Every domain serv
 - A projection may be stale, but it must retain the authoritative aggregate ID and version.
 
 ## Contract activation state
+
+Issue #11 activates the local platform boundary: Config Server serves the versioned `local-v1` profile, Eureka registers the Gateway and four domain services, and Gateway declares only Identity, Battle HTTP/WebSocket and Community browser routes. Judge remains an internal service boundary and has no browser route. Gateway health is public, other ingress requires a bearer token, and a bounded `X-Correlation-Id` is preserved or generated at ingress. Identity, Battle and Community deny non-health requests until their product security contracts are implemented.
+
+Each domain database now has a service-owned forward-only Flyway chain aligned with this document's logical ERD. Previously applied V1 migrations remain immutable; Identity, Battle and Community reach the normalized model through V2, while Judge preserves V1/V2 and strengthens its model through V3. Upgrade normalization never silently discards a V1-valid row: ambiguous refresh lineages, accepted-submission pointers, duplicate judge correlations, legacy null attempt numbers and duplicate runtime evidence retain an explicit legacy record, while an untypable Community projection remains as a `REBUILD_REQUIRED` placeholder referenced by existing posts and its original payload enters a rebuild queue for authoritative event replay. A legacy Judge SUBMIT with no attempt is assigned a deterministic positive attempt before it can enter the active dispatcher, preventing an invalid row from starving the bounded queue. Battle constraints that cannot be inferred safely for every historical row are installed `NOT VALID`, which still enforces all new writes; a later evidence-backed cleanup migration must validate them. Identity keeps new refresh-token rotation inside one user's single-use lineage. Battle derives new accepted-submission state from its owned judge-job correlation instead of maintaining a second pointer. Community stores valid match seats as distinct typed UUIDs and reconstructs the public event array at its boundary. Container tests prove both fresh installation and adversarial existing-data upgrade; Battle additionally proves Redis and Kafka connectivity. These migrations provide persistence boundaries, not completed Identity, Battle or Community behavior.
 
 Judge HTTP v1 has service-authenticated `RUN`/`SUBMIT` handlers, idempotent acceptance with a stable submission ID, and a bounded evidence read containing the minimum correctness and repeated size-tier runtime summary required by Battle. Judge persists the private command and safe evidence in its PostgreSQL database, fences asynchronous evaluation claims, and commits the terminal evidence with a `submission.judged.v1` outbox record before Kafka publication. Public responses and events omit source, hidden cases, provider credentials, compiler commands, and raw diagnostics.
 
