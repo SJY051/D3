@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ddd.d3.battle.application.ActiveRankedMatchConflictException;
+import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.OptimisticMatchConflictException;
 import com.ddd.d3.battle.application.RankedMatchStore;
@@ -15,6 +16,7 @@ import com.ddd.d3.battle.application.RankedQueueStore;
 import com.ddd.d3.battle.domain.BattleMatch;
 import com.ddd.d3.battle.domain.RankedMatchmaker;
 import com.ddd.d3.battle.infrastructure.persistence.JdbcBattleMatchRepository;
+import com.ddd.d3.battle.infrastructure.persistence.JdbcBattleConnectionGenerationSource;
 import com.ddd.d3.battle.infrastructure.persistence.JdbcBattleCommandReceiptStore;
 import com.ddd.d3.battle.infrastructure.persistence.JdbcRankedMatchStore;
 import com.ddd.d3.battle.infrastructure.persistence.JdbcPublicRatingReader;
@@ -94,7 +96,7 @@ class BattleInfrastructureIntegrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(7, migrations);
+        assertEquals(8, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -111,6 +113,18 @@ class BattleInfrastructureIntegrationTest {
                         "outbox_event",
                         "inbox_event"),
                 tables);
+    }
+
+    @Test
+    void d3Btl002AllocatesMonotonicTransportGenerationsFromPostgres() {
+        JdbcBattleConnectionGenerationSource generations =
+                new JdbcBattleConnectionGenerationSource(dataSource);
+
+        long first = generations.nextGeneration();
+        long second = generations.nextGeneration();
+
+        assertTrue(first > 0);
+        assertEquals(first + 1, second);
     }
 
     @Test
@@ -305,6 +319,8 @@ class BattleInfrastructureIntegrationTest {
 
         BattleMatch match = BattleMatch.restore(matches.findById(created.matchId()).orElseThrow(), clock);
         assertEquals(BattleMatch.ConnectionState.CONNECTING, match.connectionState(first.playerId().toString()));
+        applyAndSave(matches, match, new BattleMatch.Reconnect(first.playerId().toString(), 1));
+        applyAndSave(matches, match, new BattleMatch.Reconnect(second.playerId().toString(), 2));
         applyAndSave(matches, match, new BattleMatch.Ready(first.playerId().toString()));
         applyAndSave(matches, match, new BattleMatch.Ready(second.playerId().toString()));
         applyAndSave(matches, match, new BattleMatch.Start(Duration.ofMinutes(10)));
@@ -396,6 +412,15 @@ class BattleInfrastructureIntegrationTest {
                 Duration.ofMinutes(10),
                 new TransactionTemplate(transactionManager),
                 matchId -> {});
+        BattleConnectionService connections = new BattleConnectionService(
+                matches,
+                new JdbcBattleConnectionGenerationSource(dataSource),
+                Clock.fixed(Instant.parse("2026-08-14T00:00:00Z"), ZoneOffset.UTC),
+                new TransactionTemplate(transactionManager),
+                matchId -> {},
+                3);
+        long firstGeneration = connections.connected(created.matchId(), first.playerId()).generation();
+        long secondGeneration = connections.connected(created.matchId(), second.playerId()).generation();
         UUID firstCommand = UUID.randomUUID();
         UUID secondCommand = UUID.randomUUID();
 
@@ -403,26 +428,42 @@ class BattleInfrastructureIntegrationTest {
                 created.matchId(),
                 firstCommand,
                 first.playerId(),
+                firstGeneration,
                 new BattleMatch.Ready(first.playerId().toString()));
         BattleMatch.Snapshot running = commands.handle(
                 created.matchId(),
                 secondCommand,
                 second.playerId(),
+                secondGeneration,
                 new BattleMatch.Ready(second.playerId().toString()));
         BattleMatch.Snapshot replayed = commands.handle(
                 created.matchId(),
                 secondCommand,
                 second.playerId(),
+                secondGeneration,
                 new BattleMatch.Ready(second.playerId().toString()));
+        connections.connected(created.matchId(), first.playerId());
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> commands.handle(
+                        created.matchId(),
+                        UUID.randomUUID(),
+                        first.playerId(),
+                        firstGeneration,
+                        new BattleMatch.Surrender(first.playerId().toString())));
 
         assertEquals(BattleMatch.State.RUNNING, running.state());
-        assertEquals(3, running.aggregateVersion());
+        assertEquals(5, running.aggregateVersion());
         assertEquals(running, replayed);
+        assertEquals(
+                BattleMatch.State.RUNNING,
+                matches.findById(created.matchId()).orElseThrow().state());
         assertEquals(2, jdbc.sql("select count(*) from match_command_receipt where match_id = :matchId")
                 .param("matchId", created.matchId())
                 .query(Integer.class)
                 .single());
-        assertEquals(3L, jdbc.sql("select aggregate_version from match where id = :matchId")
+        assertEquals(6L, jdbc.sql("select aggregate_version from match where id = :matchId")
                 .param("matchId", created.matchId())
                 .query(Long.class)
                 .single());
@@ -750,7 +791,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(6, applied);
+        assertEquals(7, applied);
         assertEquals(1, jdbc.sql("""
                         select count(*)
                         from judge_job_reference
@@ -929,7 +970,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(6, applied);
+        assertEquals(7, applied);
         assertEquals(1, jdbc.sql("select count(*) from match where id = :id")
                 .param("id", matchId)
                 .query(Integer.class)

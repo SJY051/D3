@@ -2,6 +2,8 @@ package com.ddd.d3.battle.adapter.websocket;
 
 import com.ddd.d3.battle.infrastructure.redis.RedisBattleSnapshotChannel;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -25,6 +27,15 @@ class BattleSnapshotFanoutConfiguration {
         executor.setQueueCapacity(256);
         executor.setThreadNamePrefix("battle-snapshot-");
         return executor;
+    }
+
+    @Bean(name = "battleDisconnectRetryScheduler", destroyMethod = "shutdown")
+    ScheduledExecutorService battleDisconnectRetryScheduler() {
+        return Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "battle-disconnect-retry");
+            thread.setDaemon(true);
+            return thread;
+        });
     }
 
     @Bean

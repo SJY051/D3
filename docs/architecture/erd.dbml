@@ -181,7 +181,7 @@ Table battle_db.match_player {
   reconnect_deadline_at timestamptz
   queue_ticket_id uuid [note: 'User-scoped HTTP idempotency ticket; null on legacy rows']
   ready boolean [not null, default: false]
-  connection_generation bigint [not null, default: 0]
+  connection_generation bigint [not null, default: 0, note: 'Latest server-issued transport generation; active while DISCONNECTED and completed while CONNECTED. Allocated from battle_connection_generation_seq and never accepted from a client.']
   attempts int [not null, default: 0]
   score numeric [note: 'Committed total; null before result calculation']
   speed_score_component numeric [note: 'Committed D3-BTL-003 speed component; null before result calculation']

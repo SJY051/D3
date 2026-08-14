@@ -1,6 +1,7 @@
 package com.ddd.d3.battle.adapter.websocket;
 
 import com.ddd.d3.battle.application.BattleMatchCommandService;
+import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchNotFoundException;
 import com.ddd.d3.battle.application.CommandIdConflictException;
 import com.ddd.d3.battle.application.OptimisticMatchConflictException;
@@ -26,14 +27,17 @@ final class BattleWebSocketHandler extends TextWebSocketHandler implements SubPr
     static final String APPLICATION_PROTOCOL = "d3.battle.v2";
     private static final int MAX_COMMAND_BYTES = 4096;
     private final BattleWebSocketSessionRegistry sessions;
+    private final BattleConnectionService connections;
     private final BattleMatchCommandService commands;
     private final ObjectReader commandReader;
 
     BattleWebSocketHandler(
             BattleWebSocketSessionRegistry sessions,
+            BattleConnectionService connections,
             BattleMatchCommandService commands,
             ObjectMapper objectMapper) {
         this.sessions = Objects.requireNonNull(sessions, "sessions must not be null");
+        this.connections = Objects.requireNonNull(connections, "connections must not be null");
         this.commands = Objects.requireNonNull(commands, "commands must not be null");
         ObjectMapper commandMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null")
                 .rebuild()
@@ -54,7 +58,12 @@ final class BattleWebSocketHandler extends TextWebSocketHandler implements SubPr
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        sessions.register(session);
+        UUID matchId = BattleWebSocketSessionRegistry.requiredAttribute(
+                session, BattleWebSocketHandshakeInterceptor.MATCH_ID_ATTRIBUTE, UUID.class);
+        UUID viewerId = BattleWebSocketSessionRegistry.requiredAttribute(
+                session, BattleWebSocketHandshakeInterceptor.VIEWER_ID_ATTRIBUTE, UUID.class);
+        BattleConnectionService.ConnectionLease lease = connections.connected(matchId, viewerId);
+        sessions.register(session, lease.generation());
     }
 
     void publishLocal(UUID matchId) {
@@ -93,10 +102,12 @@ final class BattleWebSocketHandler extends TextWebSocketHandler implements SubPr
         }
 
         try {
+            long connectionGeneration = sessions.requiredGeneration(session);
             commands.handle(
                     sessionMatchId,
                     command.commandId(),
                     viewerId,
+                    connectionGeneration,
                     command.toDomain(viewerId));
         } catch (BattleMatchNotFoundException
                 | CommandIdConflictException

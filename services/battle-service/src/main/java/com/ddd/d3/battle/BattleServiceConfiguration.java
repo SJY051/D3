@@ -1,6 +1,8 @@
 package com.ddd.d3.battle;
 
 import com.ddd.d3.battle.application.BattleCommandReceiptStore;
+import com.ddd.d3.battle.application.BattleConnectionGenerationSource;
+import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.BattleMatchRepository;
 import com.ddd.d3.battle.application.BattleMatchViewService;
@@ -64,6 +66,23 @@ class BattleServiceConfiguration {
                 matchDuration,
                 new TransactionTemplate(transactionManager),
                 snapshots);
+    }
+
+    @Bean
+    BattleConnectionService battleConnectionService(
+            BattleMatchRepository matches,
+            BattleConnectionGenerationSource generations,
+            Clock clock,
+            PlatformTransactionManager transactionManager,
+            BattleSnapshotPublisher snapshots,
+            @Value("${d3.battle.connection.maximum-attempts:3}") int maximumAttempts) {
+        return new BattleConnectionService(
+                matches,
+                generations,
+                clock,
+                new TransactionTemplate(transactionManager),
+                snapshots,
+                maximumAttempts);
     }
 
     @Bean
