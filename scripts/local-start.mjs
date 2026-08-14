@@ -6,7 +6,11 @@ import {
   resolveLocalEnvironment,
   resolveLocalWebServer,
 } from "./local-start-config.mjs";
-import { mergeRequestedExitCode } from "./local-start-lifecycle.mjs";
+import {
+  assertSynchronousRunCompleted,
+  mergeRequestedExitCode,
+  StartupCancelledError,
+} from "./local-start-lifecycle.mjs";
 
 const windows = process.platform === "win32";
 const gradle = windows ? "gradlew.bat" : "./gradlew";
@@ -53,8 +57,7 @@ const applications = [
 
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: process.cwd(), env: environment, stdio: "inherit" });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} exited with ${result.status}`);
+  assertSynchronousRunCompleted(result, command);
 }
 
 function start(name, command, args, env = environment) {
@@ -105,8 +108,6 @@ async function waitForHealth(target, timeoutMillis = 60_000) {
   }
   throw new Error(`${target.name} did not become healthy within ${timeoutMillis}ms`);
 }
-
-class StartupCancelledError extends Error {}
 
 function waitForRetry(delayMillis) {
   if (startupAbort.signal.aborted) throw new StartupCancelledError();

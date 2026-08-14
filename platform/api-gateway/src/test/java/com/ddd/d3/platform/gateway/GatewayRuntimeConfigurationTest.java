@@ -43,9 +43,10 @@ class GatewayRuntimeConfigurationTest {
                 .stream()
                 .collect(Collectors.toMap(RouteDefinition::getId, Function.identity()));
 
-        assertEquals(3, routes.size());
+        assertEquals(4, routes.size());
         assertEquals(URI.create("lb://identity-service"), routes.get("identity-api").getUri());
-        assertEquals(URI.create("lb://battle-service"), routes.get("battle-api-and-websocket").getUri());
+        assertEquals(URI.create("lb://battle-service"), routes.get("battle-api").getUri());
+        assertEquals(URI.create("lb:ws://battle-service"), routes.get("battle-websocket").getUri());
         assertEquals(URI.create("lb://community-service"), routes.get("community-api").getUri());
         assertTrue(routes.values().stream().noneMatch(route -> route.getUri().toString().contains("judge")));
     }

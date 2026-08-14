@@ -20,10 +20,14 @@ spring:
               uri: lb://identity-service
               predicates:
                 - Path=/api/v1/auth/**,/api/v1/users/**
-            - id: battle-api-and-websocket
+            - id: battle-api
               uri: lb://battle-service
               predicates:
-                - Path=/api/v1/battle/**,/ws/v1/battle/**
+                - Path=/api/v1/battle/**
+            - id: battle-websocket
+              uri: lb:ws://battle-service
+              predicates:
+                - Path=/ws/v1/battle/**
             - id: community-api
               uri: lb://community-service
               predicates:
