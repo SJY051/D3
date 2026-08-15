@@ -136,6 +136,25 @@ class HttpJudge0ClientTest {
     }
 
     @Test
+    void d3Jdg001RoundsHighPrecisionProviderTimeToMicroseconds() {
+        server.removeContext("/submissions");
+        server.createContext("/submissions", exchange -> {
+            if ("POST".equals(exchange.getRequestMethod())) {
+                respond(exchange, 201, "{\"token\":\"11111111-1111-4111-8111-111111111111\"}");
+            } else {
+                respond(
+                        exchange,
+                        200,
+                        "{\"status\":{\"description\":\"Accepted\"},\"time\":\"0.059333333333333\",\"memory\":2048}");
+            }
+        });
+
+        Judge0Result result = client.execute(request());
+
+        assertEquals(59_333, result.cpuTimeMicros());
+    }
+
+    @Test
     void d3Jdg001RetriesPollingWithTheSameTokenWithoutSubmittingAgain() {
         AtomicInteger posts = new AtomicInteger();
         AtomicInteger gets = new AtomicInteger();

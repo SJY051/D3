@@ -3,6 +3,7 @@ package com.ddd.d3.judge.adapter.judge0;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -222,7 +223,10 @@ public final class HttpJudge0Client implements Judge0Client {
             throw new Judge0ClientException("Judge0 omitted execution time for an accepted submission");
         }
         try {
-            long micros = new BigDecimal(value.asText()).movePointRight(6).longValueExact();
+            long micros = new BigDecimal(value.asText())
+                    .movePointRight(6)
+                    .setScale(0, RoundingMode.HALF_UP)
+                    .longValueExact();
             if (micros < 0) {
                 throw new Judge0ClientException("Judge0 returned a negative execution time");
             }
