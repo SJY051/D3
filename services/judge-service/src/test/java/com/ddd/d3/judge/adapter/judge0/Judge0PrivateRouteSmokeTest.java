@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -39,12 +40,17 @@ class Judge0PrivateRouteSmokeTest {
     @Test
     void d3Jdg001ExecutesEveryPinnedRuntimeThroughThePrivateApplicationRoute() {
         assertEquals(PRIVATE_JUDGE0_URI, configuredBaseUri());
-        Judge0ExecutionAdapter adapter = adapter();
+        RecordingJudge0Client client = client();
+        Judge0ExecutionAdapter adapter =
+                new Judge0ExecutionAdapter(client, new DemoJudgeProblemCatalog(), Clock.systemUTC());
 
         for (JudgeLanguage language : JudgeLanguage.values()) {
             assertTrue(adapter.isAvailable(language), () -> language + " must be available");
             JudgeExecutionResult result = adapter.execute(command(language));
-            assertEquals(JudgeStatus.ACCEPTED, result.status(), () -> language + " must be accepted");
+            assertEquals(
+                    JudgeStatus.ACCEPTED,
+                    result.status(),
+                    () -> language + " must be accepted; provider outcome: " + client.lastOutcome());
             assertEquals(1, result.passedCount(), () -> language + " must pass the public case");
             assertEquals(1, result.totalCount(), () -> language + " must run exactly the public case");
             assertEquals("judge0-ce-1.13.1", result.adapterVersion());
@@ -53,7 +59,7 @@ class Judge0PrivateRouteSmokeTest {
         }
     }
 
-    private static Judge0ExecutionAdapter adapter() {
+    private static RecordingJudge0Client client() {
         Judge0HttpSettings settings = new Judge0HttpSettings(
                 configuredBaseUri(),
                 configuredBaseUri(),
@@ -62,11 +68,10 @@ class Judge0PrivateRouteSmokeTest {
                 Duration.ofSeconds(10),
                 Duration.ofMillis(100),
                 Duration.ofSeconds(30));
-        Judge0Client client = new HttpJudge0Client(
+        return new RecordingJudge0Client(new HttpJudge0Client(
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build(),
                 new ObjectMapper(),
-                settings);
-        return new Judge0ExecutionAdapter(client, new DemoJudgeProblemCatalog(), Clock.systemUTC());
+                settings));
     }
 
     private static SubmissionCommand command(JudgeLanguage language) {
@@ -94,4 +99,35 @@ class Judge0PrivateRouteSmokeTest {
         }
         return value;
     }
+    private static final class RecordingJudge0Client implements Judge0Client {
+
+        private final Judge0Client delegate;
+        private String lastOutcome = "not executed";
+
+        private RecordingJudge0Client(Judge0Client delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public Set<Integer> availableLanguageIds() {
+            return delegate.availableLanguageIds();
+        }
+
+        @Override
+        public Judge0Result execute(Judge0Request request) {
+            try {
+                Judge0Result result = delegate.execute(request);
+                lastOutcome = result.statusDescription();
+                return result;
+            } catch (Judge0ClientException exception) {
+                lastOutcome = exception.getClass().getSimpleName() + ": " + exception.getMessage();
+                throw exception;
+            }
+        }
+
+        private String lastOutcome() {
+            return lastOutcome;
+        }
+    }
+
 }
