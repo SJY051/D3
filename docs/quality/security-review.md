@@ -1,7 +1,7 @@
 # Security review boundary
 
 Owner: 윤서진  
-Status: Local ingress and Judge application review partially evidenced
+Status: Local ingress and Judge production-adapter route evidenced; application deployment partially evidenced
 Requirement: D3-SEC-001
 
 Review these surfaces when their implementation appears:
@@ -29,7 +29,7 @@ Review these surfaces when their implementation appears:
 
 ## Judge0 activation review
 
-Last verified: 2026-08-14 against issue #13/#15 implementation, issue #14 and the bound AWS resources
+Last verified: 2026-08-15 against issue #13/#15/#59 implementation, issue #14 and the bound AWS resources
 
 | Control | Result | Evidence boundary |
 |---|---|---|
@@ -41,23 +41,23 @@ Last verified: 2026-08-14 against issue #13/#15 implementation, issue #14 and th
 | Privileged runtime containment | PASS with residual risk | Official server/worker containers require privileged mode; host is dedicated, zero-ingress, SSM-only, and contains no application workload |
 | Submission network and resource limits | PASS | Network opt-in rejected, executed outbound socket blocked, request ceilings rejected, and configured defaults plus per-request CPU/wall/memory/process/stack/file boundaries exercised |
 | Submission body-size limits | PASS at application boundary | Judge0 CE 1.13.1 has no field ceiling; issue #13 rejects the bounded HTTP body and UTF-8 source/stdin/expected-output fields before provider access, with negative tests |
-| Source and diagnostic privacy | PASS in bounded tests; live path NOT RUN | Host smoke found zero post-smoke secret/source log matches; application tests keep source, hidden input, credentials and raw provider diagnostics out of public responses and events |
-| Private service path | PENDING | Current public subnet is zero-ingress for bootstrap; source-SG-only Judge-service route is not bound |
+| Source and diagnostic privacy | PASS at host and production-adapter boundaries | Host smoke found zero post-smoke secret/source log matches. Issue #59 SSM command `a38944c3-8073-47de-b414-f3bd610acdf8` also verified that the production adapter's output contains no credential or source; application tests keep source, hidden input and raw provider diagnostics out of public responses and events |
+| Private service path | PASS for the temporary production-adapter route; deployment PENDING | Issue #59 allowed TCP 2358 only from a dedicated no-ingress application-runner SG, ran all six pinned mappings, removed the runner/SG/rule, and reconfirmed zero Judge0 ingress. A deployed Judge service must bind its own reviewed source SG |
 
 ## Judge application review
 
 | Control | Result | Evidence boundary |
 |---|---|---|
 | Service authentication and authorization | PASS in issuer, acquisition, HTTP and validator tests | Identity issues only short-lived `judge.submit`/`judge.read` tokens to the Basic-authenticated Battle client; Battle acquires them without browser credentials; Judge requires the trusted signature/issuer, explicit clock skew, `aud=judge-service`, `client_id=battle-service`, `token_use=service` and endpoint scope. Anonymous, user-scope, user-token, wrong-audience and wrong-service callers are rejected. |
-| Provider destination and credential handling | PARTIAL PASS | The adapter accepts one exact configured origin, sends one configured authentication header, bounds provider responses and exposes no credential; deployment egress restriction remains PENDING |
+| Provider destination and credential handling | PASS at the production adapter boundary; deployment PARTIAL | The adapter accepts one exact configured origin, sends one configured authentication header, bounds provider responses and exposes no credential. Issue #59 exercised that path from the exact source SG; persistent deployment egress binding remains PENDING |
 | Execution option allowlist | PASS in adapter tests | Six language mappings and fixed CPU, wall-time, memory, process/thread, stack, file-size and disabled-network options are asserted before provider access |
 | Durable idempotency and recovery | PASS in container tests | PostgreSQL enforces one command key and request fingerprint; an opaque evaluation claim token fences stale workers; terminal evidence and outbox insertion share one transaction |
 | Public response and event privacy | PASS in serialization tests | Safe evidence and `submission.judged.v1` omit source, hidden cases, compiler commands, provider credentials and raw diagnostics |
-| Real judge-service to AWS Judge0 call | NOT RUN | The real adapter path exists, but its intended source-security-group-only route is not bound; retain issue #14 host smoke as separate evidence |
+| Production adapter to AWS Judge0 | PASS | Issue #59 ran `HttpJudge0Client` and `Judge0ExecutionAdapter` over the source-SG-only private route for all six pinned runtimes with output-privacy checks; a deployed Judge HTTP service is NOT RUN |
 
 Judge0 submission POSTs are never retried because CE 1.13.1 exposes no idempotency key for that operation. Judge durably marks a claim before the first provider request. After a token is received, transient polling failures retry only the same token within the original absolute deadline; an ambiguous POST result or exhausted polling becomes one privacy-safe `PLATFORM_FAILURE` without replaying completed cases. Database completion retries reuse the same in-memory evidence, and stale recovery of a marked claim emits `PLATFORM_FAILURE` without calling Judge0 again. Provider token and per-case evidence are not persisted in this MVP, so a judge-service process loss can still leave an orphan provider job or discard a completed provider result, but it cannot replay marked provider work; durable continuation remains outside the current live-path claim.
 
-Host activation does not waive application review. The private route and deployment egress control remain PENDING and block a claim of real Judge service integration. Complete a final targeted diff review before issue #13 merge; unresolved Critical or High findings block merge.
+Host and production-adapter activation do not waive deployment review. The temporary route is removed; the real Judge-service source SG and persistent deployment egress control remain PENDING. Do not claim a deployed Judge HTTP service until those controls and an end-to-end service call are evidenced.
 
 Unresolved Critical or High findings block merge. Record an inapplicable result with evidence rather than suppressing the scanner or weakening a test.
 

@@ -8,7 +8,7 @@ Last verified: 2026-08-15 in account `811221506617`, region `ap-northeast-2`
 
 Requirements: D3-JDG-001, D3-UX-002, D3-SEC-001, M-04, M-10
 
-Judge0 is a private execution dependency of Judge service. Browser, Gateway, Battle, and Community must never call it directly. The real Judge adapter must normalize its response behind [`contracts/http/judge.openapi.json`](../../contracts/http/judge.openapi.json); activation of this host does not claim that application integration is complete.
+Judge0 is a private execution dependency of Judge service. Browser, Gateway, Battle, and Community must never call it directly. The real Judge adapter normalizes its response behind [`contracts/http/judge.openapi.json`](../../contracts/http/judge.openapi.json). Issue #59 proves the production adapter's private application-to-host route; it does not claim a deployed Judge HTTP service.
 
 ## Bound deployment
 
@@ -27,7 +27,7 @@ Judge0 is a private execution dependency of Judge service. Browser, Gateway, Bat
 
 The role has `AmazonSSMManagedInstanceCore` and one inline `secretsmanager:GetSecretValue` permission scoped to `d3/judge0/api-auth-token-*`. There is no SSH key pair or inbound SSH rule. IMDSv2 is required with hop limit 1; instance metadata tags are disabled.
 
-The current subnet assigns a public IPv4 address for outbound bootstrap because this VPC has no private egress path. Zero security-group ingress prevents the internet from reaching the API, and the 2026-08-14 external `:2358` probe timed out. This is an activation compromise, not the final private-subnet target. Before allowing Judge service traffic, add a source-security-group-only rule on the private address or move the host behind a reviewed private egress path; never add a public CIDR rule.
+The current subnet assigns a public IPv4 address for outbound bootstrap because this VPC has no private egress path. Zero security-group ingress prevents the internet from reaching the API, and the 2026-08-14 external `:2358` probe timed out. Issue #59 temporarily allowed TCP 2358 only from a dedicated application-runner security group and removed that rule after the smoke. Any deployed Judge service must use a reviewed source-security-group rule or a reviewed private egress path; never add a public CIDR rule.
 
 ## Pinned containers
 
@@ -130,6 +130,24 @@ Use SSM Run Command to inspect `systemctl status d3-judge0` and `docker-compose 
 
 Stop the instance when the team does not need live judging. Compute billing stops while it is stopped, but the EBS volume and Secrets Manager secret remain billable.
 
+## Application private-route smoke
+
+Issue #59 exercised the production `HttpJudge0Client` and `Judge0ExecutionAdapter` from a temporary SSM-managed application-side runner on 2026-08-15.
+
+| Binding | Evidence |
+|---|---|
+| Revision | `baffcbb8f48abebf2afb29af13a1ce77c4bab6b3` on `test/59-private-judge-route` |
+| Runner | `i-05ce54793f34afbe8`, `t3.small`, Amazon Linux 2023, private address `172.30.0.102` |
+| Network | VPC `vpc-0fed27f3f40fdcd72`, subnet `subnet-0928189f3c272e682`, no-ingress source SG `sg-04de140bbcf61e653` |
+| Authorization | Temporary `D3-Issue59-JudgeRouteRunner` role with SSM core plus `secretsmanager:GetSecretValue` scoped to the Judge0 token |
+| Judge route | Temporary TCP 2358 rule on `sg-0e3253c9132787639` referencing only `sg-04de140bbcf61e653`; no CIDR rule |
+| Passing command | SSM `a38944c3-8073-47de-b414-f3bd610acdf8`: six pinned `RUN` mappings PASS through the production adapter |
+| Privacy | Credential and source-output scans PASS; reports contain no source, token, hidden input, compiler diagnostics or provider submission token |
+
+The first build command (`6e5934e0-6c3e-42c6-889a-3936c1e9d7a3`) failed before execution because the runner had a JRE but no compiler. The first production-path diagnostic (`eadd086f-7453-4af0-a4f8-119f3dd24d79`) then exposed that high-precision Judge0 execution times were rejected instead of normalized; `HttpJudge0Client` now rounds seconds to microseconds with `HALF_UP`, defended by a focused HTTP-client test. A subsequent validation (`490d8980-c2c9-4cef-910b-f12250854eda`) isolated an incompatible TypeScript smoke fixture before the final pass.
+
+After evidence capture, the runner was terminated and its delete-on-termination root disk, source SG, SG ingress rule, instance profile and IAM role were removed. A post-cleanup read confirmed the designated Judge0 SG has zero ingress rules.
+
 ## Cleanup boundary
 
 Cleanup is destructive and requires a separate decision that this exact host is no longer needed. Resolve the exact resource IDs above, capture final evidence, and then remove in this order:
@@ -159,7 +177,7 @@ Do not delete the shared VPC, subnet, route table, internet gateway, account-lev
 | Startup environment hardening | PASS: local failure injection stops both startup paths for touch, ownership, mode and write failures; live files are `root:judge0 0640` after restart |
 | Runtime log privacy | PASS after overlay and secret rotation: 0 secret/source matches |
 | Reboot persistence | PASS: systemd active, cgroup v1, repository overlay hashes, authenticated Python execution, and zero secret log matches |
-| Real Judge service adapter | IMPLEMENTED with bounded HTTP, runtime mapping, normalization and privacy tests; Judge service-to-host source-security-group private route NOT RUN |
+| Real Judge service adapter | PASS at the application adapter boundary: issue #59 ran all six pinned runtime mappings over the source-security-group-only private route with authenticated production HTTP and safe normalization; deployed Judge HTTP service NOT RUN |
 | Designated-host performance calibration | NOT RUN; no performance claim |
 
 Primary upstream references: [Judge0 repository](https://github.com/judge0/judge0), [Judge0 changelog](https://github.com/judge0/judge0/blob/master/CHANGELOG.md), and [Judge0 API documentation](https://github.com/judge0/judge0/blob/master/public/docs.html).
