@@ -6,6 +6,9 @@ import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.BattleMatchRepository;
 import com.ddd.d3.battle.application.BattleMatchViewService;
+import com.ddd.d3.battle.application.BattleDeadlineClaimStore;
+import com.ddd.d3.battle.application.BattleDeadlineScheduler;
+import com.ddd.d3.battle.application.BattleDeadlineService;
 import com.ddd.d3.battle.application.BattleSnapshotPublisher;
 import com.ddd.d3.battle.application.PublicRatingReader;
 import com.ddd.d3.battle.application.RankedMatchStore;
@@ -14,6 +17,8 @@ import com.ddd.d3.battle.application.RankedQueueStore;
 import com.ddd.d3.battle.domain.RankedMatchmaker;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.concurrent.Executor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -88,5 +93,29 @@ class BattleServiceConfiguration {
     @Bean
     BattleMatchViewService battleMatchViewService(BattleMatchRepository matches, Clock clock) {
         return new BattleMatchViewService(matches, clock);
+    }
+
+    @Bean
+    BattleDeadlineService battleDeadlineService(
+            BattleDeadlineClaimStore claims,
+            BattleMatchRepository matches,
+            Clock clock,
+            PlatformTransactionManager transactionManager,
+            BattleSnapshotPublisher snapshots,
+            @Qualifier("battleSnapshotFanoutExecutor") Executor snapshotExecutor) {
+        return new BattleDeadlineService(
+                claims,
+                matches,
+                clock,
+                new TransactionTemplate(transactionManager),
+                snapshots,
+                snapshotExecutor);
+    }
+
+    @Bean
+    BattleDeadlineScheduler battleDeadlineScheduler(
+            BattleDeadlineService deadlines,
+            @Value("${d3.battle.deadline-driver.batch-size:25}") int batchSize) {
+        return new BattleDeadlineScheduler(deadlines, batchSize);
     }
 }

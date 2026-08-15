@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.ddd.d3.battle.application.ActiveRankedMatchConflictException;
 import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
+import com.ddd.d3.battle.application.BattleDeadlineService;
 import com.ddd.d3.battle.application.OptimisticMatchConflictException;
 import com.ddd.d3.battle.application.RankedMatchStore;
 import com.ddd.d3.battle.application.RankedMatchmakingCoordinator;
@@ -27,11 +28,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -125,6 +128,96 @@ class BattleInfrastructureIntegrationTest {
 
         assertTrue(first > 0);
         assertEquals(first + 1, second);
+    }
+
+    @Test
+    void d3Btl002ExpiresOnlyReconnectDeadlinesReachedByServerTime() {
+        Instant cutoff = Instant.parse("2026-08-14T00:00:00Z");
+        UUID expiredMatchId = createReconnectExpiryMatch(cutoff);
+        UUID pendingMatchId = createReconnectExpiryMatch(cutoff.plusMillis(1));
+        DataSourceTransactionManager transactionManager = new DataSourceTransactionManager(dataSource);
+        JdbcBattleMatchRepository matches = new JdbcBattleMatchRepository(dataSource, transactionManager);
+        List<UUID> published = new ArrayList<>();
+        BattleDeadlineService deadlines = new BattleDeadlineService(
+                matches,
+                matches,
+                Clock.fixed(cutoff, ZoneOffset.UTC),
+                new TransactionTemplate(transactionManager),
+                published::add,
+                Runnable::run);
+
+        assertEquals(1, deadlines.advanceDue(10));
+
+        BattleMatch.Snapshot expired = matches.findById(expiredMatchId).orElseThrow();
+        BattleMatch.Snapshot pending = matches.findById(pendingMatchId).orElseThrow();
+        assertEquals(BattleMatch.State.FINISHED, expired.state());
+        assertEquals(BattleMatch.ResolutionReason.DISCONNECT_TIMEOUT, expired.result().reason());
+        assertEquals(BattleMatch.State.RUNNING, pending.state());
+        assertEquals(List.of(expiredMatchId), published);
+    }
+
+    @Test
+    void d3Btl002AdvancesAMatchDeadlineBeforeItsLaterReconnectExpiry() {
+        Instant cutoff = Instant.parse("2026-08-14T00:00:00Z");
+        UUID matchId = createLifecycleDeadlineMatch(cutoff, cutoff.plusSeconds(20));
+        DataSourceTransactionManager transactionManager = new DataSourceTransactionManager(dataSource);
+        JdbcBattleMatchRepository matches = new JdbcBattleMatchRepository(dataSource, transactionManager);
+        List<UUID> published = new ArrayList<>();
+        BattleDeadlineService deadlines = new BattleDeadlineService(
+                matches,
+                matches,
+                Clock.fixed(cutoff, ZoneOffset.UTC),
+                new TransactionTemplate(transactionManager),
+                published::add,
+                Runnable::run);
+
+        assertEquals(1, deadlines.advanceDue(10));
+
+        BattleMatch.Snapshot advanced = matches.findById(matchId).orElseThrow();
+        assertEquals(BattleMatch.State.JUDGING, advanced.state());
+        assertEquals(null, advanced.result());
+        assertEquals(List.of(matchId), published);
+    }
+
+    @Test
+    void d3Btl002SkipsAnExpiredReconnectLockedByAnotherBattleInstance() throws Exception {
+        Instant cutoff = Instant.parse("2026-08-14T00:00:00Z");
+        UUID matchId = createReconnectExpiryMatch(cutoff);
+        DataSourceTransactionManager firstManager = new DataSourceTransactionManager(dataSource);
+        DataSourceTransactionManager secondManager = new DataSourceTransactionManager(dataSource);
+        JdbcBattleMatchRepository firstRepository = new JdbcBattleMatchRepository(dataSource, firstManager);
+        JdbcBattleMatchRepository secondRepository = new JdbcBattleMatchRepository(dataSource, secondManager);
+        TransactionTemplate firstTransaction = new TransactionTemplate(firstManager);
+        TransactionTemplate secondTransaction = new TransactionTemplate(secondManager);
+        CountDownLatch claimed = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+
+        try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+            Future<BattleMatch.Snapshot> first = executor.submit(() -> firstTransaction.execute(status -> {
+                BattleMatch.Snapshot snapshot = firstRepository
+                        .claimNextDue(cutoff)
+                        .orElseThrow();
+                claimed.countDown();
+                try {
+                    if (!release.await(5, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Reconnect expiry claim was not released");
+                    }
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Reconnect expiry claim was interrupted", interrupted);
+                }
+                return snapshot;
+            }));
+
+            assertTrue(claimed.await(5, TimeUnit.SECONDS));
+            assertEquals(Boolean.TRUE, secondTransaction.execute(status -> secondRepository
+                    .claimNextDue(cutoff)
+                    .isEmpty()));
+            release.countDown();
+            assertEquals(matchId.toString(), first.get(5, TimeUnit.SECONDS).matchId());
+        } finally {
+            release.countDown();
+        }
     }
 
     @Test
@@ -1154,6 +1247,59 @@ class BattleInfrastructureIntegrationTest {
                         """)
                 .param("id", matchId)
                 .param("problemId", problemId)
+                .update());
+        return matchId;
+    }
+
+    private UUID createReconnectExpiryMatch(Instant reconnectDeadline) {
+        return createLifecycleDeadlineMatch(reconnectDeadline.plus(Duration.ofMinutes(9)), reconnectDeadline);
+    }
+
+    private UUID createLifecycleDeadlineMatch(Instant matchDeadline, Instant reconnectDeadline) {
+        UUID problemId = createProblem();
+        UUID matchId = UUID.randomUUID();
+        UUID playerOneId = UUID.randomUUID();
+        UUID playerTwoId = UUID.randomUUID();
+        Instant startedAt = matchDeadline.minus(Duration.ofMinutes(10));
+        assertEquals(1, jdbc.sql("""
+                        insert into match (
+                            id, problem_id, ranked, status, result,
+                            server_started_at, deadline_at, aggregate_version, created_at
+                        ) values (
+                            :id, :problemId, true, 'RUNNING', null,
+                            :startedAt, :deadlineAt, 5, :createdAt
+                        )
+                        """)
+                .param("id", matchId)
+                .param("problemId", problemId)
+                .param("startedAt", Timestamp.from(startedAt))
+                .param("deadlineAt", Timestamp.from(startedAt.plus(Duration.ofMinutes(10))))
+                .param("createdAt", Timestamp.from(startedAt.minusSeconds(1)))
+                .update());
+        assertEquals(1, jdbc.sql("""
+                        insert into match_player (
+                            match_id, user_id, seat, language_key, ready,
+                            connection_state, connection_generation, reconnect_deadline_at
+                        ) values (
+                            :matchId, :playerId, 1, 'java', true,
+                            'DISCONNECTED', 1, :reconnectDeadline
+                        )
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", playerOneId)
+                .param("reconnectDeadline", Timestamp.from(reconnectDeadline))
+                .update());
+        assertEquals(1, jdbc.sql("""
+                        insert into match_player (
+                            match_id, user_id, seat, language_key, ready,
+                            connection_state, connection_generation
+                        ) values (
+                            :matchId, :playerId, 2, 'java', true,
+                            'CONNECTED', 2
+                        )
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", playerTwoId)
                 .update());
         return matchId;
     }

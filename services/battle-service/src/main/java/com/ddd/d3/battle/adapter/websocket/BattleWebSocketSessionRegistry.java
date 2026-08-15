@@ -4,8 +4,10 @@ import com.ddd.d3.battle.application.BattleMatchViewService;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -55,6 +57,12 @@ final class BattleWebSocketSessionRegistry {
                 .forEach(this::sendLatestQuietly);
     }
 
+    Set<UUID> activeMatchIds() {
+        return sessions.values().stream()
+                .map(registration -> registration.matchId)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
     void close(WebSocketSession session, CloseStatus status) {
         Registration registration = sessions.remove(session.getId());
         closeQuietly(session, status);
@@ -81,6 +89,11 @@ final class BattleWebSocketSessionRegistry {
     private void sendLatestQuietly(Registration registration) {
         try {
             sendLatest(registration);
+        } catch (SnapshotPreparationException exception) {
+            LOGGER.warn(
+                    "Battle snapshot read deferred; matchId={} sessionId={}",
+                    registration.matchId,
+                    registration.session.getId());
         } catch (IOException | RuntimeException exception) {
             evict(registration);
             LOGGER.warn(
@@ -97,13 +110,25 @@ final class BattleWebSocketSessionRegistry {
                 evict(registration);
                 return;
             }
-            var view = views.read(registration.matchId, registration.viewerId);
-            if (view.aggregateVersion() <= registration.lastSequence) {
+            PreparedSnapshot prepared = prepareLatest(registration);
+            if (prepared == null) {
                 return;
             }
+            registration.session.sendMessage(prepared.message());
+            registration.lastSequence = prepared.sequence();
+        }
+    }
+
+    private PreparedSnapshot prepareLatest(Registration registration) {
+        try {
+            var view = views.read(registration.matchId, registration.viewerId);
+            if (view.aggregateVersion() <= registration.lastSequence) {
+                return null;
+            }
             String payload = objectMapper.writeValueAsString(BattleSnapshotMessageV2.from(view));
-            registration.session.sendMessage(new TextMessage(payload));
-            registration.lastSequence = view.aggregateVersion();
+            return new PreparedSnapshot(view.aggregateVersion(), new TextMessage(payload));
+        } catch (RuntimeException exception) {
+            throw new SnapshotPreparationException(exception);
         }
     }
 
@@ -160,6 +185,15 @@ final class BattleWebSocketSessionRegistry {
             this.matchId = matchId;
             this.viewerId = viewerId;
             this.generation = generation;
+        }
+    }
+
+    private record PreparedSnapshot(long sequence, TextMessage message) {}
+
+    private static final class SnapshotPreparationException extends RuntimeException {
+
+        private SnapshotPreparationException(Exception cause) {
+            super(cause);
         }
     }
 }
