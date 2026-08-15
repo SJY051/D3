@@ -23,22 +23,26 @@ class BattleWebSocketCredentialWebFilterTest {
     private final BattleWebSocketCredentialWebFilter filter = new BattleWebSocketCredentialWebFilter();
 
     @Test
-    void d3Sec001ConvertsAndRemovesTheBrowserCredentialProtocol() {
-        MockServerWebExchange exchange = handshake(
-                BattleWebSocketCredentialWebFilter.APPLICATION_PROTOCOL + ", "
-                        + BattleWebSocketCredentialWebFilter.CREDENTIAL_PREFIX + TOKEN);
-        AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
+    void d3Sec001ConvertsAndRemovesTheBrowserCredentialProtocolForEveryApplicationVersion() {
+        for (String applicationProtocol : new String[] {
+            BattleWebSocketCredentialWebFilter.APPLICATION_PROTOCOL,
+            BattleWebSocketCredentialWebFilter.V3_APPLICATION_PROTOCOL
+        }) {
+            MockServerWebExchange exchange = handshake(
+                    applicationProtocol + ", " + BattleWebSocketCredentialWebFilter.CREDENTIAL_PREFIX + TOKEN);
+            AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
 
-        filter.filter(exchange, candidate -> {
-                    forwarded.set(candidate);
-                    return candidate.getResponse().setComplete();
-                })
-                .block();
+            filter.filter(exchange, candidate -> {
+                        forwarded.set(candidate);
+                        return candidate.getResponse().setComplete();
+                    })
+                    .block();
 
-        HttpHeaders headers = forwarded.get().getRequest().getHeaders();
-        assertEquals("Bearer " + TOKEN, headers.getFirst(HttpHeaders.AUTHORIZATION));
-        assertEquals(BattleWebSocketCredentialWebFilter.APPLICATION_PROTOCOL, headers.getFirst(PROTOCOL_HEADER));
-        assertFalse(headers.getFirst(PROTOCOL_HEADER).contains(TOKEN));
+            HttpHeaders headers = forwarded.get().getRequest().getHeaders();
+            assertEquals("Bearer " + TOKEN, headers.getFirst(HttpHeaders.AUTHORIZATION));
+            assertEquals(applicationProtocol, headers.getFirst(PROTOCOL_HEADER));
+            assertFalse(headers.getFirst(PROTOCOL_HEADER).contains(TOKEN));
+        }
     }
 
     @Test
@@ -46,6 +50,8 @@ class BattleWebSocketCredentialWebFilterTest {
         for (MockServerWebExchange exchange : new MockServerWebExchange[] {
             handshake(BattleWebSocketCredentialWebFilter.CREDENTIAL_PREFIX + TOKEN),
             handshake(BattleWebSocketCredentialWebFilter.APPLICATION_PROTOCOL + ", unknown"),
+            handshake(BattleWebSocketCredentialWebFilter.APPLICATION_PROTOCOL + ", "
+                    + BattleWebSocketCredentialWebFilter.V3_APPLICATION_PROTOCOL),
             handshake(BattleWebSocketCredentialWebFilter.APPLICATION_PROTOCOL + ", d3.jwt.not-a-jwt"),
             handshake(BattleWebSocketCredentialWebFilter.APPLICATION_PROTOCOL + ", d3.jwt." + TOKEN
                     + ", d3.jwt.other.payload.signature"),

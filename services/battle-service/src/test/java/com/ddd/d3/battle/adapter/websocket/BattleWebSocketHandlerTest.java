@@ -12,6 +12,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.ddd.d3.battle.application.BattleAttackService;
+import com.ddd.d3.battle.application.BattleAttackView;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchView;
@@ -193,6 +195,37 @@ class BattleWebSocketHandlerTest {
     }
 
     @Test
+    void d3Btl003DispatchesVersionThreeAttackCommandsFromTheAuthenticatedSession() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED));
+        BattleAttackService attacks = mock(BattleAttackService.class);
+        when(attacks.read(MATCH_ID, PLAYER_ONE)).thenReturn(attackView());
+        BattleMatchCommandService commands = mock(BattleMatchCommandService.class);
+        BattleConnectionService connections = mock(BattleConnectionService.class);
+        when(connections.connected(MATCH_ID, PLAYER_ONE))
+                .thenReturn(new BattleConnectionService.ConnectionLease(1));
+        BattleWebSocketHandler handler = handler(views, commands, connections, attacks);
+        WebSocketSession session = session("v3", PLAYER_ONE, BattleWebSocketHandler.V3_PROTOCOL);
+        handler.afterConnectionEstablished(session);
+
+        ArgumentCaptor<TextMessage> initial = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session).sendMessage(initial.capture());
+        JsonNode snapshot = objectMapper.readTree(initial.getValue().getPayload());
+        assertEquals(3, snapshot.path("version").asInt());
+        assertEquals(0, snapshot.path("payload").path("attack").path("selfEnergy").asInt());
+
+        handler.handleTextMessage(session, new TextMessage("""
+                {"type":"ATTACK_LAUNCH","version":3,"matchId":"%s","commandId":"%s","attackId":"attack-one"}
+                """.formatted(MATCH_ID, COMMAND_ONE)));
+
+        verify(attacks).launch(MATCH_ID, COMMAND_ONE, PLAYER_ONE, 1, "attack-one");
+        verifyNoInteractions(commands);
+        verify(session, never()).close(CloseStatus.BAD_DATA);
+        verify(session, never()).close(CloseStatus.POLICY_VIOLATION);
+    }
+
+    @Test
     void d3Sec001RejectsUnknownFieldsAndCrossMatchCommands() throws Exception {
         BattleMatchViewService views = mock(BattleMatchViewService.class);
         when(views.read(MATCH_ID, PLAYER_ONE))
@@ -305,12 +338,17 @@ class BattleWebSocketHandlerTest {
     }
 
     private static WebSocketSession session(String id, UUID viewerId) {
+        return session(id, viewerId, BattleWebSocketHandler.V2_PROTOCOL);
+    }
+
+    private static WebSocketSession session(String id, UUID viewerId, String protocol) {
         WebSocketSession session = mock(WebSocketSession.class);
         Map<String, Object> attributes = new HashMap<>();
         attributes.put(BattleWebSocketHandshakeInterceptor.MATCH_ID_ATTRIBUTE, MATCH_ID);
         attributes.put(BattleWebSocketHandshakeInterceptor.VIEWER_ID_ATTRIBUTE, viewerId);
         when(session.getId()).thenReturn(id);
         when(session.getAttributes()).thenReturn(attributes);
+        when(session.getAcceptedProtocol()).thenReturn(protocol);
         when(session.isOpen()).thenReturn(true);
         return session;
     }
@@ -343,6 +381,36 @@ class BattleWebSocketHandlerTest {
                 commands,
                 objectMapper);
     }
+    private BattleWebSocketHandler handler(
+            BattleMatchViewService views,
+            BattleMatchCommandService commands,
+            BattleConnectionService connections,
+            BattleAttackService attacks) {
+        return new BattleWebSocketHandler(
+                new BattleWebSocketSessionRegistry(
+                        views,
+                        attacks,
+                        new BattleDisconnectRetryQueue(
+                                connections,
+                                mock(ScheduledExecutorService.class),
+                                Duration.ofMillis(1)),
+                        objectMapper),
+                connections,
+                commands,
+                attacks,
+                objectMapper);
+    }
+
+    private static BattleAttackView attackView() {
+        return new BattleAttackView(
+                MATCH_ID,
+                0,
+                NOW,
+                0,
+                0,
+                null);
+    }
+
 
     private static BattleMatchView view(
             UUID self, UUID opponent, long version, BattleMatchView.ConnectionState opponentConnection) {

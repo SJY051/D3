@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d3.local/contracts/websocket/battle-event.v3.schema.json",
+  "title": "Battle WebSocket Snapshot v3",
+  "x-requirements": ["D3-BTL-003", "D3-SEC-001"],
+  "type": "object",
+  "required": ["type", "version", "matchId", "sequence", "serverTime", "payload"],
+  "properties": {
+    "type": { "const": "BATTLE_SNAPSHOT" },
+    "version": { "type": "integer", "const": 3 },
+    "matchId": { "type": "string", "format": "uuid" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "serverTime": { "type": "string", "format": "date-time" },
+    "payload": {
+      "type": "object",
+      "required": ["match", "attack"],
+      "properties": {
+        "match": { "$ref": "battle-event.v2.schema.json#/$defs/matchSnapshot" },
+        "attack": { "$ref": "#/$defs/attack" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "attack": {
+      "type": "object",
+      "required": ["selfEnergy", "opponentEnergy", "current"],
+      "properties": {
+        "selfEnergy": { "type": "integer", "minimum": 0 },
+        "opponentEnergy": { "type": "integer", "minimum": 0 },
+        "current": {
+          "oneOf": [
+            { "$ref": "#/$defs/currentAttack" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "currentAttack": {
+      "type": "object",
+      "required": ["attackId", "phase", "target", "warningDeadline", "overlayExpiresAt", "overlaySeed", "resolution"],
+      "properties": {
+        "attackId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "phase": { "enum": ["WARNING", "ACTIVE", "RESOLVED"] },
+        "target": { "enum": ["SELF", "OPPONENT"] },
+        "warningDeadline": { "type": "string", "format": "date-time" },
+        "overlayExpiresAt": { "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] },
+        "overlaySeed": { "type": "integer" },
+        "resolution": { "oneOf": [{ "enum": ["BLOCKED", "EXPIRED"] }, { "type": "null" }] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "phase": { "const": "WARNING" } }, "required": ["phase"] },
+          "then": { "properties": { "overlayExpiresAt": { "type": "null" }, "resolution": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "phase": { "const": "ACTIVE" } }, "required": ["phase"] },
+          "then": { "properties": { "overlayExpiresAt": { "type": "string", "format": "date-time" }, "resolution": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "phase": { "const": "RESOLVED" } }, "required": ["phase"] },
+          "then": { "properties": { "resolution": { "enum": ["BLOCKED", "EXPIRED"] } } }
+        }
+      ],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

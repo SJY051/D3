@@ -99,7 +99,7 @@ class BattleInfrastructureIntegrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(8, migrations);
+        assertEquals(9, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -110,6 +110,7 @@ class BattleInfrastructureIntegrationTest {
                         "judge_job_reference",
                         "judge_job_reference_legacy_duplicate",
                         "attack_event",
+                        "attack_event_legacy",
                         "match_command_receipt",
                         "rating",
                         "season_rank",
@@ -884,7 +885,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(7, applied);
+        assertEquals(8, applied);
         assertEquals(1, jdbc.sql("""
                         select count(*)
                         from judge_job_reference
@@ -1063,7 +1064,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(7, applied);
+        assertEquals(8, applied);
         assertEquals(1, jdbc.sql("select count(*) from match where id = :id")
                 .param("id", matchId)
                 .query(Integer.class)
@@ -1523,11 +1524,22 @@ class BattleInfrastructureIntegrationTest {
         return jdbc.sql("""
                         insert into attack_event (
                             id, match_id, sequence, actor_user_id, target_user_id,
-                            attack_type, resolution, energy_cost, occurred_at
+                            attack_type, resolution, energy_cost, occurred_at,
+                            payload_version, event_payload
                         ) values (
                             :id, :matchId,
                             (select coalesce(max(sequence), 0) + 1 from attack_event where match_id = :matchId),
-                            :actorId, :targetId, 'CAESAR', 'APPLIED', 1, now()
+                            :actorId, :targetId, 'CAESAR', 'APPLIED', 1, now(), 1,
+                            jsonb_build_object(
+                                'sequence', (select coalesce(max(sequence), 0) + 1
+                                             from attack_event where match_id = :matchId),
+                                'type', 'CAESAR',
+                                'playerId', cast(:actorId as text),
+                                'key', 'fixture',
+                                'energyDelta', -1,
+                                'energyAfter', 0,
+                                'occurredAt', '2026-08-15T00:00:00Z'
+                            )
                         )
                         """)
                 .param("id", UUID.randomUUID())
