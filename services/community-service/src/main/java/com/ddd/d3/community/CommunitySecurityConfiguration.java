@@ -31,7 +31,7 @@ public class CommunitySecurityConfiguration {
     JwtDecoder communityJwtDecoder(
             @Value("${d3.security.jwk-set-uri}") String jwkSetUri,
             @Value("${d3.security.issuer}") String issuer,
-            @Value("${d3.security.audience:community-service}") String audience) {
+            @Value("${d3.security.audience:d3-user}") String audience) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
         OAuth2TokenValidator<Jwt> issuerValidator = JwtValidators.createDefaultWithIssuer(issuer);
         OAuth2TokenValidator<Jwt> audienceValidator = new JwtClaimValidator<List<String>>(
