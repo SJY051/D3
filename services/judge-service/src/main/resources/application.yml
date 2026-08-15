@@ -38,6 +38,7 @@ d3:
     audience: ${D3_JWT_JUDGE_AUDIENCE:judge-service}
     allowed-client-id: ${D3_JWT_JUDGE_CLIENT_ID:battle-service}
     allowed-token-use: ${D3_JWT_SERVICE_TOKEN_USE:service}
+    clock-skew: ${D3_JWT_CLOCK_SKEW:30s}
   judge0:
     base-url: ${JUDGE0_BASE_URL:http://localhost:2358}
     allowed-origin: ${JUDGE0_ALLOWED_ORIGIN:http://localhost:2358}

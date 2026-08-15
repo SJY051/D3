@@ -48,7 +48,7 @@ Last verified: 2026-08-14 against issue #13/#15 implementation, issue #14 and th
 
 | Control | Result | Evidence boundary |
 |---|---|---|
-| Service authentication and authorization | PASS in HTTP and validator tests | JWT issuer, Judge audience, `client_id=battle-service`, `token_use=service` and endpoint scopes are required; anonymous, user-scope, user-token, wrong-audience and wrong-service callers are rejected. Identity issuance and Battle acquisition remain PENDING |
+| Service authentication and authorization | PASS in issuer, acquisition, HTTP and validator tests | Identity issues only short-lived `judge.submit`/`judge.read` tokens to the Basic-authenticated Battle client; Battle acquires them without browser credentials; Judge requires the trusted signature/issuer, explicit clock skew, `aud=judge-service`, `client_id=battle-service`, `token_use=service` and endpoint scope. Anonymous, user-scope, user-token, wrong-audience and wrong-service callers are rejected. |
 | Provider destination and credential handling | PARTIAL PASS | The adapter accepts one exact configured origin, sends one configured authentication header, bounds provider responses and exposes no credential; deployment egress restriction remains PENDING |
 | Execution option allowlist | PASS in adapter tests | Six language mappings and fixed CPU, wall-time, memory, process/thread, stack, file-size and disabled-network options are asserted before provider access |
 | Durable idempotency and recovery | PASS in container tests | PostgreSQL enforces one command key and request fingerprint; an opaque evaluation claim token fences stale workers; terminal evidence and outbox insertion share one transaction |
