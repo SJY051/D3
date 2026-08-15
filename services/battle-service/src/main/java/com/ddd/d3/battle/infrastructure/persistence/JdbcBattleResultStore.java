@@ -51,35 +51,57 @@ public final class JdbcBattleResultStore implements BattleResultStore {
     @Override
     public Optional<PendingMatch> claimNextReady() {
         Optional<UUID> candidate = jdbc.sql("""
-                        select battle_match.id
-                        from match battle_match
-                        where (
-                                battle_match.status = 'FINISHED'
-                                or (
-                                    battle_match.status = 'JUDGING'
-                                    and not exists (
-                                        select 1
-                                        from judge_job_reference judge_reference
-                                        where judge_reference.match_id = battle_match.id
-                                          and judge_reference.last_judge_status in ('QUEUED', 'RUNNING')
-                                    )
-                                    and not exists (
-                                        select 1
-                                        from judge_job_reference unsafe_reference
-                                        where unsafe_reference.match_id = battle_match.id
-                                          and unsafe_reference.mode = 'SUBMIT'
-                                          and unsafe_reference.last_judge_status not in ('QUEUED', 'RUNNING')
-                                          and unsafe_reference.evidence_version is null
+                        with ready_match as materialized (
+                            select candidate.id,
+                                   coalesce(candidate.finished_at, candidate.deadline_at) as ready_at
+                            from match candidate
+                            where (
+                                    candidate.status = 'FINISHED'
+                                    or (
+                                        candidate.status = 'JUDGING'
+                                        and not exists (
+                                            select 1
+                                            from judge_job_reference judge_reference
+                                            where judge_reference.match_id = candidate.id
+                                              and judge_reference.last_judge_status in ('QUEUED', 'RUNNING')
+                                        )
+                                        and not exists (
+                                            select 1
+                                            from judge_job_reference unsafe_reference
+                                            where unsafe_reference.match_id = candidate.id
+                                              and unsafe_reference.mode = 'SUBMIT'
+                                              and unsafe_reference.last_judge_status not in ('QUEUED', 'RUNNING')
+                                              and (
+                                                  unsafe_reference.evidence_version is null
+                                                  or unsafe_reference.runtime_measurements is null
+                                              )
+                                        )
                                     )
                                 )
-                            )
-                          and not exists (
-                              select 1
-                              from outbox_event outbox
-                              where outbox.aggregate_id = battle_match.id
-                                and outbox.event_type = 'match.finished'
-                          )
-                        order by coalesce(battle_match.finished_at, battle_match.deadline_at), battle_match.id
+                              and not exists (
+                                  select 1
+                                  from outbox_event outbox
+                                  where outbox.aggregate_id = candidate.id
+                                    and outbox.event_type = 'match.finished'
+                              )
+                        )
+                        select battle_match.id
+                        from ready_match candidate
+                        join match battle_match on battle_match.id = candidate.id
+                        where not exists (
+                            select 1
+                            from ready_match older
+                            where (older.ready_at, older.id) < (candidate.ready_at, candidate.id)
+                              and exists (
+                                  select 1
+                                  from match_player older_player
+                                  join match_player candidate_player
+                                    on candidate_player.match_id = candidate.id
+                                   and candidate_player.user_id = older_player.user_id
+                                  where older_player.match_id = older.id
+                              )
+                        )
+                        order by candidate.ready_at, candidate.id
                         limit 1
                         for update of battle_match skip locked
                         """)
@@ -242,6 +264,7 @@ public final class JdbcBattleResultStore implements BattleResultStore {
                           and player_user_id = :playerId
                           and mode = 'SUBMIT'
                           and last_judge_status not in ('QUEUED', 'RUNNING', 'PLATFORM_FAILURE')
+                          and runtime_measurements is not null
                         order by
                             case when last_judge_status = 'ACCEPTED' then 1 else 0 end desc,
                             case when total_count > 0 then passed_count::numeric / total_count else 0 end desc,
@@ -250,15 +273,18 @@ public final class JdbcBattleResultStore implements BattleResultStore {
                         """)
                 .param("matchId", matchId)
                 .param("playerId", playerId)
-                .query((resultSet, rowNumber) -> new JudgedPerformance(
-                        "ACCEPTED".equals(resultSet.getString("last_judge_status")),
-                        resultSet.getTimestamp("accepted_at").toInstant(),
-                        resultSet.getInt("passed_count"),
-                        resultSet.getInt("total_count"),
-                        runtimeMeasurements(resultSet.getString("runtime_measurements")),
-                        resultSet.getString("adapter_version"),
-                        resultSet.getString("runtime_version"),
-                        resultSet.getString("evidence_version")))
+                .query((resultSet, rowNumber) -> {
+                    Timestamp acceptedAt = resultSet.getTimestamp("accepted_at");
+                    return new JudgedPerformance(
+                            "ACCEPTED".equals(resultSet.getString("last_judge_status")),
+                            acceptedAt == null ? null : acceptedAt.toInstant(),
+                            resultSet.getInt("passed_count"),
+                            resultSet.getInt("total_count"),
+                            runtimeMeasurements(resultSet.getString("runtime_measurements")),
+                            resultSet.getString("adapter_version"),
+                            resultSet.getString("runtime_version"),
+                            resultSet.getString("evidence_version"));
+                })
                 .optional();
     }
 

@@ -22,6 +22,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -173,6 +174,101 @@ class JdbcBattleResultStoreIntegrationTest {
                 false));
     }
 
+    @Test
+    void legacyFinishedEvidenceWithoutRuntimeDataDoesNotPoisonResultCompletion() {
+        MatchFixture legacy = createFinishedMatch(
+                UUID.randomUUID(), UUID.randomUUID(), NOW.minusSeconds(30));
+        addLegacyEvidence(legacy.matchId(), legacy.playerOneId());
+        BattleResultService service = new BattleResultService(
+                results,
+                matches,
+                MatchScoreCalculator.initialWeights("score-v1"),
+                RatingProgressionCalculator.initialPolicy(),
+                ignored -> {},
+                clock,
+                transactions);
+
+        assertEquals(1, service.completeBatch(1));
+        assertEquals(1, count(
+                "select count(*) from outbox_event where event_type = 'match.finished'",
+                legacy.matchId(),
+                false));
+    }
+
+    @Test
+    void unsafeLegacyJudgingEvidenceDoesNotBlockANewerSafeResult() {
+        MatchFixture legacy = createJudgingMatch();
+        jdbc.sql("delete from judge_job_reference where match_id = :matchId")
+                .param("matchId", legacy.matchId())
+                .update();
+        addLegacyEvidence(legacy.matchId(), legacy.playerOneId());
+        jdbc.sql("update match set deadline_at = :deadline where id = :matchId")
+                .param("deadline", Timestamp.from(NOW.minusSeconds(30)))
+                .param("matchId", legacy.matchId())
+                .update();
+        MatchFixture safe = createJudgingMatch();
+        BattleResultService service = new BattleResultService(
+                results,
+                matches,
+                MatchScoreCalculator.initialWeights("score-v1"),
+                RatingProgressionCalculator.initialPolicy(),
+                ignored -> {},
+                clock,
+                transactions);
+
+        assertEquals(1, service.completeBatch(1));
+        assertEquals("JUDGING", value("select status from match where id = :id", legacy.matchId(), String.class));
+        assertEquals("FINISHED", value("select status from match where id = :id", safe.matchId(), String.class));
+    }
+
+    @Test
+    void concurrentClaimsPreserveResultOrderForTheSamePlayer() throws Exception {
+        UUID sharedPlayer = UUID.randomUUID();
+        MatchFixture older = createFinishedMatch(
+                sharedPlayer, UUID.randomUUID(), NOW.minusSeconds(30));
+        MatchFixture newer = createFinishedMatch(
+                sharedPlayer, UUID.randomUUID(), NOW.minusSeconds(10));
+        CountDownLatch olderClaimed = new CountDownLatch(1);
+        CountDownLatch releaseOlder = new CountDownLatch(1);
+
+        try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+            Future<UUID> first = executor.submit(() -> transactions.execute(status -> {
+                UUID claimed = results.claimNextReady().orElseThrow().matchId();
+                jdbc.sql("""
+                                insert into outbox_event (
+                                    id, aggregate_id, aggregate_version, event_type, payload, occurred_at
+                                ) values (
+                                    :id, :matchId, 99, 'match.finished', cast('{}' as jsonb), :occurredAt
+                                )
+                                """)
+                        .param("id", UUID.randomUUID())
+                        .param("matchId", claimed)
+                        .param("occurredAt", Timestamp.from(NOW))
+                        .update();
+                olderClaimed.countDown();
+                try {
+                    releaseOlder.await();
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("result claim test was interrupted", exception);
+                }
+                return claimed;
+            }));
+
+            assertTrue(olderClaimed.await(5, TimeUnit.SECONDS));
+            try {
+                var concurrent = transactions.execute(status -> results.claimNextReady());
+                assertTrue(concurrent != null && concurrent.isEmpty());
+            } finally {
+                releaseOlder.countDown();
+            }
+            assertEquals(older.matchId(), first.get());
+        }
+
+        UUID next = transactions.execute(status -> results.claimNextReady().orElseThrow().matchId());
+        assertEquals(newer.matchId(), next);
+    }
+
     private MatchFixture createFinishedVoidMatch() {
         MatchFixture match = createJudgingMatch();
         jdbc.sql("delete from judge_job_reference where match_id = :matchId")
@@ -230,6 +326,60 @@ class JdbcBattleResultStoreIntegrationTest {
         addAcceptedEvidence(matchId, playerOneId, NOW.minusSeconds(40), 18_000);
         addAcceptedEvidence(matchId, playerTwoId, NOW.minusSeconds(20), 36_000);
         return new MatchFixture(matchId, playerOneId, playerTwoId);
+    }
+
+    private MatchFixture createFinishedMatch(UUID playerOneId, UUID playerTwoId, Instant finishedAt) {
+        UUID problemId = UUID.randomUUID();
+        UUID matchId = UUID.randomUUID();
+        jdbc.sql("""
+                        insert into problem (
+                            id, slug, version, title, difficulty, active, created_at, updated_at
+                        ) values (
+                            :id, :slug, 4, 'Problem', 'GOLD', true, :createdAt, :createdAt
+                        )
+                        """)
+                .param("id", problemId)
+                .param("slug", "problem-" + problemId)
+                .param("createdAt", Timestamp.from(finishedAt.minusSeconds(120)))
+                .update();
+        jdbc.sql("""
+                        insert into match (
+                            id, problem_id, ranked, status, result, resolution_reason,
+                            server_started_at, deadline_at, finished_at, aggregate_version, created_at
+                        ) values (
+                            :id, :problemId, true, 'FINISHED', 'PLAYER_ONE_WIN', 'SURRENDER',
+                            :startedAt, :deadlineAt, :finishedAt, 5, :createdAt
+                        )
+                        """)
+                .param("id", matchId)
+                .param("problemId", problemId)
+                .param("startedAt", Timestamp.from(finishedAt.minusSeconds(60)))
+                .param("deadlineAt", Timestamp.from(finishedAt))
+                .param("finishedAt", Timestamp.from(finishedAt))
+                .param("createdAt", Timestamp.from(finishedAt.minusSeconds(120)))
+                .update();
+        addPlayer(matchId, playerOneId, 1);
+        addPlayer(matchId, playerTwoId, 2);
+        return new MatchFixture(matchId, playerOneId, playerTwoId);
+    }
+
+    private void addLegacyEvidence(UUID matchId, UUID playerId) {
+        jdbc.sql("""
+                        insert into judge_job_reference (
+                            submission_id, match_id, player_user_id, mode, command_id,
+                            attempt_number, last_judge_status, evidence_version, accepted_at, last_result_at
+                        ) values (
+                            :submissionId, :matchId, :playerId, 'SUBMIT', :commandId,
+                            1, 'WRONG_ANSWER', 'legacy-evidence-v1', :acceptedAt, :resultAt
+                        )
+                        """)
+                .param("submissionId", UUID.randomUUID())
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .param("commandId", UUID.randomUUID())
+                .param("acceptedAt", Timestamp.from(NOW.minusSeconds(30)))
+                .param("resultAt", Timestamp.from(NOW.minusSeconds(20)))
+                .update();
     }
 
     private void addPlayer(UUID matchId, UUID playerId, int seat) {
