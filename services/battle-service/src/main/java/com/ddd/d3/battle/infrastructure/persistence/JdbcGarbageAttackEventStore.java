@@ -14,7 +14,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 @Repository
-public final class JdbcGarbageAttackEventStore implements GarbageAttackEventStore {
+public class JdbcGarbageAttackEventStore implements GarbageAttackEventStore {
 
     private static final int CURRENT_PAYLOAD_VERSION = 1;
 

@@ -68,6 +68,22 @@ class BattleMatchViewServiceTest {
         assertEquals(NOW, view.result().resolvedAt());
     }
 
+    @Test
+    void d3Btl003MapsJudgedDraw() {
+        BattleMatch match = runningMatch();
+        match.handle(new BattleMatch.BeginJudging());
+        match.handle(new BattleMatch.CompleteJudging(null));
+        BattleMatchViewService service = service(match.snapshot());
+
+        BattleMatchView view = service.read(MATCH_ID, PLAYER_ONE);
+
+        assertEquals(BattleMatchView.State.FINISHED, view.state());
+        assertEquals(BattleMatchView.Outcome.DRAW, view.result().outcome());
+        assertNull(view.result().winnerId());
+        assertEquals(BattleMatchView.ResolutionReason.JUDGE_RESULT, view.result().reason());
+        assertEquals(NOW, view.result().resolvedAt());
+    }
+
     private static BattleMatch runningMatch() {
         BattleMatch match = new BattleMatch(
                 MATCH_ID.toString(), PLAYER_ONE.toString(), PLAYER_TWO.toString(), CLOCK);

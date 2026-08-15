@@ -38,6 +38,7 @@ public record BattleMatchView(
         SURRENDER,
         DISCONNECT_TIMEOUT,
         PLATFORM_INCIDENT,
+        JUDGE_RESULT,
         LEGACY_IMPORT
     }
 

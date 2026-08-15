@@ -24,7 +24,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 @Repository
-public final class JdbcBattleResultStore implements BattleResultStore {
+public class JdbcBattleResultStore implements BattleResultStore {
 
     private final JdbcClient jdbc;
     private final ObjectMapper objectMapper;

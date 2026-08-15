@@ -12,7 +12,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public final class JdbcBattleOutboxStore implements BattleOutboxStore {
+public class JdbcBattleOutboxStore implements BattleOutboxStore {
 
     private final JdbcClient jdbc;
 

@@ -94,6 +94,7 @@ class JdbcBattleResultStoreIntegrationTest {
 
         assertEquals(0, service.completeBatch(1));
         assertEquals("FINISHED", value("select status from match where id = :id", match.matchId(), String.class));
+        assertEquals("FINISHED", matches.findById(match.matchId()).orElseThrow().state().name());
         assertEquals("PLAYER_ONE_WIN", value("select result from match where id = :id", match.matchId(), String.class));
         assertEquals("JUDGE_RESULT", value(
                 "select resolution_reason from match where id = :id", match.matchId(), String.class));
@@ -139,6 +140,28 @@ class JdbcBattleResultStoreIntegrationTest {
         assertFalse(payloads.stream().anyMatch(payload -> payload.contains("sourceCode")
                 || payload.contains("hiddenTests")
                 || payload.contains("credential")));
+    }
+
+    @Test
+    void d3Btl003RestoresADrawWhenNeitherPlayerSubmits() {
+        MatchFixture match = createJudgingMatch();
+        jdbc.sql("delete from judge_job_reference where match_id = :matchId")
+                .param("matchId", match.matchId())
+                .update();
+        BattleResultService service = new BattleResultService(
+                results,
+                matches,
+                MatchScoreCalculator.initialWeights("score-v1"),
+                RatingProgressionCalculator.initialPolicy(),
+                ignored -> {},
+                clock,
+                transactions);
+
+        assertEquals(1, service.completeBatch(1));
+        assertEquals("FINISHED", matches.findById(match.matchId()).orElseThrow().state().name());
+        assertEquals(
+                "DRAW",
+                value("select result from match where id = :id", match.matchId(), String.class));
     }
 
     @Test

@@ -10,7 +10,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public final class JdbcBattleCommandReceiptStore implements BattleCommandReceiptStore {
+public class JdbcBattleCommandReceiptStore implements BattleCommandReceiptStore {
 
     private final JdbcClient jdbc;
 

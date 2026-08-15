@@ -18,7 +18,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
-public final class JdbcRankedMatchStore implements RankedMatchStore {
+public class JdbcRankedMatchStore implements RankedMatchStore {
 
     private final JdbcClient jdbc;
     private final TransactionTemplate transactions;

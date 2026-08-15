@@ -17,7 +17,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
-public final class JdbcBattleMatchRepository implements BattleMatchRepository, BattleDeadlineClaimStore {
+public class JdbcBattleMatchRepository implements BattleMatchRepository, BattleDeadlineClaimStore {
 
     private final JdbcClient jdbc;
     private final TransactionTemplate transactions;
