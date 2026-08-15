@@ -1,9 +1,3 @@
-URL: https://raw.githubusercontent.com/SJY051/D3/d99829d905ab7ff729bc878c6edc83f23bd3096c/services/identity-service/src/main/resources/db/migration/V2__strengthen_refresh_session_lineage.sql
-Content-Type: text/plain
-Method: text
-
----
-
 create table refresh_session_legacy_normalization (
     session_id uuid primary key,
     user_id uuid not null,
