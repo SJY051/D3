@@ -67,6 +67,8 @@ Operation:   Problem list → Inspect → Activate / bounded edit
 ```
 
 ## WF-04 — Active battle (`/battles/:matchId`)
+Status: Approved by SJY051 on 2026-08-15 for Issue #48.
+
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -81,7 +83,7 @@ Operation:   Problem list → Inspect → Activate / bounded edit
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-The timer, connection state, submit lock, warning window, and attack effect require text or shape in addition to color.
+The timer, connection state, submit lock, warning window, and attack effect require text or shape in addition to color. The implementation keeps the deterministic garbage effect in a pointer-free display layer above the editor so the controlled source buffer remains unchanged.
 
 ## WF-05 — Match result (`/results/:matchId`)
 
