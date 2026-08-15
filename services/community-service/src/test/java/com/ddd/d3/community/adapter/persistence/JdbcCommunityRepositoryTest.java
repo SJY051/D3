@@ -48,12 +48,6 @@ class JdbcCommunityRepositoryTest {
 
     @Test
     void d3Com001RecognizesAllAudiencesButFeedsOnlyPublicPostsWithKeysetPagination() {
-        assertEquals(
-                4,
-                jdbc.sql("select count(*) from unnest(enum_range(null::community_post_visibility))")
-                        .query(Integer.class)
-                        .single());
-
         repository.insertPost(new NewPost(POST_ONE, USER_ONE, PostVisibility.PUBLIC, "one", "<p>one</p>", 3));
         repository.insertPost(new NewPost(POST_TWO, USER_TWO, PostVisibility.PUBLIC, "two", "<p>two</p>", 3));
         jdbc.sql("""
@@ -61,7 +55,7 @@ class JdbcCommunityRepositoryTest {
                             id, author_user_id, visibility, prose_markdown, rendered_html,
                             prose_character_count, created_at, updated_at
                         )
-                        values (:id, :authorUserId, cast('PRIVATE' as community_post_visibility), 'hidden', '<p>hidden</p>', 6, now(), now())
+                        values (:id, :authorUserId, 'PRIVATE', 'hidden', '<p>hidden</p>', 6, now(), now())
                         """)
                 .param("id", UUID.fromString("33333333-3333-4333-8333-333333333333"))
                 .param("authorUserId", USER_ONE)

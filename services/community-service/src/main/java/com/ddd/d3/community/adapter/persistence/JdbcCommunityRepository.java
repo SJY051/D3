@@ -30,7 +30,7 @@ public final class JdbcCommunityRepository {
                             prose_character_count, created_at, updated_at
                         )
                         values (
-                            :id, :authorUserId, cast(:visibility as community_post_visibility), :markdown,
+                            :id, :authorUserId, :visibility, :markdown,
                             :renderedHtml, :proseCharacterCount, :createdAt, :updatedAt
                         )
                         """)
