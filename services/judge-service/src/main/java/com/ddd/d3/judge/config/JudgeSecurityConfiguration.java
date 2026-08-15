@@ -5,6 +5,7 @@ import com.ddd.d3.judge.adapter.http.JudgeRequestSizeFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,7 +26,8 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.beans.factory.annotation.Value;
 import tools.jackson.databind.ObjectMapper;
@@ -39,15 +41,21 @@ public class JudgeSecurityConfiguration {
             @Value("${d3.security.issuer}") String issuer,
             @Value("${d3.security.audience:judge-service}") String audience,
             @Value("${d3.security.allowed-client-id:battle-service}") String allowedClientId,
-            @Value("${d3.security.allowed-token-use:service}") String allowedTokenUse) {
+            @Value("${d3.security.allowed-token-use:service}") String allowedTokenUse,
+            @Value("${d3.security.clock-skew:30s}") Duration clockSkew) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-        decoder.setJwtValidator(judgeTokenValidator(issuer, audience, allowedClientId, allowedTokenUse));
+        decoder.setJwtValidator(judgeTokenValidator(issuer, audience, allowedClientId, allowedTokenUse, clockSkew));
         return decoder;
     }
 
     static OAuth2TokenValidator<Jwt> judgeTokenValidator(
-            String issuer, String audience, String allowedClientId, String allowedTokenUse) {
-        OAuth2TokenValidator<Jwt> issuerValidator = JwtValidators.createDefaultWithIssuer(issuer);
+            String issuer,
+            String audience,
+            String allowedClientId,
+            String allowedTokenUse,
+            Duration clockSkew) {
+        OAuth2TokenValidator<Jwt> timestampValidator = new JwtTimestampValidator(clockSkew);
+        OAuth2TokenValidator<Jwt> issuerValidator = new JwtIssuerValidator(issuer);
         OAuth2TokenValidator<Jwt> audienceValidator = new JwtClaimValidator<List<String>>(
                 "aud", audiences -> audiences != null && audiences.contains(audience));
         OAuth2TokenValidator<Jwt> clientValidator = new JwtClaimValidator<String>(
@@ -55,7 +63,7 @@ public class JudgeSecurityConfiguration {
         OAuth2TokenValidator<Jwt> tokenUseValidator = new JwtClaimValidator<String>(
                 "token_use", allowedTokenUse::equals);
         return new DelegatingOAuth2TokenValidator<>(
-                issuerValidator, audienceValidator, clientValidator, tokenUseValidator);
+                timestampValidator, issuerValidator, audienceValidator, clientValidator, tokenUseValidator);
     }
 
     @Bean

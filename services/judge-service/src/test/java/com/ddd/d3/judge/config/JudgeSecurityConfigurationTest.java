@@ -3,6 +3,7 @@ package com.ddd.d3.judge.config;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
@@ -16,13 +17,17 @@ class JudgeSecurityConfigurationTest {
     @Test
     void d3Sec001AcceptsOnlyTheBattleServiceIdentityForTheJudgeAudience() {
         var validator = JudgeSecurityConfiguration.judgeTokenValidator(
-                ISSUER, "judge-service", "battle-service", "service");
+                ISSUER, "judge-service", "battle-service", "service", Duration.ofSeconds(30));
 
         assertFalse(validator.validate(token(builder -> {})).hasErrors());
         assertTrue(validator.validate(token(builder -> builder.audience(List.of("d3-user")))).hasErrors());
         assertTrue(validator.validate(token(builder -> builder.claim("client_id", "browser-user"))).hasErrors());
         assertTrue(validator.validate(token(builder -> builder.claim("token_use", "user"))).hasErrors());
         assertTrue(validator.validate(token(builder -> builder.issuer("https://untrusted.example"))).hasErrors());
+        assertTrue(validator.validate(token(builder -> builder
+                        .issuedAt(Instant.now().minusSeconds(120))
+                        .expiresAt(Instant.now().minusSeconds(31))))
+                .hasErrors());
     }
 
     private static Jwt token(Consumer<Jwt.Builder> customization) {

@@ -117,11 +117,34 @@
           }
         }
       }
+    },
+    "/internal/v1/service-tokens": {
+      "post": {
+        "summary": "Issue a short-lived Judge service token to Battle",
+        "security": [{"serviceClient": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {"schema": {"$ref": "#/components/schemas/ServiceTokenRequest"}}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Short-lived Battle service token",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/ServiceTokenResponse"}}
+            }
+          },
+          "400": {"$ref": "#/components/responses/Error"},
+          "401": {"$ref": "#/components/responses/Error"}
+        }
+      }
     }
   },
   "components": {
     "securitySchemes": {
-      "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+      "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"},
+      "serviceClient": {"type": "http", "scheme": "basic", "description": "Battle service client credentials"}
     },
     "parameters": {
       "RefreshCookie": {
@@ -184,6 +207,24 @@
         "required": ["displayName"],
         "properties": {
           "displayName": {"type": "string", "maxLength": 80}
+        }
+      },
+      "ServiceTokenRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scope"],
+        "properties": {
+          "scope": {"type": "string", "enum": ["judge.submit", "judge.read"]}
+        }
+      },
+      "ServiceTokenResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["accessToken", "tokenType", "expiresIn"],
+        "properties": {
+          "accessToken": {"type": "string"},
+          "tokenType": {"type": "string", "const": "Bearer"},
+          "expiresIn": {"type": "integer", "minimum": 1, "maximum": 900}
         }
       },
       "ErrorResponse": {

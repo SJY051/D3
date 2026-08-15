@@ -27,6 +27,9 @@ export function resolveLocalEnvironment(source = process.env) {
     D3_COMMUNITY_HEALTH_URL: `http://${serviceHost}:8084/actuator/health`,
     D3_JWT_JWK_SET_URI: `http://${serviceHost}:8081/.well-known/jwks.json`,
     D3_JWT_ISSUER: `http://${serviceHost}:8081`,
+    D3_BATTLE_SERVICE_CLIENT_SECRET:
+      source.D3_BATTLE_SERVICE_CLIENT_SECRET?.trim() || "local-battle-service-secret",
+    D3_IDENTITY_INTERNAL_URL: `http://${serviceHost}:8081`,
     IDENTITY_DB_URL: `jdbc:postgresql://${postgresHost}:${postgresPort}/d3_identity`,
     BATTLE_DB_URL: `jdbc:postgresql://${postgresHost}:${postgresPort}/d3_battle`,
     JUDGE_DB_URL: `jdbc:postgresql://${postgresHost}:${postgresPort}/d3_judge`,

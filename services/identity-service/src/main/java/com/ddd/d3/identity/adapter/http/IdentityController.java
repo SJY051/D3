@@ -6,6 +6,7 @@ import com.ddd.d3.identity.application.IdentityRepository;
 import com.ddd.d3.identity.application.IdentityService;
 import com.ddd.d3.identity.application.RefreshTokenRejectedException;
 import com.ddd.d3.identity.application.SessionToken;
+import com.ddd.d3.identity.config.BrowserSessionCookiePolicy;
 import com.ddd.d3.identity.domain.Account;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -14,7 +15,6 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Duration;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -45,11 +45,11 @@ public final class IdentityController {
             IdentityService identityService,
             AccessTokenIssuer accessTokenIssuer,
             IdentityRepository identityRepository,
-            @Value("${D3_REFRESH_COOKIE_SECURE:false}") boolean refreshCookieSecure) {
+            BrowserSessionCookiePolicy cookiePolicy) {
         this.identityService = identityService;
         this.accessTokenIssuer = accessTokenIssuer;
         this.identityRepository = identityRepository;
-        this.refreshCookieSecure = refreshCookieSecure;
+        this.refreshCookieSecure = cookiePolicy.secure();
     }
 
     @PostMapping("/v1/auth/register")
