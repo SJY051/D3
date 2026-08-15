@@ -14,6 +14,8 @@ test("local runtime binds every Java application to loopback by default", () => 
   assert.equal(environment.SERVER_ADDRESS, "127.0.0.1");
   assert.equal(environment.SPRING_PROFILES_ACTIVE, "local");
   assert.equal(environment.D3_JUDGE_ADAPTER, "fake");
+  assert.equal(environment.D3_BATTLE_SERVICE_CLIENT_SECRET, "local-battle-service-secret");
+  assert.equal(environment.D3_IDENTITY_INTERNAL_URL, "http://127.0.0.1:8081");
 });
 
 test("local runtime aligns health, Config, Eureka, and JWT URLs with an explicit bind address", () => {
@@ -23,6 +25,7 @@ test("local runtime aligns health, Config, Eureka, and JWT URLs with an explicit
     EUREKA_URL: "http://127.0.0.1:8761/eureka/",
     D3_CONFIG_HEALTH_URL: "http://localhost:8888/actuator/health",
     D3_JUDGE_ADAPTER: "judge0",
+    D3_BATTLE_SERVICE_CLIENT_SECRET: "supplied-local-secret",
   });
 
   assert.equal(environment.SERVER_ADDRESS, "192.168.1.20");
@@ -36,6 +39,8 @@ test("local runtime aligns health, Config, Eureka, and JWT URLs with an explicit
   assert.equal(environment.D3_IDENTITY_HEALTH_URL, "http://192.168.1.20:8081/actuator/health");
   assert.equal(environment.D3_JWT_JWK_SET_URI, "http://192.168.1.20:8081/.well-known/jwks.json");
   assert.equal(environment.D3_JWT_ISSUER, "http://192.168.1.20:8081");
+  assert.equal(environment.D3_IDENTITY_INTERNAL_URL, "http://192.168.1.20:8081");
+  assert.equal(environment.D3_BATTLE_SERVICE_CLIENT_SECRET, "supplied-local-secret");
   assert.equal(environment.D3_JUDGE_ADAPTER, "judge0");
 });
 

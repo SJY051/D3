@@ -14,7 +14,7 @@ public final class AccessTokenIssuer {
 
     // ponytail: fixed 15-minute access lifetime; move behind config alongside the refresh policy if it needs tuning
     private static final Duration ACCESS_TTL = Duration.ofMinutes(15);
-    private static final String SCOPE = "identity.profile";
+    private static final String SCOPE = "identity.profile battle.play";
 
     private final JwtEncoder encoder;
     private final String issuer;

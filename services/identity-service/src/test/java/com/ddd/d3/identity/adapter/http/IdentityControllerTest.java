@@ -33,7 +33,13 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(value = IdentityController.class, properties = "D3_REFRESH_COOKIE_SECURE=true")
+@WebMvcTest(
+        value = IdentityController.class,
+        properties = {
+            "spring.profiles.active=test",
+            "D3_REFRESH_COOKIE_SECURE=true",
+            "D3_BATTLE_SERVICE_CLIENT_SECRET=test-battle-secret"
+        })
 @Import({
     IdentityJwtConfiguration.class,
     IdentitySecurityConfiguration.class,

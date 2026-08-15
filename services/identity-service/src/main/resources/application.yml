@@ -6,6 +6,9 @@ spring:
     name: identity-service
   config:
     import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
   datasource:
     url: ${IDENTITY_DB_URL:jdbc:postgresql://localhost:5432/d3_identity}
     username: ${IDENTITY_DB_USER:d3_identity}

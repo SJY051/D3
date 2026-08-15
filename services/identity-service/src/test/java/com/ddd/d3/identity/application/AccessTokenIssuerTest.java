@@ -40,7 +40,7 @@ class AccessTokenIssuerTest {
         assertEquals(userId.toString(), decoded.getSubject());
         assertEquals("http://localhost:8081", decoded.getClaimAsString("iss"));
         assertTrue(decoded.getAudience().contains("d3-user"));
-        assertEquals("identity.profile", decoded.getClaimAsString("scope"));
+        assertEquals("identity.profile battle.play", decoded.getClaimAsString("scope"));
         assertTrue(decoded.getExpiresAt().isAfter(decoded.getIssuedAt()));
     }
 
