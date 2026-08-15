@@ -19,7 +19,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public final class JdbcBattleJudgeReferenceStore implements BattleJudgeReferenceStore {
+public class JdbcBattleJudgeReferenceStore implements BattleJudgeReferenceStore {
     private static final Set<String> SUPPORTED_LANGUAGES =
             Set.of("C", "CPP", "JAVA", "PYTHON3", "JAVASCRIPT", "TYPESCRIPT");
 

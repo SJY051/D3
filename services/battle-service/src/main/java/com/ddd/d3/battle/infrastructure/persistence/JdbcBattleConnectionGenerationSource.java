@@ -6,7 +6,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public final class JdbcBattleConnectionGenerationSource implements BattleConnectionGenerationSource {
+public class JdbcBattleConnectionGenerationSource implements BattleConnectionGenerationSource {
 
     private final JdbcClient jdbc;
 

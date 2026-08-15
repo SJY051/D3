@@ -297,7 +297,7 @@ Table battle_db.match_command_receipt {
   command_id uuid [pk]
   match_id uuid [not null]
   player_user_id uuid [not null, note: 'Must be a participant in the named match']
-  command_type text [not null, note: 'READY, DISCONNECT, RECONNECT, or SURRENDER']
+  command_type text [not null, note: 'READY, DISCONNECT, RECONNECT, SURRENDER, RUN, SUBMIT, ATTACK_LAUNCH, ATTACK_BLOCK, or ATTACK_REFLECT']
   payload_fingerprint text [not null, note: 'Bounded non-secret command identity, never source code']
   aggregate_version bigint [not null]
   accepted_at timestamptz [not null]

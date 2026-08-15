@@ -9,7 +9,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public final class JdbcPublicRatingReader implements PublicRatingReader {
+public class JdbcPublicRatingReader implements PublicRatingReader {
 
     private final JdbcClient jdbc;
     private final int initialRating;

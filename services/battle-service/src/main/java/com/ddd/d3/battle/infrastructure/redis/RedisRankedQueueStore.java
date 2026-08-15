@@ -18,7 +18,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public final class RedisRankedQueueStore implements RankedQueueStore {
+public class RedisRankedQueueStore implements RankedQueueStore {
 
     private static final DefaultRedisScript<Long> COMPARE_AND_DELETE = new DefaultRedisScript<>("""
             if redis.call('GET', KEYS[1]) == ARGV[1] then

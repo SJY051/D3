@@ -99,7 +99,7 @@ class BattleInfrastructureIntegrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(11, migrations);
+        assertEquals(12, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -117,6 +117,32 @@ class BattleInfrastructureIntegrationTest {
                         "outbox_event",
                         "inbox_event"),
                 tables);
+    }
+
+    @Test
+    void d3Btl002PersistsRunAndSubmitCommandReceipts() {
+        UUID matchId = createRunningMatch();
+        UUID playerId = UUID.randomUUID();
+        assertEquals(1, addPlayer(matchId, playerId, 1));
+        JdbcBattleCommandReceiptStore receipts = new JdbcBattleCommandReceiptStore(dataSource);
+        Instant acceptedAt = Instant.parse("2026-08-15T00:00:00Z");
+
+        receipts.record(new JdbcBattleCommandReceiptStore.Receipt(
+                UUID.randomUUID(), matchId, playerId, "RUN", "run-fingerprint", 1, acceptedAt));
+        receipts.record(new JdbcBattleCommandReceiptStore.Receipt(
+                UUID.randomUUID(), matchId, playerId, "SUBMIT", "submit-fingerprint", 1, acceptedAt));
+
+        assertEquals(
+                List.of("RUN", "SUBMIT"),
+                jdbc.sql("""
+                                select command_type
+                                from match_command_receipt
+                                where match_id = :matchId
+                                order by command_type
+                                """)
+                        .param("matchId", matchId)
+                        .query(String.class)
+                        .list());
     }
 
     @Test
@@ -885,7 +911,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(10, applied);
+        assertEquals(11, applied);
         assertEquals(1, jdbc.sql("""
                         select count(*)
                         from judge_job_reference
@@ -1064,7 +1090,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(10, applied);
+        assertEquals(11, applied);
         assertEquals(1, jdbc.sql("select count(*) from match where id = :id")
                 .param("id", matchId)
                 .query(Integer.class)
