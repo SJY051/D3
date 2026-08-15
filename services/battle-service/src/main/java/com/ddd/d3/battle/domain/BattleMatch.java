@@ -40,11 +40,12 @@ public final class BattleMatch {
         SURRENDER,
         DISCONNECT_TIMEOUT,
         PLATFORM_INCIDENT,
+        JUDGE_RESULT,
         LEGACY_IMPORT
     }
 
     public sealed interface Command permits Ready, Start, BeginJudging, AdvanceTime, Disconnect,
-            Reconnect, Surrender, PlatformIncident {}
+            Reconnect, Surrender, PlatformIncident, CompleteJudging {}
 
     public record Ready(String playerId) implements Command {}
 
@@ -73,6 +74,14 @@ public final class BattleMatch {
     public record Surrender(String playerId) implements Command {}
 
     public record PlatformIncident(String incidentReference) implements Command {}
+
+    public record CompleteJudging(String winnerId) implements Command {
+        public CompleteJudging {
+            if (winnerId != null && winnerId.isBlank()) {
+                throw new IllegalArgumentException("winnerId must not be blank");
+            }
+        }
+    }
 
     public record Result(
             Outcome outcome,
@@ -141,6 +150,7 @@ public final class BattleMatch {
             case Reconnect reconnect -> reconnect(reconnect.playerId(), reconnect.connectionGeneration());
             case Surrender surrender -> surrender(surrender.playerId());
             case PlatformIncident incident -> platformIncident(incident.incidentReference());
+            case CompleteJudging completion -> completeJudging(completion.winnerId());
         }
         if (!before.equals(domainState())) {
             aggregateVersion++;
@@ -414,6 +424,22 @@ public final class BattleMatch {
                 incidentReference));
     }
 
+    private void completeJudging(String winnerId) {
+        if (result != null) {
+            return;
+        }
+        requireState(State.JUDGING);
+        if (winnerId != null) {
+            requireParticipant(winnerId);
+        }
+        finish(new Result(
+                winnerId == null ? Outcome.DRAW : Outcome.WIN,
+                winnerId,
+                ResolutionReason.JUDGE_RESULT,
+                clock.instant(),
+                null));
+    }
+
     private void finish(Result terminalResult) {
         if (result != null) {
             return;
@@ -530,8 +556,9 @@ public final class BattleMatch {
             case DRAW -> {
                 if (restoredResult.winnerId() != null
                         || restoredResult.incidentReference() != null
-                        || restoredResult.reason() != ResolutionReason.LEGACY_IMPORT) {
-                    throw new IllegalArgumentException("legacy draw requires only the imported resolution reason");
+                        || (restoredResult.reason() != ResolutionReason.LEGACY_IMPORT
+                                && restoredResult.reason() != ResolutionReason.JUDGE_RESULT)) {
+                    throw new IllegalArgumentException("draw requires a supported resolution reason");
                 }
             }
             case VOID -> {

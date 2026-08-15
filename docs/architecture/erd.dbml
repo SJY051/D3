@@ -167,7 +167,7 @@ Table battle_db.match {
   deadline_at timestamptz
   finished_at timestamptz
   void_reason text
-  resolution_reason text [note: 'SURRENDER, DISCONNECT_TIMEOUT, PLATFORM_INCIDENT, or LEGACY_IMPORT for preserved pre-V3 terminal rows']
+  resolution_reason text [note: 'SURRENDER, DISCONNECT_TIMEOUT, PLATFORM_INCIDENT, JUDGE_RESULT, or LEGACY_IMPORT for preserved terminal rows']
   aggregate_version bigint [not null, default: 0]
   created_at timestamptz [not null]
 }
@@ -188,10 +188,18 @@ Table battle_db.match_player {
   efficiency_score_component numeric [note: 'Committed dynamic-efficiency component; null before result calculation']
   submission_score_component numeric [note: 'Committed submission-discipline component; null before result calculation']
   score_calculation_version text [note: 'Immutable formula and weight version used for the committed components']
+  score_problem_version text [note: 'Problem slug/version used by the committed score']
+  score_runtime_version text [note: 'Comparable runtime version used by the committed dynamic-efficiency score']
+  score_calibration_version text [note: 'Judge evidence and adapter calibration version used by the committed score']
   rating_before int
   rating_after int
   rp_before int
   rp_after int
+  placement_count_before int
+  placement_count_after int
+  season_id uuid
+  tier_after text
+  division_after text
 
   Indexes {
     (match_id, user_id) [pk]
@@ -205,6 +213,8 @@ Table battle_db.match_player {
     `connection_generation >= 0` [name: 'match_player_connection_generation_non_negative']
     `connection_state <> 'DISCONNECTED' OR connection_generation > 0` [name: 'match_player_disconnect_generation_consistent']
     `ready = false OR connection_state <> 'CONNECTING'` [name: 'match_player_ready_connection_consistent']
+    `(score_problem_version IS NULL AND score_runtime_version IS NULL AND score_calibration_version IS NULL) OR (score IS NOT NULL AND speed_score_component IS NOT NULL AND efficiency_score_component IS NOT NULL AND submission_score_component IS NOT NULL AND score_calculation_version IS NOT NULL AND NULLIF(BTRIM(score_problem_version), '') IS NOT NULL AND NULLIF(BTRIM(score_runtime_version), '') IS NOT NULL AND NULLIF(BTRIM(score_calibration_version), '') IS NOT NULL AND score = speed_score_component + efficiency_score_component + submission_score_component)` [name: 'match_player_versioned_score_consistent']
+    `(placement_count_before IS NULL AND placement_count_after IS NULL AND season_id IS NULL AND tier_after IS NULL AND division_after IS NULL) OR (rating_before IS NOT NULL AND rating_after IS NOT NULL AND rp_before IS NOT NULL AND rp_after IS NOT NULL AND placement_count_before >= 0 AND placement_count_after IN (placement_count_before, placement_count_before + 1) AND season_id IS NOT NULL AND NULLIF(BTRIM(tier_after), '') IS NOT NULL)` [name: 'match_player_rating_audit_consistent']
   }
 }
 

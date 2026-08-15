@@ -420,6 +420,38 @@ class BattleMatchTest {
     }
 
     @Test
+    void d3Btl003CommitsTheJudgedWinnerExactlyOnce() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+        match.handle(new BattleMatch.BeginJudging());
+
+        match.handle(new BattleMatch.CompleteJudging(PLAYER_ONE));
+        long committedVersion = match.aggregateVersion();
+        match.handle(new BattleMatch.CompleteJudging(PLAYER_TWO));
+
+        BattleMatch.Result result = match.result().orElseThrow();
+        assertEquals(BattleMatch.State.FINISHED, match.state());
+        assertEquals(BattleMatch.Outcome.WIN, result.outcome());
+        assertEquals(PLAYER_ONE, result.winnerId());
+        assertEquals(BattleMatch.ResolutionReason.JUDGE_RESULT, result.reason());
+        assertEquals(committedVersion, match.aggregateVersion());
+    }
+
+    @Test
+    void d3Btl003CommitsAnExactJudgedTieAsADraw() {
+        MutableClock clock = new MutableClock(START);
+        BattleMatch match = runningMatch(clock);
+        match.handle(new BattleMatch.BeginJudging());
+
+        match.handle(new BattleMatch.CompleteJudging(null));
+
+        BattleMatch.Result result = match.result().orElseThrow();
+        assertEquals(BattleMatch.Outcome.DRAW, result.outcome());
+        assertNull(result.winnerId());
+        assertEquals(BattleMatch.ResolutionReason.JUDGE_RESULT, result.reason());
+    }
+
+    @Test
     void d3Btl002DoesNotThrowWhenALateDisconnectResolvesTheMatch() {
         MutableClock clock = new MutableClock(START);
         BattleMatch match = runningMatch(clock);

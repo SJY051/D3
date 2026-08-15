@@ -16,6 +16,12 @@ import com.ddd.d3.battle.application.BattleDeadlineClaimStore;
 import com.ddd.d3.battle.application.BattleDeadlineScheduler;
 import com.ddd.d3.battle.application.BattleDeadlineService;
 import com.ddd.d3.battle.application.BattleSnapshotPublisher;
+import com.ddd.d3.battle.application.BattleEventPublisher;
+import com.ddd.d3.battle.application.BattleOutboxDispatcher;
+import com.ddd.d3.battle.application.BattleOutboxStore;
+import com.ddd.d3.battle.application.BattleResultScheduler;
+import com.ddd.d3.battle.application.BattleResultService;
+import com.ddd.d3.battle.application.BattleResultStore;
 import com.ddd.d3.battle.application.JudgeServiceTokenProvider;
 import com.ddd.d3.battle.application.PublicRatingReader;
 import com.ddd.d3.battle.application.RankedMatchStore;
@@ -23,6 +29,11 @@ import com.ddd.d3.battle.application.RankedMatchmakingCoordinator;
 import com.ddd.d3.battle.application.RankedQueueStore;
 import com.ddd.d3.battle.domain.RankedMatchmaker;
 import com.ddd.d3.battle.domain.attack.GarbageAttackExchange;
+import com.ddd.d3.battle.domain.outcome.MatchScoreCalculator;
+import com.ddd.d3.battle.domain.outcome.RatingProgressionCalculator;
+import com.ddd.d3.battle.infrastructure.messaging.KafkaBattleEventPublisher;
+import com.ddd.d3.battle.infrastructure.messaging.ScheduledBattleOutboxPublisher;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.Executor;
@@ -31,6 +42,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -157,6 +169,57 @@ class BattleServiceConfiguration {
                 snapshots,
                 clock,
                 new TransactionTemplate(transactionManager));
+    }
+
+    @Bean
+    BattleResultService battleResultService(
+            BattleResultStore results,
+            BattleMatchRepository matches,
+            BattleSnapshotPublisher snapshots,
+            Clock clock,
+            PlatformTransactionManager transactionManager,
+            @Value("${d3.battle.scoring.version:score-v1}") String scoreVersion,
+            @Value("${d3.battle.scoring.speed-weight:0.50}") BigDecimal speedWeight,
+            @Value("${d3.battle.scoring.dynamic-efficiency-weight:0.35}") BigDecimal efficiencyWeight,
+            @Value("${d3.battle.scoring.submission-discipline-weight:0.15}") BigDecimal disciplineWeight) {
+        MatchScoreCalculator scoreCalculator = new MatchScoreCalculator(
+                scoreVersion,
+                new MatchScoreCalculator.ScoringWeights(
+                        speedWeight, efficiencyWeight, disciplineWeight));
+        return new BattleResultService(
+                results,
+                matches,
+                scoreCalculator,
+                RatingProgressionCalculator.initialPolicy(),
+                snapshots,
+                clock,
+                new TransactionTemplate(transactionManager));
+    }
+
+    @Bean
+    BattleResultScheduler battleResultScheduler(
+            BattleResultService results,
+            @Value("${d3.battle.result-driver.batch-size:25}") int batchSize) {
+        return new BattleResultScheduler(results, batchSize);
+    }
+
+    @Bean
+    BattleEventPublisher battleEventPublisher(
+            KafkaTemplate<String, String> kafkaTemplate,
+            @Value("${d3.battle.match-finished-topic:match.finished.v1}") String matchFinishedTopic,
+            @Value("${d3.battle.rating-changed-topic:rating.changed.v1}") String ratingChangedTopic) {
+        return new KafkaBattleEventPublisher(kafkaTemplate, matchFinishedTopic, ratingChangedTopic);
+    }
+
+    @Bean
+    BattleOutboxDispatcher battleOutboxDispatcher(
+            BattleOutboxStore store, BattleEventPublisher publisher, Clock clock) {
+        return new BattleOutboxDispatcher(store, publisher, clock);
+    }
+
+    @Bean
+    ScheduledBattleOutboxPublisher scheduledBattleOutboxPublisher(BattleOutboxDispatcher dispatcher) {
+        return new ScheduledBattleOutboxPublisher(dispatcher);
     }
 
     @Bean
