@@ -2,7 +2,7 @@
 
 - Owner: 윤서진 (development lead)
 - Status: Active operating baseline
-- Last verified: 2026-08-15 against `origin/main` at `d99829d`, live GitHub state and AWS schedule group `d3-judge0-20260814-16`
+- Last verified: 2026-08-15 against origin/main at 2bc1075, live GitHub state; AWS session expired, Judge0 smoke pending
 - Scope: M-01 through M-10 and D3-QLT-001
 - Target: freeze a demonstrable release candidate on 2026-08-19 and present it on 2026-08-20
 
@@ -44,8 +44,12 @@ local sign-in
 | [#42](https://github.com/SJY051/D3/pull/42) | `SJY051` | **MERGED — PARTIAL #15** | transport-owned PostgreSQL connection generation과 stale-close/command fencing을 고정했다. CI 5/5 후 2026-08-14에 squash merge했다. Merge commit: `1f23faf3c7cf509e4098b3c17fd3ccd25376ffe8`. JUDGING socket-close 정책은 [#43](https://github.com/SJY051/D3/issues/43)으로 이관했다. |
 | [#44](https://github.com/SJY051/D3/pull/44) | `SJY051` | **MERGED — PARTIAL #15** | PostgreSQL 권위의 match/reconnect deadline driver, bounded async fan-out, generation-fenced retry와 local-session resync를 활성화했다. 최종 HEAD `4a4d285`에서 Battle 118 PASS/7 기존 scaffold SKIP, CI 5/5, Codex major issue 0건을 확인하고 2026-08-14에 squash merge했다. Merge commit: `7bbf17cdd1a3086ae42984d0f59e4b3d741e4b4c`. 비차단 polling index는 [#45](https://github.com/SJY051/D3/issues/45)로 이관했다. |
 | [#50](https://github.com/SJY051/D3/pull/50) | `SJY051` | **MERGED — PARTIAL #16** | reversible garbage attack, authoritative energy/event persistence, versioned WebSocket v3 attack commands/snapshots와 Gateway credential bridge를 활성화했다. CI 5/5와 미해결 review thread 0건 후 2026-08-15에 squash merge했다. Merge commit: `d99829d905ab7ff729bc878c6edc83f23bd3096c`. result/rating/outbox 연결과 browser overlay는 후속이다. |
-| [#51](https://github.com/SJY051/D3/pull/51) | `SJY051` | **OPEN — COMPLETE #27** | user `battle.play`, Identity short-lived Judge service-token issuance, Battle acquisition, explicit Judge clock skew, stable deploy signing key와 cookie profile policy를 구현했다. targeted Identity/Battle/Judge/Gateway tests와 local config tests PASS; CI와 review 대기다. |
-| [#31](https://github.com/SJY051/D3/pull/31) | `GledoubleN` | **REBASE BLOCKED — PARTIAL #17** | public developer feed 구현은 기존 CI가 성공했지만 최신 `main`과 충돌한다. Community 소유권과 migration checksum을 보존해 rebase한 뒤 privacy, keyset pagination, 실제 event projection 경계를 통합 리뷰한다. |
+| [#51](https://github.com/SJY051/D3/pull/51) | `SJY051` | **MERGED — COMPLETE #27** | user `battle.play`, Identity short-lived Judge service-token issuance, Battle acquisition, explicit Judge clock skew, stable deploy signing key와 cookie profile policy를 구현했다. targeted Identity/Battle/Judge/Gateway tests와 local config tests PASS. CI 5/5 후 2026-08-15에 squash merge했다. Merge commit: `43495dbf2112017bf3a0a2360b6371ce4d815214`. #27은 completed로 종료됐다. |
+| [#31](https://github.com/SJY051/D3/pull/31) | `GledoubleN` | **MERGED — PARTIAL #17** | public feed, sanitized Markdown, keyset pagination을 병합했다. Merge commit: `6b618a00f5744752e359361a34e507102a04db67`. user/match/rating projection consumer는 후속이다. |
+| [#52](https://github.com/SJY051/D3/pull/52) | `SJY051` | **MERGED — PARTIAL #15** | Judge submission/result 통합과 accepted-submission correlation을 병합했다. Merge commit: `2eb5d804aba8709590149f7efa08686f6b37c91c`. |
+| [#53](https://github.com/SJY051/D3/pull/53) | `SJY051` | **MERGED — PARTIAL #16** | versioned scoring, exactly-once rating/RP, `match.finished.v1`/`rating.changed.v1` outbox를 병합했다. Merge commit: `767a73a14266adb80d447c2014bd55ba04f944ec`. |
+| [#54](https://github.com/SJY051/D3/pull/54) | `SJY051` | **MERGED — COMPLETE #16** | Battle v3 attack command/overlay UI와 browser evidence를 병합했다. Merge commit: `b899e071b0434bae06dcea5a1d9339da0f420d44`. #16과 #48은 종료됐다. |
+| [#55](https://github.com/SJY051/D3/pull/55) | `SJY051` | **MERGED — COMPLETE #15** | repository proxy, RUN/SUBMIT receipt 제약 V11, `JUDGE_RESULT` snapshot 투영의 런타임 통합 결함 3건을 수정하고 두 세션 실경로 증거를 남겼다. Merge commit: `2bc10750ec3e7f87ba15d9c2324cbef2181c093a`. #15는 종료됐다. |
 
 ## 3. Critical path and parallel lanes
 
@@ -59,6 +63,8 @@ local sign-in
   -> #17 result projections + #18 integrated web golden path
   -> #19 release-candidate rehearsal
 ```
+
+#15와 #16은 2026-08-15에 병합 완료됐다. 남은 critical path는 #17 projection consumer -> #18 web golden path -> #19 rehearsal이다.
 
 이 순서는 병합 순서다. 개발 착수 순서는 완전히 직렬일 필요가 없다.
 
@@ -76,11 +82,11 @@ local sign-in
 | --- | --- | --- | --- | --- | --- | --- |
 | F0 Platform and migrations | [#11](https://github.com/SJY051/D3/issues/11), PR #23 / 기반 전체 | **윤서진** | 팀원 리뷰 | 완료 | 과거 checksum 보존, fresh install와 upgrade path, Compose/runtime preflight, CI와 bot/human review | **병합 완료** (`2f71323`) |
 | F1 Identity sessions | [#12](https://github.com/SJY051/D3/issues/12), PR #26 / M-01 | **임수혁** (`GledoubleN`) | 윤서진 통합 리뷰 | 병합 완료 | forward-only migration, 단일 security chain, Gateway canonical path, rotating HttpOnly cookie, stable deploy signing key | **완료** (`2e2168e`): CI 5/5와 migration immutability evidence PASS |
-| F2 Cross-service auth and contracts | [#27](https://github.com/SJY051/D3/issues/27), PR #36/#51 / D3-SEC-001 | **윤서진** | 임수혁 지원 | PR #51 검증 | Battle service token 발급·획득·검증, canonical route, browser session transport, negative authorization evidence | **구현 완료·CI 대기**: Gateway/Judge foundation, cookie/key lifecycle, user `battle.play`, Identity service-token issuance와 Battle acquisition 테스트 PASS |
-| B1 Ranked realtime lifecycle | [#15](https://github.com/SJY051/D3/issues/15), PR #33/#38/#40/#42/#44 / M-02, M-03 | **윤서진** | 임수혁 backend 지원 | #33/#36/#38/#40/#42/#44/#51 기반 병합 | 두 client 매칭, server clock, reconnect, surrender, incident void, authenticated WS, Judge correlation | **진행 중**: authenticated outbound WebSocket auth/membership, retrying Redis cross-instance fan-out, bounded delivery, replay, closed READY/SURRENDER command, transport-owned PostgreSQL connection generation, stale-close/command fencing, pre-start close convergence, bounded PostgreSQL autonomous deadline driver와 Identity user/service-token 경계 PASS; accepted-submission correlation, judged-event 종료 처리와 live 두 세션 증거는 PENDING. 비차단 session/rate/index 보강은 #37/#39/#45로 이관 |
-| B2 Outcome, rating and attack | [#16](https://github.com/SJY051/D3/issues/16) / M-05, M-06, M-07 | **윤서진** | 최정민 acceptance example 검토 | 계산식 테스트는 즉시 | versioned scoring, exactly-once rating/RP, reversible attack, result outbox, repeatable examples | 미구현 |
+| F2 Cross-service auth and contracts | [#27](https://github.com/SJY051/D3/issues/27), PR #36/#51 / D3-SEC-001 | **윤서진** | 임수혁 지원 | PR #51 검증 | Battle service token 발급·획득·검증, canonical route, browser session transport, negative authorization evidence | **완료** (#51 merge, #27 closed) |
+| B1 Ranked realtime lifecycle | [#15](https://github.com/SJY051/D3/issues/15), PR #33/#38/#40/#42/#44 / M-02, M-03 | **윤서진** | 임수혁 backend 지원 | #33/#36/#38/#40/#42/#44/#51 기반 병합 | 두 client 매칭, server clock, reconnect, surrender, incident void, authenticated WS, Judge correlation | **완료** (#15는 #55까지의 merge와 두 세션 런타임 증거로 closed) |
+| B2 Outcome, rating and attack | [#16](https://github.com/SJY051/D3/issues/16) / M-05, M-06, M-07 | **윤서진** | 최정민 acceptance example 검토 | 계산식 테스트는 즉시 | versioned scoring, exactly-once rating/RP, reversible attack, result outbox, repeatable examples | **완료** (#52/#53/#54 merge, #16 closed) |
 | J0 Judge boundary | [#13](https://github.com/SJY051/D3/issues/13), [#14](https://github.com/SJY051/D3/issues/14) / M-04 | **윤서진** | 팀원 smoke 지원 | 완료 | app-to-host private-path smoke는 배포 통합 시 별도 증거로 남김 | 기반 완료; AWS host healthy, power schedule 5개 enabled, app/Judge0 smoke 대기 |
-| C1 Community and projections | [#17](https://github.com/SJY051/D3/issues/17), PR #31 / M-08, M-09 | **임수혁** | 윤서진 event/privacy 리뷰 | #31 최신 main rebase | Markdown/privacy, public feed, idempotent user/match/rating projections, replay evidence | public feed 부분 구현 PR이 최신 `main`과 충돌; projection producer 계약은 PENDING, GitHub issue assignee 미지정 |
+| C1 Community and projections | [#17](https://github.com/SJY051/D3/issues/17), PR #31 / M-08, M-09 | **임수혁** | 윤서진 event/privacy 리뷰 | #31 최신 main rebase | Markdown/privacy, public feed, idempotent user/match/rating projections, replay evidence | feed 병합 완료 (`6b618a0`); producer 이벤트는 #53으로 고정됨; user/match/rating projection consumer 미구현, assignee 지정 필요 |
 | W1 Web golden path | [#18](https://github.com/SJY051/D3/issues/18), PR #28 / D3-UX-001, D3-UX-002 | **박주형** (`david3123123`) | 최정민 wireframe, 윤서진 API 리뷰 | 해당 wireframe 승인 후 | 최신 main rebase, 실제 API adapter, 접근 가능한 상태 UI, 두 세션 흐름, P1 mock 미노출 | 임시 UI PR 열림, rebase 필요 |
 | Q1 QA and rehearsal | [#19](https://github.com/SJY051/D3/issues/19) / M-10, D3-QLT-001 | **박주형** (`david3123123`, 현재 assignee) | 최정민 발표·acceptance 주도, 전원 evidence 제공 | acceptance matrix는 즉시 | frozen SHA, preflight, full scenario, pass/fail/skip/not-run 기록, 녹화와 fallback | 준비 단계; 역할·assignee 정합화 필요 |
 

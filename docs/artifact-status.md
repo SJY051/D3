@@ -4,7 +4,7 @@ Owner: 윤서진
 
 Status: Required-source baseline; implementation and final presentation evidence pending
 
-Last verified: 2026-08-14 against the 18-page bootcamp planning PDF, repository sources and bound AWS identity
+Last verified: 2026-08-15 against origin/main at 2bc1075, repository sources and bound AWS identity
 
 Requirement: D3-DOC-001
 
@@ -17,13 +17,13 @@ The planning PDF names the ten artifact classes below. This table is the authori
 | 1 | Requirements specification: core/optional, priority and MUST/SHOULD | [MVP specification](specs/d3-mvp.md#internal-scoring-priority-plan) | 윤서진 | Baseline | 2026-08-14 · PDF/source and AWS activation-gate cross-check | Implemented evidence per matrix item; final rubric confirmation |
 | 2 | Workflow Swimlane | [Ranked workflow](architecture/workflow.md) | 최정민 | Target baseline | 2026-08-13 · scenarios and contracts cross-check | Render review and Scenario A/B/C runtime traces |
 | 3 | System architecture | [System context](architecture/system-context.md) | 윤서진 | Baseline | 2026-08-13 · boundary source review | Running topology and final deployment substitutions |
-| 4 | Service architecture | [Service boundaries](architecture/services.md) | 윤서진 | Local platform active; product services partial | 2026-08-14 · Gateway/config/discovery and service ownership review | Implemented product endpoints, events and authorization evidence |
+| 4 | Service architecture | [Service boundaries](architecture/services.md) | 윤서진 | Local platform active; identity/battle/judge P0 paths implemented; community projections partial | 2026-08-15 · merged #51–#55 and two-session local runtime evidence | Implemented product endpoints, events and authorization evidence |
 | 5 | Service database ERD | [Logical ERD](architecture/erd.dbml) | Service owners | Logical baseline: 32 tables, 20 intra-service refs; four forward-only Flyway chains | 2026-08-14 · fresh install, adversarial existing-data upgrade, ownership invariants and Testcontainers review | Rendered diagram, legacy cleanup validation and feature query-plan evidence |
 | 6 | Cloud architecture | [Cloud architecture](architecture/cloud.md) | 윤서진 | Account/region and Judge0 host bound; application services pending | 2026-08-14 · STS, EC2/IAM/network and six-runtime review | Application IAM, quota and deployed-resource evidence |
 | 7 | Wireframes and functions | [WF-01 through WF-08](wireframes/README.md) | 최정민 | Review required | 2026-08-13 · route/requirement mapping review | Team sign-off and styled-screen linkage/screenshots |
 | 8 | Test plan: unit, integration, load and chaos | [Test plan](quality/test-plan.md) | 최정민 and service owners | Plan baseline | 2026-08-13 · test/CI source review | Functional activation, designated host, load and chaos reports |
 | 9 | Deployment plan: CI/CD, procedure and rollback | [Deployment plan](operations/deployment-plan.md) | 윤서진 | Local runtime active; developer account and Judge0 host bound; application deployment pending | 2026-08-14 · full local preflight, CI and Judge0 AWS boundary review | Application images, AWS/OIDC bindings, deploy and rollback rehearsal |
-| 10 | Source and README | [README](../README.md), repository and [public contracts](../contracts/README.md) | Team | Executable local contributor baseline | 2026-08-14 · local start/preflight and repository command review | Integrated product behavior, final revision, license decision and release evidence |
+| 10 | Source and README | [README](../README.md), repository and [public contracts](../contracts/README.md) | Team | Executable local contributor baseline | 2026-08-15 · local start/preflight, two-session golden-path runtime and repository command review | Integrated product behavior, final revision, license decision and release evidence |
 
 ## Supporting presentation sources
 
