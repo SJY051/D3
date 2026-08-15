@@ -36,6 +36,10 @@ function snapshot(overrides: Record<string, unknown> = {}, overlaySeed = 9123) {
       attack: {
         selfEnergy: 60,
         opponentEnergy: 40,
+        maximumEnergy: 100,
+        attackCost: 40,
+        blockCost: 20,
+        reflectCost: 30,
         current: {
           attackId: "attack-7",
           phase: "ACTIVE",
@@ -55,11 +59,17 @@ describe("Battle v3 realtime boundary", () => {
   it("parses the authoritative attack projection and rejects a mismatched version", () => {
     const parsed = parseBattleSnapshot(snapshot());
 
-    expect(parsed?.attack.current).toMatchObject({
-      attackId: "attack-7",
-      phase: "ACTIVE",
-      target: "SELF",
-      overlaySeed: 9123,
+    expect(parsed?.attack).toMatchObject({
+      maximumEnergy: 100,
+      attackCost: 40,
+      blockCost: 20,
+      reflectCost: 30,
+      current: {
+        attackId: "attack-7",
+        phase: "ACTIVE",
+        target: "SELF",
+        overlaySeed: 9123,
+      },
     });
     expect(parseBattleSnapshot(snapshot({ version: 2 }))).toBeNull();
     expect(parseBattleSnapshot("not-json")).toBeNull();

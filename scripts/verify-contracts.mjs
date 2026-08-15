@@ -295,6 +295,10 @@ const attackSnapshot = {
     attack: {
       selfEnergy: 60,
       opponentEnergy: 30,
+      maximumEnergy: 100,
+      attackCost: 40,
+      blockCost: 20,
+      reflectCost: 30,
       current: {
         attackId: "attack-one",
         phase: "WARNING",

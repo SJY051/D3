@@ -29,6 +29,10 @@ export interface BattleSnapshot {
   attack: {
     selfEnergy: number;
     opponentEnergy: number;
+    maximumEnergy: number;
+    attackCost: number;
+    blockCost: number;
+    reflectCost: number;
     current: {
       attackId: string;
       phase: AttackPhase;
@@ -217,10 +221,18 @@ function isAttack(value: unknown): value is BattleSnapshot["attack"] {
   const attack = value as {
     selfEnergy?: unknown;
     opponentEnergy?: unknown;
+    maximumEnergy?: unknown;
+    attackCost?: unknown;
+    blockCost?: unknown;
+    reflectCost?: unknown;
     current?: unknown;
   };
   if (!isNonNegativeInteger(attack.selfEnergy)
-      || !isNonNegativeInteger(attack.opponentEnergy)) {
+      || !isNonNegativeInteger(attack.opponentEnergy)
+      || !isPositiveInteger(attack.maximumEnergy)
+      || !isPositiveInteger(attack.attackCost)
+      || !isPositiveInteger(attack.blockCost)
+      || !isPositiveInteger(attack.reflectCost)) {
     return false;
   }
   if (attack.current === null) {
@@ -259,6 +271,10 @@ function isAttack(value: unknown): value is BattleSnapshot["attack"] {
 
 function isInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value);
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && Number(value) > 0;
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

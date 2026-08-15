@@ -17,6 +17,7 @@ import {
 interface BattleArenaProps {
   connection: ConnectionState;
   matchId: string;
+  messageRevision: number;
   onCommand: (command: BattleCommand) => void;
   onReconnect: () => void;
   snapshot: BattleSnapshot;
@@ -56,6 +57,7 @@ export function LiveBattlePage() {
   const [connection, setConnection] = useState<ConnectionState>("CONNECTING");
   const [snapshot, setSnapshot] = useState<BattleSnapshot | null>(null);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [messageRevision, setMessageRevision] = useState(0);
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -93,6 +95,7 @@ export function LiveBattlePage() {
           socket?.close(1002, "invalid battle snapshot");
           return;
         }
+        setMessageRevision((revision) => revision + 1);
         setSnapshot((current) => current !== null && current.sequence >= next.sequence ? current : next);
       };
       socket.onerror = () => {
@@ -154,6 +157,7 @@ export function LiveBattlePage() {
   return (
     <BattleArena
       connection={connection}
+      messageRevision={messageRevision}
       matchId={matchId}
       onCommand={sendCommand}
       onReconnect={() => setReconnectAttempt((attempt) => attempt + 1)}
@@ -162,7 +166,16 @@ export function LiveBattlePage() {
   );
 }
 
-export function BattleArena({ connection, matchId, onCommand, onReconnect, snapshot }: BattleArenaProps) {
+export function BattleArena({
+  connection,
+  matchId,
+  messageRevision,
+  onCommand,
+  onReconnect,
+  snapshot,
+}: BattleArenaProps) {
+  const [pendingCommand, setPendingCommand] = useState<BattleCommandType | null>(null);
+  const pendingCommandRef = useRef(false);
   const [source, setSource] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const clockOffset = useMemo(() => Date.parse(snapshot.serverTime) - Date.now(), [snapshot.serverTime]);
@@ -176,6 +189,11 @@ export function BattleArena({ connection, matchId, onCommand, onReconnect, snaps
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    pendingCommandRef.current = false;
+    setPendingCommand(null);
+  }, [connection, messageRevision]);
+
   const authoritativeNow = now + clockOffset;
   const matchRemaining = formatCountdown(snapshot.match.matchDeadline, authoritativeNow);
   const warningRemaining = formatCountdown(attack?.warningDeadline ?? null, authoritativeNow);
@@ -188,7 +206,14 @@ export function BattleArena({ connection, matchId, onCommand, onReconnect, snaps
   const command = (
     type: BattleCommandType,
     fields: Pick<BattleCommand, "attackId" | "sourceCode"> = {},
-  ) => onCommand(createBattleCommand(matchId, type, fields));
+  ) => {
+    if (pendingCommandRef.current) {
+      return;
+    }
+    pendingCommandRef.current = true;
+    setPendingCommand(type);
+    onCommand(createBattleCommand(matchId, type, fields));
+  };
 
   const statusText = isIncomingWarning
     ? `Incoming attack. ${warningRemaining} to block or reflect.`
@@ -218,7 +243,7 @@ export function BattleArena({ connection, matchId, onCommand, onReconnect, snaps
         </div>
         <div className="battle-self-summary">
           <span className="battle-kicker">You</span>
-          <strong>{snapshot.attack.selfEnergy}/100 energy</strong>
+          <strong>{snapshot.attack.selfEnergy}/{snapshot.attack.maximumEnergy} energy</strong>
         </div>
       </header>
 
@@ -290,17 +315,36 @@ export function BattleArena({ connection, matchId, onCommand, onReconnect, snaps
           <span className="status-mark" aria-hidden="true" />
           <strong>{statusText}</strong>
         </div>
-        <div className="battle-actions" aria-label="Battle actions">
+        <div className="battle-actions" aria-label="Battle actions" aria-busy={pendingCommand !== null}>
+          {snapshot.match.state === "LOBBY" && (
+            <button
+              type="button"
+              disabled={connection !== "LIVE" || snapshot.match.self.ready || pendingCommand !== null}
+              onClick={() => command("READY")}
+            >
+              {snapshot.match.self.ready ? "Ready sent" : "Ready"}
+            </button>
+          )}
           <button
             type="button"
-            disabled={connection !== "LIVE" || snapshot.match.state !== "RUNNING" || source.trim().length === 0}
+            disabled={
+              connection !== "LIVE"
+              || snapshot.match.state !== "RUNNING"
+              || source.trim().length === 0
+              || pendingCommand !== null
+            }
             onClick={() => command("RUN", { sourceCode: source })}
           >
             Run
           </button>
           <button
             type="button"
-            disabled={connection !== "LIVE" || snapshot.match.state !== "RUNNING" || source.trim().length === 0}
+            disabled={
+              connection !== "LIVE"
+              || snapshot.match.state !== "RUNNING"
+              || source.trim().length === 0
+              || pendingCommand !== null
+            }
             onClick={() => command("SUBMIT", { sourceCode: source })}
           >
             Submit
@@ -308,7 +352,13 @@ export function BattleArena({ connection, matchId, onCommand, onReconnect, snaps
           <span className="action-divider" aria-hidden="true" />
           <button
             type="button"
-            disabled={connection !== "LIVE" || snapshot.match.state !== "RUNNING" || attackBusy}
+            disabled={
+              connection !== "LIVE"
+              || snapshot.match.state !== "RUNNING"
+              || attackBusy
+              || snapshot.attack.selfEnergy < snapshot.attack.attackCost
+              || pendingCommand !== null
+            }
             onClick={() => {
               const attackId = crypto.randomUUID();
               command("ATTACK_LAUNCH", { attackId });
@@ -318,14 +368,26 @@ export function BattleArena({ connection, matchId, onCommand, onReconnect, snaps
           </button>
           <button
             type="button"
-            disabled={connection !== "LIVE" || !isIncomingWarning || attack === null}
+            disabled={
+              connection !== "LIVE"
+              || !isIncomingWarning
+              || attack === null
+              || snapshot.attack.selfEnergy < snapshot.attack.blockCost
+              || pendingCommand !== null
+            }
             onClick={() => attack !== null && command("ATTACK_BLOCK", { attackId: attack.attackId })}
           >
             Block
           </button>
           <button
             type="button"
-            disabled={connection !== "LIVE" || !isIncomingWarning || attack === null}
+            disabled={
+              connection !== "LIVE"
+              || !isIncomingWarning
+              || attack === null
+              || snapshot.attack.selfEnergy < snapshot.attack.reflectCost
+              || pendingCommand !== null
+            }
             onClick={() => attack !== null && command("ATTACK_REFLECT", { attackId: attack.attackId })}
           >
             Reflect

@@ -12,8 +12,16 @@ type Attack = {
   resolution: "BLOCKED" | "EXPIRED" | null;
 } | null;
 
-function snapshot(sequence: number, attack: Attack): string {
+interface SnapshotOptions {
+  selfEnergy?: number;
+  selfReady?: boolean;
+  state?: "LOBBY" | "RUNNING";
+}
+
+function snapshot(sequence: number, attack: Attack, options: SnapshotOptions = {}): string {
   const now = Date.now();
+  const state = options.state ?? "RUNNING";
+  const running = state === "RUNNING";
   return JSON.stringify({
     type: "BATTLE_SNAPSHOT",
     version: 3,
@@ -22,24 +30,28 @@ function snapshot(sequence: number, attack: Attack): string {
     serverTime: new Date(now).toISOString(),
     payload: {
       match: {
-        state: "RUNNING",
-        startedAt: new Date(now - 60_000).toISOString(),
-        matchDeadline: new Date(now + 9 * 60_000).toISOString(),
+        state,
+        startedAt: running ? new Date(now - 60_000).toISOString() : null,
+        matchDeadline: running ? new Date(now + 9 * 60_000).toISOString() : null,
         self: {
           playerId: "22222222-2222-4222-8222-222222222222",
-          ready: true,
+          ready: options.selfReady ?? running,
           connectionState: "CONNECTED",
           reconnectDeadline: null,
         },
         opponent: {
-          ready: true,
+          ready: running,
           connectionState: "CONNECTED",
           reconnectDeadline: null,
         },
       },
       attack: {
-        selfEnergy: 70,
+        selfEnergy: options.selfEnergy ?? 70,
         opponentEnergy: 45,
+        maximumEnergy: 100,
+        attackCost: 40,
+        blockCost: 20,
+        reflectCost: 30,
         current: attack,
       },
     },
@@ -47,7 +59,7 @@ function snapshot(sequence: number, attack: Attack): string {
 }
 
 test("D3-BTL-004 keeps source intact through warning, reflect, overlay, and expiry", async ({ page }) => {
-  const initialSnapshot = snapshot(1, null);
+  const initialSnapshot = snapshot(1, null, { state: "LOBBY", selfReady: false });
   await page.addInitScript(({ firstSnapshot }) => {
     const runtime = window as typeof window & {
       __d3Commands: unknown[];
@@ -119,14 +131,44 @@ test("D3-BTL-004 keeps source intact through warning, reflect, overlay, and expi
   });
   expect(refreshCount).toBe(1);
   await expect(editor).toBeVisible();
+  const ready = page.getByRole("button", { name: "Ready", exact: true });
+  await expect(ready).toBeEnabled();
+  await ready.evaluate((button) => {
+    button.click();
+    button.click();
+  });
+  await expect(ready).toBeDisabled();
+  let commands = await page.evaluate(() => {
+    const runtime = window as typeof window & { __d3Commands: Array<Record<string, unknown>> };
+    return runtime.__d3Commands;
+  });
+  expect(commands.filter(({ type }) => type === "READY")).toHaveLength(1);
+
+  await page.evaluate((message) => {
+    const runtime = window as typeof window & { __d3PushSnapshot: (value: string) => void };
+    runtime.__d3PushSnapshot(message);
+  }, snapshot(2, null, { selfEnergy: 0 }));
+  await expect(page.getByRole("button", { name: "Launch attack" })).toBeDisabled();
+
   const source = "function solve(input) {\n  return input.trim();\n}";
   await editor.fill(source);
+  await page.getByRole("button", { name: "Submit" }).evaluate((button) => {
+    button.click();
+    button.click();
+  });
+  commands = await page.evaluate(() => {
+    const runtime = window as typeof window & { __d3Commands: Array<Record<string, unknown>> };
+    return runtime.__d3Commands;
+  });
+  expect(commands.filter(({ type }) => type === "SUBMIT")).toHaveLength(1);
+  await expect(page.getByRole("button", { name: "Submit" })).toBeDisabled();
+
 
   const warningDeadline = new Date(Date.now() + 30_000).toISOString();
   await page.evaluate((message) => {
     const runtime = window as typeof window & { __d3PushSnapshot: (value: string) => void };
     runtime.__d3PushSnapshot(message);
-  }, snapshot(2, {
+  }, snapshot(3, {
     attackId: "attack-browser-1",
     phase: "WARNING",
     target: "SELF",
@@ -134,15 +176,28 @@ test("D3-BTL-004 keeps source intact through warning, reflect, overlay, and expi
     overlayExpiresAt: null,
     overlaySeed: 8844,
     resolution: null,
-  }));
+  }, { selfEnergy: 25 }));
 
   await expect(page.getByRole("status")).toContainText("Incoming attack");
   await expect(page.getByRole("button", { name: "Block" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Reflect" })).toBeDisabled();
+  await page.evaluate((message) => {
+    const runtime = window as typeof window & { __d3PushSnapshot: (value: string) => void };
+    runtime.__d3PushSnapshot(message);
+  }, snapshot(4, {
+    attackId: "attack-browser-1",
+    phase: "WARNING",
+    target: "SELF",
+    warningDeadline,
+    overlayExpiresAt: null,
+    overlaySeed: 8844,
+    resolution: null,
+  }, { selfEnergy: 70 }));
   await expect(page.getByRole("button", { name: "Reflect" })).toBeEnabled();
   await expect(editor).toHaveValue(source);
 
   await page.getByRole("button", { name: "Reflect" }).click();
-  const commands = await page.evaluate(() => {
+  commands = await page.evaluate(() => {
     const runtime = window as typeof window & { __d3Commands: Array<Record<string, unknown>> };
     return runtime.__d3Commands;
   });
@@ -156,7 +211,7 @@ test("D3-BTL-004 keeps source intact through warning, reflect, overlay, and expi
   await page.evaluate((message) => {
     const runtime = window as typeof window & { __d3PushSnapshot: (value: string) => void };
     runtime.__d3PushSnapshot(message);
-  }, snapshot(3, {
+  }, snapshot(5, {
     attackId: "attack-browser-1",
     phase: "ACTIVE",
     target: "SELF",
@@ -173,7 +228,7 @@ test("D3-BTL-004 keeps source intact through warning, reflect, overlay, and expi
   await page.evaluate((message) => {
     const runtime = window as typeof window & { __d3PushSnapshot: (value: string) => void };
     runtime.__d3PushSnapshot(message);
-  }, snapshot(4, {
+  }, snapshot(6, {
     attackId: "attack-browser-1",
     phase: "RESOLVED",
     target: "SELF",
