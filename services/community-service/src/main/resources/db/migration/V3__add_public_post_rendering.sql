@@ -2,6 +2,7 @@ alter table post
     add column rendered_html text,
     add column prose_character_count integer;
 
+-- Defensive backfill for legacy rows; no pre-feed posts are expected.
 update post
 set rendered_html = '<p>' || replace(replace(replace(replace(replace(
         prose_markdown, '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), '"', '&quot;'), '''', '&#39;') || '</p>',
