@@ -21,6 +21,7 @@ Use English for code, identifiers, comments, schemas, and commit titles. Use Kor
 
 ## Context pointers
 
+- **P0 sequencing:** before assigning, starting, or merging P0 work, read `docs/requirements/p0-delivery-plan.md`.
 - **Observable behavior:** before changing product behavior or acceptance tests, read `docs/specs/d3-mvp.md`.
 - **Frontend:** before changing `apps/web`, read `docs/wireframes/README.md`; styled work starts only from a reviewed wireframe ID.
 - **Services and data:** before changing a service boundary, database, HTTP call, or event, read `docs/architecture/services.md`, `docs/architecture/postgresql.md`, and `docs/architecture/erd.dbml`.
