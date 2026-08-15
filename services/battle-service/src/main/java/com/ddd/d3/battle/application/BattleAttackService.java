@@ -3,6 +3,7 @@ package com.ddd.d3.battle.application;
 import com.ddd.d3.battle.domain.BattleMatch;
 import com.ddd.d3.battle.domain.attack.GarbageAttackExchange;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -57,6 +58,7 @@ public final class BattleAttackService {
             requireRunningParticipant(loaded.match(), playerId);
             int before = loaded.exchange().events().size();
             loaded.exchange().advanceTime();
+            accruePassive(loaded);
             loaded.exchange().awardProgress(playerId.toString(), Objects.requireNonNull(marker));
             appendNew(matchId, loaded.exchange(), before);
             return project(matchId, playerId, loaded.match(), loaded.exchange());
@@ -71,6 +73,7 @@ public final class BattleAttackService {
             requireParticipant(loaded.match(), viewerId);
             int before = loaded.exchange().events().size();
             loaded.exchange().advanceTime();
+            accruePassive(loaded);
             appendNew(matchId, loaded.exchange(), before);
             return project(matchId, viewerId, loaded.match(), loaded.exchange());
         }));
@@ -95,6 +98,7 @@ public final class BattleAttackService {
             }
             int before = loaded.exchange().events().size();
             loaded.exchange().advanceTime();
+            accruePassive(loaded);
             action.apply(loaded.exchange());
             appendNew(matchId, loaded.exchange(), before);
             Instant acceptedAt = clock.instant();
@@ -113,6 +117,19 @@ public final class BattleAttackService {
         var exchange = GarbageAttackExchange.diagnosticReplay(matchId.toString(), match.playerOneId(),
                 match.playerTwoId(), clock, policy, overlaySeeds, events.findByMatchId(matchId));
         return new Loaded(match, exchange);
+    }
+
+    private void accruePassive(Loaded loaded) {
+        BattleMatch.Snapshot match = loaded.match();
+        if (match.state() != BattleMatch.State.RUNNING) {
+            return;
+        }
+        long completedIntervals = Duration.between(match.startedAt(), clock.instant())
+                .dividedBy(policy.passiveInterval());
+        for (long bucket = 1; bucket <= completedIntervals; bucket++) {
+            loaded.exchange().awardPassive(match.playerOneId(), bucket);
+            loaded.exchange().awardPassive(match.playerTwoId(), bucket);
+        }
     }
 
     private void appendNew(UUID matchId, GarbageAttackExchange exchange, int before) {

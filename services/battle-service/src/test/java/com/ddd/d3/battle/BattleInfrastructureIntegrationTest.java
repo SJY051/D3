@@ -110,6 +110,7 @@ class BattleInfrastructureIntegrationTest {
                         "judge_job_reference",
                         "judge_job_reference_legacy_duplicate",
                         "attack_event",
+                        "attack_event_legacy",
                         "match_command_receipt",
                         "rating",
                         "season_rank",

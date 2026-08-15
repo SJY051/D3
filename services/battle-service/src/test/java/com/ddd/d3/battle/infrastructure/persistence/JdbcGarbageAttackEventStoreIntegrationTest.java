@@ -67,7 +67,7 @@ class JdbcGarbageAttackEventStoreIntegrationTest {
     }
 
     @Test
-    void upgradePreservesLegacyAttackRowsAsExplicitVersionZeroPayloads() {
+    void upgradeArchivesLegacyAttackRowsOutsideTheReplayableEventStream() {
         Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
         Flyway.configure().dataSource(dataSource).target("7").load().migrate();
         jdbc = JdbcClient.create(dataSource);
@@ -91,22 +91,23 @@ class JdbcGarbageAttackEventStoreIntegrationTest {
 
         assertEquals(1, Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted);
 
-        assertEquals(0, jdbc.sql("select payload_version from attack_event where id = :id")
+        assertEquals(0, jdbc.sql("select count(*) from attack_event where id = :id")
                 .param("id", eventId)
                 .query(Integer.class)
                 .single());
         assertEquals("LEGACY_ATTACK", jdbc.sql("""
-                        select event_payload ->> 'attackType'
-                        from attack_event
+                        select attack_type
+                        from attack_event_legacy
                         where id = :id
                         """)
                 .param("id", eventId)
                 .query(String.class)
                 .single());
-        assertEquals(1, jdbc.sql("select count(*) from attack_event where id = :id")
+        assertEquals(1, jdbc.sql("select count(*) from attack_event_legacy where id = :id")
                 .param("id", eventId)
                 .query(Integer.class)
                 .single());
+        assertEquals(List.of(), store.findByMatchId(match.matchId()));
     }
 
     @Test

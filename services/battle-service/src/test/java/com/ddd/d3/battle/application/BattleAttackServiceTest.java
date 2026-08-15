@@ -57,6 +57,25 @@ class BattleAttackServiceTest {
     }
 
     @Test
+    void d3Btl004AccruesServerOwnedPassiveEnergyBeforeAProductionAttackCommand() {
+        MutableClock clock = new MutableClock(NOW.plusSeconds(80));
+        FakeEvents events = new FakeEvents();
+        BattleAttackService service = service(clock, events, new FakeReceipts(), new ArrayList<>());
+
+        BattleAttackView launched = service.launch(MATCH_ID, COMMAND_ID, PLAYER_ONE, 1, "attack-one");
+
+        assertEquals(0, launched.selfEnergy());
+        assertEquals(GarbageAttackExchange.Phase.WARNING, launched.attack().phase());
+        assertEquals(17, events.events.size());
+        assertEquals(
+                16,
+                events.events.stream()
+                        .filter(event -> event.type() == GarbageAttackExchange.EventType.ENERGY_GRANTED)
+                        .count());
+        assertEquals(GarbageAttackExchange.EventType.ATTACK_WARNED, events.events.getLast().type());
+    }
+
+    @Test
     void d3Sec001RejectsAnAttackFromASupersededConnectionGeneration() {
         MutableClock clock = new MutableClock(NOW);
         FakeEvents events = new FakeEvents();
@@ -103,7 +122,11 @@ class BattleAttackServiceTest {
 
         assertEquals(GarbageAttackExchange.Phase.RESOLVED, expired.attack().phase());
         assertEquals(GarbageAttackExchange.Resolution.EXPIRED, expired.attack().resolution());
-        assertEquals(GarbageAttackExchange.EventType.OVERLAY_EXPIRED, events.events.getLast().type());
+        assertEquals(
+                1L,
+                events.events.stream()
+                        .filter(event -> event.type() == GarbageAttackExchange.EventType.OVERLAY_EXPIRED)
+                        .count());
         assertEquals(expired.sequence(), events.events.getLast().sequence());
     }
 

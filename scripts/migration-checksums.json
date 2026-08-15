@@ -9,7 +9,7 @@
     "services/battle-service/src/main/resources/db/migration/V5__preserve_legacy_results.sql": "48d1efb8915536673ba4250f1844590f32c06c7f0f1a1584dda9754f614c08d3",
     "services/battle-service/src/main/resources/db/migration/V6__normalize_legacy_match_snapshots.sql": "620b48ba11769110309a9e50f24217650adc01a497f7a2d65b7859cbdda5cc4d",
     "services/battle-service/src/main/resources/db/migration/V7__allocate_transport_connection_generations.sql": "a0bced0baa67b0237011dbe3d99e3972f5f3118cc34bcf966c79aff8884c42aa",
-    "services/battle-service/src/main/resources/db/migration/V8__persist_versioned_attack_events.sql": "528d959aeebff68862f3e5e68bea718386aaad13cb4153b5b73c546ac9f9d774",
+    "services/battle-service/src/main/resources/db/migration/V8__persist_versioned_attack_events.sql": "d75e2a0dbc665e3ce7c51c328f7baeb1dbcb099135a22c1253f46532a0eecb85",
     "services/community-service/src/main/resources/db/migration/V1__create_community_tables.sql": "0efcae33992a0869904ded0afc3f10b723bb3730af920a7734e9e696a89847a7",
     "services/community-service/src/main/resources/db/migration/V2__normalize_match_projection_players.sql": "ecdd6315246e6b54b59bf460c86f0a520c5bd75935775123564af9897cbcc14a",
     "services/identity-service/src/main/resources/db/migration/V1__create_identity_tables.sql": "2df6e59c98cffc0406f611ee19da4a939fc1147bf52f816e6d2d9589cb07f5de",

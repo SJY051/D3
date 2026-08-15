@@ -1,38 +1,33 @@
-alter table attack_event
-    add column payload_version smallint,
-    add column event_payload jsonb;
+create table attack_event_legacy (like attack_event including all);
 
-update attack_event
-set payload_version = 0,
-    event_payload = jsonb_build_object(
-        'id', id,
-        'matchId', match_id,
-        'sequence', sequence,
-        'actorUserId', actor_user_id,
-        'targetUserId', target_user_id,
-        'attackType', attack_type,
-        'resolution', resolution,
-        'energyCost', energy_cost,
-        'occurredAt', occurred_at
-    );
+alter table attack_event_legacy
+    add column archived_at timestamptz not null default now();
+
+insert into attack_event_legacy (
+    id, match_id, sequence, actor_user_id, target_user_id,
+    attack_type, resolution, energy_cost, occurred_at
+)
+select
+    id, match_id, sequence, actor_user_id, target_user_id,
+    attack_type, resolution, energy_cost, occurred_at
+from attack_event;
+
+delete from attack_event;
 
 alter table attack_event
-    alter column payload_version set not null,
-    alter column event_payload set not null,
+    add column payload_version smallint not null,
+    add column event_payload jsonb not null,
     add constraint attack_event_payload_version_supported
-        check (payload_version in (0, 1)),
+        check (payload_version = 1),
     add constraint attack_event_v1_payload_consistent check (
-        payload_version = 0
-        or (
-            jsonb_typeof(event_payload) = 'object'
-            and event_payload ?& array[
-                'sequence', 'type', 'playerId', 'key',
-                'energyDelta', 'energyAfter', 'occurredAt'
-            ]
-            and (event_payload ->> 'sequence')::bigint = sequence
-            and event_payload ->> 'type' = attack_type
-            and event_payload ->> 'playerId' = actor_user_id::text
-        )
+        jsonb_typeof(event_payload) = 'object'
+        and event_payload ?& array[
+            'sequence', 'type', 'playerId', 'key',
+            'energyDelta', 'energyAfter', 'occurredAt'
+        ]
+        and (event_payload ->> 'sequence')::bigint = sequence
+        and event_payload ->> 'type' = attack_type
+        and event_payload ->> 'playerId' = actor_user_id::text
     );
 
 create function enforce_attack_event_sequence_continuity()

@@ -223,8 +223,15 @@ public final class GarbageAttackExchange {
     }
 
     public synchronized boolean awardPassive(String playerId) {
-        requireParticipant(playerId);
         long bucket = Math.floorDiv(clock.millis(), policy.passiveInterval().toMillis());
+        return awardPassive(playerId, bucket);
+    }
+
+    public synchronized boolean awardPassive(String playerId, long bucket) {
+        requireParticipant(playerId);
+        if (bucket <= 0) {
+            throw new IllegalArgumentException("passive bucket must be positive");
+        }
         return grantEnergy(playerId, "passive:" + bucket, policy.passiveGain());
     }
 
