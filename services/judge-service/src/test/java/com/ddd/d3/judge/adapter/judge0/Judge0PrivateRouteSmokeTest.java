@@ -99,6 +99,7 @@ class Judge0PrivateRouteSmokeTest {
         }
         return value;
     }
+
     private static final class RecordingJudge0Client implements Judge0Client {
 
         private final Judge0Client delegate;

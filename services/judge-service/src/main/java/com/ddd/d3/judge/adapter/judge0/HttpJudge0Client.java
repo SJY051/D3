@@ -223,14 +223,13 @@ public final class HttpJudge0Client implements Judge0Client {
             throw new Judge0ClientException("Judge0 omitted execution time for an accepted submission");
         }
         try {
-            long micros = new BigDecimal(value.asText())
-                    .movePointRight(6)
-                    .setScale(0, RoundingMode.HALF_UP)
-                    .longValueExact();
-            if (micros < 0) {
+            BigDecimal seconds = new BigDecimal(value.asText());
+            if (seconds.signum() < 0) {
                 throw new Judge0ClientException("Judge0 returned a negative execution time");
             }
-            return micros;
+            return seconds.movePointRight(6)
+                    .setScale(0, RoundingMode.HALF_UP)
+                    .longValueExact();
         } catch (ArithmeticException | NumberFormatException exception) {
             throw new Judge0ClientException("Judge0 returned an invalid execution time");
         }
