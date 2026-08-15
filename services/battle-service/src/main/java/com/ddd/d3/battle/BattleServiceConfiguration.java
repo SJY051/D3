@@ -3,6 +3,10 @@ package com.ddd.d3.battle;
 import com.ddd.d3.battle.application.BattleCommandReceiptStore;
 import com.ddd.d3.battle.application.BattleAttackService;
 import com.ddd.d3.battle.application.BattleConnectionGenerationSource;
+import com.ddd.d3.battle.application.BattleJudgeCommandService;
+import com.ddd.d3.battle.application.BattleJudgeGateway;
+import com.ddd.d3.battle.application.BattleJudgeReferenceStore;
+import com.ddd.d3.battle.application.BattleJudgedSubmissionService;
 import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.BattleMatchRepository;
@@ -12,6 +16,7 @@ import com.ddd.d3.battle.application.BattleDeadlineClaimStore;
 import com.ddd.d3.battle.application.BattleDeadlineScheduler;
 import com.ddd.d3.battle.application.BattleDeadlineService;
 import com.ddd.d3.battle.application.BattleSnapshotPublisher;
+import com.ddd.d3.battle.application.JudgeServiceTokenProvider;
 import com.ddd.d3.battle.application.PublicRatingReader;
 import com.ddd.d3.battle.application.RankedMatchStore;
 import com.ddd.d3.battle.application.RankedMatchmakingCoordinator;
@@ -116,6 +121,42 @@ class BattleServiceConfiguration {
                 () -> ThreadLocalRandom.current().nextLong(),
                 new TransactionTemplate(transactionManager),
                 snapshots);
+    }
+
+    @Bean
+    BattleJudgeCommandService battleJudgeCommandService(
+            BattleJudgeReferenceStore references,
+            BattleCommandReceiptStore receipts,
+            BattleJudgeGateway judge,
+            JudgeServiceTokenProvider tokens,
+            Clock clock,
+            PlatformTransactionManager transactionManager) {
+        return new BattleJudgeCommandService(
+                references,
+                receipts,
+                judge,
+                tokens,
+                clock,
+                new TransactionTemplate(transactionManager));
+    }
+
+    @Bean
+    BattleJudgedSubmissionService battleJudgedSubmissionService(
+            BattleJudgeReferenceStore references,
+            BattleJudgeGateway judge,
+            JudgeServiceTokenProvider tokens,
+            BattleMatchRepository matches,
+            BattleSnapshotPublisher snapshots,
+            Clock clock,
+            PlatformTransactionManager transactionManager) {
+        return new BattleJudgedSubmissionService(
+                references,
+                judge,
+                tokens,
+                matches,
+                snapshots,
+                clock,
+                new TransactionTemplate(transactionManager));
     }
 
     @Bean

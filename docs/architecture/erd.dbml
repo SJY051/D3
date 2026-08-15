@@ -231,6 +231,11 @@ Table battle_db.judge_job_reference {
   evidence_version text
   accepted_at timestamptz [not null]
   last_result_at timestamptz
+  passed_count int [note: 'Privacy-safe completed-test count copied from Judge evidence']
+  total_count int [note: 'Privacy-safe total-test count copied from Judge evidence']
+  runtime_measurements jsonb [note: 'Bounded repeated size-tier runtime summary; no source, hidden cases, commands, or diagnostics']
+  adapter_version text
+  runtime_version text
 
   Indexes {
     (match_id, player_user_id, mode, attempt_number)
@@ -242,6 +247,7 @@ Table battle_db.judge_job_reference {
     `(mode = 'RUN' AND attempt_number IS NULL) OR (mode = 'SUBMIT' AND attempt_number IS NOT NULL AND attempt_number > 0)` [name: 'judge_job_reference_attempt_matches_mode']
     `(last_judge_status IN ('QUEUED', 'RUNNING') AND evidence_version IS NULL AND last_result_at IS NULL) OR (last_judge_status NOT IN ('QUEUED', 'RUNNING') AND NULLIF(BTRIM(evidence_version), '') IS NOT NULL AND last_result_at IS NOT NULL)` [name: 'judge_job_reference_result_state_consistent']
     `last_result_at IS NULL OR last_result_at >= accepted_at` [name: 'judge_job_reference_result_after_acceptance']
+    `(passed_count IS NULL AND total_count IS NULL AND runtime_measurements IS NULL AND adapter_version IS NULL AND runtime_version IS NULL) OR (passed_count >= 0 AND total_count >= passed_count AND runtime_measurements IS NOT NULL AND adapter_version IS NOT NULL AND runtime_version IS NOT NULL AND jsonb_typeof(runtime_measurements) = 'array' AND BTRIM(adapter_version) <> '' AND BTRIM(runtime_version) <> '')` [name: 'judge_job_reference_safe_evidence_consistent']
   }
 }
 

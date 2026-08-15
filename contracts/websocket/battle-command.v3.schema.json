@@ -2,22 +2,67 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://d3.local/contracts/websocket/battle-command.v3.schema.json",
   "title": "Battle WebSocket Command v3",
-  "x-requirements": ["D3-BTL-003", "D3-SEC-001"],
+  "x-requirements": ["D3-BTL-001", "D3-BTL-004", "D3-JDG-001", "D3-SEC-001"],
   "type": "object",
+  "additionalProperties": false,
   "required": ["type", "version", "matchId", "commandId"],
   "properties": {
-    "type": { "enum": ["READY", "SURRENDER", "ATTACK_LAUNCH", "ATTACK_BLOCK", "ATTACK_REFLECT"] },
-    "version": { "type": "integer", "const": 3 },
-    "matchId": { "type": "string", "format": "uuid" },
-    "commandId": { "type": "string", "format": "uuid" },
-    "attackId": { "type": "string", "minLength": 1, "maxLength": 128 }
-  },
-  "allOf": [
-    {
-      "if": { "properties": { "type": { "enum": ["ATTACK_LAUNCH", "ATTACK_BLOCK", "ATTACK_REFLECT"] } }, "required": ["type"] },
-      "then": { "properties": { "attackId": {} }, "required": ["attackId"] },
-      "else": { "properties": { "attackId": false } }
+    "type": {
+      "type": "string",
+      "enum": [
+        "READY",
+        "SURRENDER",
+        "RUN",
+        "SUBMIT",
+        "ATTACK_LAUNCH",
+        "ATTACK_BLOCK",
+        "ATTACK_REFLECT"
+      ]
+    },
+    "version": {
+      "type": "integer",
+      "const": 3
+    },
+    "matchId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "commandId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "attackId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "sourceCode": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 65536
     }
-  ],
-  "additionalProperties": false
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "type": { "enum": ["READY", "SURRENDER"] },
+        "attackId": false,
+        "sourceCode": false
+      }
+    },
+    {
+      "required": ["sourceCode"],
+      "properties": {
+        "type": { "enum": ["RUN", "SUBMIT"] },
+        "attackId": false
+      }
+    },
+    {
+      "required": ["attackId"],
+      "properties": {
+        "type": { "enum": ["ATTACK_LAUNCH", "ATTACK_BLOCK", "ATTACK_REFLECT"] },
+        "sourceCode": false
+      }
+    }
+  ]
 }

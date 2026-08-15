@@ -2,6 +2,8 @@ package com.ddd.d3.battle.adapter.websocket;
 
 import com.ddd.d3.battle.application.BattleAttackService;
 import com.ddd.d3.battle.application.BattleConnectionService;
+import com.ddd.d3.battle.application.BattleJudgeCommandService;
+import com.ddd.d3.battle.application.BattleJudgeGateway;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.BattleMatchNotFoundException;
 import com.ddd.d3.battle.application.CommandIdConflictException;
@@ -29,26 +31,33 @@ final class BattleWebSocketHandler extends TextWebSocketHandler implements SubPr
     static final String V2_PROTOCOL = "d3.battle.v2";
     static final String V3_PROTOCOL = "d3.battle.v3";
     static final String APPLICATION_PROTOCOL = V2_PROTOCOL;
-    private static final int MAX_COMMAND_BYTES = 4096;
+    private static final int MAX_COMMAND_BYTES = 270_000;
     private final BattleWebSocketSessionRegistry sessions;
     private final BattleConnectionService connections;
     private final BattleMatchCommandService commands;
     private final BattleAttackService attacks;
+    private final BattleJudgeCommandService judges;
     private final ObjectReader v2Reader;
     private final ObjectReader v3Reader;
 
     BattleWebSocketHandler(BattleWebSocketSessionRegistry sessions, BattleConnectionService connections,
             BattleMatchCommandService commands, ObjectMapper objectMapper) {
-        this(sessions, connections, commands, null, objectMapper);
+        this(sessions, connections, commands, null, null, objectMapper);
     }
 
     @Autowired
-    BattleWebSocketHandler(BattleWebSocketSessionRegistry sessions, BattleConnectionService connections,
-            BattleMatchCommandService commands, BattleAttackService attacks, ObjectMapper objectMapper) {
+    BattleWebSocketHandler(
+            BattleWebSocketSessionRegistry sessions,
+            BattleConnectionService connections,
+            BattleMatchCommandService commands,
+            BattleAttackService attacks,
+            BattleJudgeCommandService judges,
+            ObjectMapper objectMapper) {
         this.sessions = Objects.requireNonNull(sessions);
         this.connections = Objects.requireNonNull(connections);
         this.commands = Objects.requireNonNull(commands);
         this.attacks = attacks;
+        this.judges = judges;
         ObjectMapper strict = Objects.requireNonNull(objectMapper).rebuild()
                 .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
                 .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
@@ -111,6 +120,20 @@ final class BattleWebSocketHandler extends TextWebSocketHandler implements SubPr
                     new BattleMatch.Ready(viewerId.toString()));
             case SURRENDER -> commands.handle(matchId, command.commandId(), viewerId, generation,
                     new BattleMatch.Surrender(viewerId.toString()));
+            case RUN -> judges.handle(
+                    matchId,
+                    command.commandId(),
+                    viewerId,
+                    generation,
+                    BattleJudgeGateway.Mode.RUN,
+                    command.sourceCode());
+            case SUBMIT -> judges.handle(
+                    matchId,
+                    command.commandId(),
+                    viewerId,
+                    generation,
+                    BattleJudgeGateway.Mode.SUBMIT,
+                    command.sourceCode());
             case ATTACK_LAUNCH -> attacks.launch(matchId, command.commandId(), viewerId, generation, command.attackId());
             case ATTACK_BLOCK -> attacks.block(matchId, command.commandId(), viewerId, generation, command.attackId());
             case ATTACK_REFLECT -> attacks.reflect(matchId, command.commandId(), viewerId, generation, command.attackId());
