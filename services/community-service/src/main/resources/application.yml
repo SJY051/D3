@@ -20,6 +20,12 @@ spring:
   kafka:
     bootstrap-servers: ${D3_KAFKA_HOST:localhost}:${D3_KAFKA_PORT:9092}
 
+d3:
+  security:
+    jwk-set-uri: ${D3_JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+    issuer: ${D3_JWT_ISSUER:http://localhost:8081}
+    audience: ${D3_JWT_COMMUNITY_AUDIENCE:d3-user}
+
 eureka:
   client:
     service-url:
