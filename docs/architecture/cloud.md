@@ -2,9 +2,9 @@
 
 Owner: 윤서진
 
-Status: Account, region and isolated Judge0 host bound; application service bindings pending
+Status: Account, region and isolated Judge0 host bound; production-adapter source-SG route proven; application service bindings pending
 
-Last verified: 2026-08-14 against the assigned account, Seoul region and Judge0 host boundary
+Last verified: 2026-08-15 against the assigned account, Seoul region and issue #59 temporary application-runner evidence
 
 ```mermaid
 flowchart TB
@@ -14,7 +14,7 @@ flowchart TB
   ECS --> RDS[("RDS PostgreSQL")]
   ECS --> Cache[("ElastiCache Redis")]
   ECS --> MSK[("Amazon MSK")]
-  ECS -. "future source-SG-only path" .-> JudgeEC2["Zero-ingress Judge0 EC2"]
+  ECS -. "source-SG-only path; smoke proven" .-> JudgeEC2["Zero-ingress Judge0 EC2"]
   SSM["AWS Systems Manager"] --> JudgeEC2
   ECS -. "optional media" .-> S3[("S3")]
   ECR[("ECR")] --> ECS
@@ -26,5 +26,5 @@ flowchart TB
 
 - The assigned account is `811221506617` in `ap-northeast-2`; bind its IAM boundary, quotas, and allowed managed services before writing Terraform resources.
 - Activate S3 and CloudFront only when a P1 upload requirement survives scope review.
-- The Judge0 host is active on dedicated compute with zero ingress, SSM-only operation, API authentication, and disabled submission networking. Its current public subnet supplies bootstrap egress; no public API path is allowed. Bind a source-security-group-only Judge-service route or migrate it to a private subnet before application integration.
+- The Judge0 host is active on dedicated compute with zero ingress, SSM-only operation, API authentication, and disabled submission networking. Its current public subnet supplies bootstrap egress; no public API path is allowed. Issue #59 proved the production adapter route from a temporary no-ingress source SG and then removed that route and runner. A deployment must bind the real Judge-service SG with the same source-SG-only rule or migrate the host to a reviewed private egress path.
 - If managed-service provisioning is blocked, deploy the same application images to one application EC2 host with Compose while keeping Judge0 on a separate host.

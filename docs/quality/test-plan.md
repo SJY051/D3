@@ -37,7 +37,8 @@ For failures, retain the request or correlation ID and sanitized operational sig
 | Judge HTTP resource boundary | PASS | Service caller authorization, validation, idempotent acceptance, safe evidence reads, bounded error responses and request/source rejection |
 | PostgreSQL repository | PASS | Idempotent insert/conflict, terminal evidence plus outbox atomicity, private event payload and opaque stale-worker claim fencing on PostgreSQL |
 | Kafka outbox publisher | PASS | Acknowledged producer publication before the outbox row is marked published; duplicate delivery remains a consumer inbox concern |
-| Full application to designated Judge0 | NOT RUN | Requires the PENDING private Judge-service route and deployment egress binding; issue #14 host smoke is not a substitute |
+| Production adapter to designated Judge0 | PASS | Issue #59 SSM command `a38944c3-8073-47de-b414-f3bd610acdf8` ran the production `HttpJudge0Client` and `Judge0ExecutionAdapter` from a temporary application-side runner through an exact source-security-group route. All six pinned `RUN` mappings passed, credentials and source were absent from output, and cleanup restored zero Judge0 ingress |
+| Deployed Judge HTTP service to designated Judge0 | NOT RUN | Application deployment is outside issue #59 and the current local-only application topology |
 
 These rows summarize narrow test evidence. The issue #13 PR report remains authoritative for exact commands, revision, counts and any skipped scaffold tests.
 
