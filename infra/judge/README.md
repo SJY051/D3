@@ -4,7 +4,7 @@ Owner: 윤서진
 
 Status: Dedicated host and six-language runtime matrix active
 
-Last verified: 2026-08-14 in account `811221506617`, region `ap-northeast-2`
+Last verified: 2026-08-15 in account `811221506617`, region `ap-northeast-2`
 
 Requirements: D3-JDG-001, D3-UX-002, D3-SEC-001, M-04, M-10
 
@@ -62,7 +62,7 @@ Judge0 CE 1.13.1 runs its server and worker containers with Docker `privileged: 
 
 ## Runtime matrix
 
-This matrix comes from the authenticated `/languages` response and SSM command `52b8543b-59de-4ca1-bd2e-df1bda357c35`, which ran [`smoke.sh`](smoke.sh) on 2026-08-14 after binding and restarting the fail-fast repository startup overlays, enforcing unique exact runtime mappings, ignoring an injected hostile curl configuration, bypassing hostile proxy variables, comparing host and sandbox reachability, rejecting every advertised disabled or above-ceiling request shape, and asserting every required execution-resource default and per-request boundary with positive controls. Its deletion check waits for a terminal submission before requiring the disabled-specific HTTP 403 response.
+The runtime matrix was established by the authenticated `/languages` response and SSM command `52b8543b-59de-4ca1-bd2e-df1bda357c35` on 2026-08-14. A fresh run on 2026-08-15 used SSM command `61189c99-7372-4977-96b1-72ae88767b02`; the remote [`smoke.sh`](smoke.sh) and startup overlay hashes matched the repository, all 19 boundary and health checks passed, and all 35 execution cases passed. The suite enforces unique exact runtime mappings, ignores an injected hostile curl configuration, bypasses hostile proxy variables, compares host and sandbox reachability, rejects every advertised disabled or above-ceiling request shape, and asserts every required execution-resource default and per-request boundary with positive controls. Its deletion check waits for a terminal submission before requiring the disabled-specific HTTP 403 response.
 
 | Product language | Judge0 ID | Observed runtime | Hello-world | Deterministic case |
 |---|---:|---|---|---|
@@ -143,7 +143,7 @@ Do not delete the shared VPC, subnet, route table, internet gateway, account-lev
 
 ## Evidence and remaining gaps
 
-| Check | 2026-08-14 result |
+| Check | 2026-08-15 result |
 |---|---|
 | Account, region, instance, AMI, encrypted disk, role | PASS |
 | Zero ingress and external API probe | PASS |
@@ -153,13 +153,13 @@ Do not delete the shared VPC, subnet, route table, internet gateway, account-lev
 | Submission network isolation | PASS: opt-in HTTP 422, host reached `1.1.1.1:53/TCP`, executed code could not |
 | Six-language hello-world and deterministic sum | PASS: 12/12 cases |
 | Provider request/resource boundaries | PASS: 16/16 numeric-ceiling or disabled-feature shapes rejected |
-| Source, stdin and expected-output body-size caps | PENDING: Judge0 CE 1.13.1 exposes no per-field ceiling; the authenticated Judge adapter must reject oversized fields before provider access in issue #13 |
+| Source, stdin and expected-output body-size caps | PASS at the application adapter boundary: `Judge0ExecutionAdapterTest` rejects oversized fields before provider access; Judge0 CE 1.13.1 itself exposes no per-field ceiling |
 | Accepted, wrong answer, compilation, runtime, CPU/wall timeout, memory, process/thread, stack and file size | PASS: 35/35 execution cases, including ten omission-based default checks; memory, process/thread, stack and file size each have paired below-bound success and above-bound failure controls |
 | Platform failure normalization | PASS in PR #20 fake-adapter test; live outage injection NOT RUN |
 | Startup environment hardening | PASS: local failure injection stops both startup paths for touch, ownership, mode and write failures; live files are `root:judge0 0640` after restart |
 | Runtime log privacy | PASS after overlay and secret rotation: 0 secret/source matches |
 | Reboot persistence | PASS: systemd active, cgroup v1, repository overlay hashes, authenticated Python execution, and zero secret log matches |
-| Real Judge service adapter | NOT IMPLEMENTED; tracked by issue #13 |
+| Real Judge service adapter | IMPLEMENTED with bounded HTTP, runtime mapping, normalization and privacy tests; Judge service-to-host source-security-group private route NOT RUN |
 | Designated-host performance calibration | NOT RUN; no performance claim |
 
 Primary upstream references: [Judge0 repository](https://github.com/judge0/judge0), [Judge0 changelog](https://github.com/judge0/judge0/blob/master/CHANGELOG.md), and [Judge0 API documentation](https://github.com/judge0/judge0/blob/master/public/docs.html).
