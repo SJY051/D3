@@ -35,7 +35,7 @@ class Judge0PrivateRouteSmokeTest {
             JudgeLanguage.JAVASCRIPT,
             "const a=require('fs').readFileSync(0,'utf8').trim().split(/\\s+/).map(Number); console.log(a.slice(1,1+a[0]).reduce((x,y)=>x+y,0));",
             JudgeLanguage.TYPESCRIPT,
-            "const a:number[]=require('fs').readFileSync(0,'utf8').trim().split(/\\s+/).map(Number); console.log(a.slice(1,1+a[0]).reduce((x,y)=>x+y,0));");
+            "declare const require:any; const a:number[]=require('fs').readFileSync(0,'utf8').trim().split(/\\s+/).map(Number); console.log(a.slice(1,1+a[0]).reduce((x,y)=>x+y,0));");
 
     @Test
     void d3Jdg001ExecutesEveryPinnedRuntimeThroughThePrivateApplicationRoute() {
