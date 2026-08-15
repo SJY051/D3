@@ -10,6 +10,10 @@ public record BattleAttackView(
         Instant serverTime,
         int selfEnergy,
         int opponentEnergy,
+        int maximumEnergy,
+        int attackCost,
+        int blockCost,
+        int reflectCost,
         Attack attack) {
 
     public enum Target {

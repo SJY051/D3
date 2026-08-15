@@ -216,6 +216,10 @@ class BattleWebSocketHandlerTest {
         JsonNode snapshot = objectMapper.readTree(initial.getValue().getPayload());
         assertEquals(3, snapshot.path("version").asInt());
         assertEquals(0, snapshot.path("payload").path("attack").path("selfEnergy").asInt());
+        assertEquals(100, snapshot.path("payload").path("attack").path("maximumEnergy").asInt());
+        assertEquals(40, snapshot.path("payload").path("attack").path("attackCost").asInt());
+        assertEquals(20, snapshot.path("payload").path("attack").path("blockCost").asInt());
+        assertEquals(30, snapshot.path("payload").path("attack").path("reflectCost").asInt());
 
         handler.handleTextMessage(session, new TextMessage("""
                 {"type":"ATTACK_LAUNCH","version":3,"matchId":"%s","commandId":"%s","attackId":"attack-one"}
@@ -452,6 +456,10 @@ class BattleWebSocketHandlerTest {
                 NOW,
                 0,
                 0,
+                100,
+                40,
+                20,
+                30,
                 null);
     }
 

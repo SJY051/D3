@@ -168,7 +168,8 @@ public final class BattleAttackService {
                 state.warningDeadline(), state.overlayExpiresAt(), state.overlaySeed(), state.resolution())).orElse(null);
         var history = exchange.events();
         return new BattleAttackView(matchId, history.isEmpty() ? 0 : history.getLast().sequence(), clock.instant(),
-                exchange.energy(self), exchange.energy(opponent), attack);
+                exchange.energy(self), exchange.energy(opponent), policy.maximumEnergy(),
+                policy.attackCost(), policy.blockCost(), policy.reflectCost(), attack);
     }
 
     private void publish(UUID matchId) {

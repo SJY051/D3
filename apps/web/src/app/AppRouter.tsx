@@ -2,6 +2,7 @@ import { Navigate, RouterProvider, createBrowserRouter } from "react-router-dom"
 
 import { AppShell } from "../components/AppShell";
 import { ScaffoldPage } from "../pages/ScaffoldPage";
+import { LiveBattlePage } from "../pages/LiveBattlePage";
 
 const router = createBrowserRouter([
   {
@@ -55,14 +56,7 @@ const router = createBrowserRouter([
       },
       {
         path: "battles/:matchId",
-        element: (
-          <ScaffoldPage
-            wireframe="WF-04"
-            requirement="D3-BTL-002"
-            title="Live battle"
-            sections={["Problem", "Own editor", "Opponent activity", "Attack state"]}
-          />
-        ),
+        element: <LiveBattlePage />,
       },
       {
         path: "results/:matchId",

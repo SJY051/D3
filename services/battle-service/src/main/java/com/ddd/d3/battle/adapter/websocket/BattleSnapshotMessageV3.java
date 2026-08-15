@@ -25,11 +25,15 @@ public record BattleSnapshotMessageV3(
                 view.attack().attackId(), view.attack().phase().name(), view.attack().target().name(),
                 view.attack().warningDeadline(), view.attack().overlayExpiresAt(), view.attack().overlaySeed(),
                 view.attack().resolution() == null ? null : view.attack().resolution().name());
-        return new Attack(view.selfEnergy(), view.opponentEnergy(), current);
+        return new Attack(view.selfEnergy(), view.opponentEnergy(), view.maximumEnergy(),
+                view.attackCost(), view.blockCost(), view.reflectCost(), current);
     }
 
     public record Payload(BattleSnapshotMessageV2.Payload match, Attack attack) {}
-    public record Attack(int selfEnergy, int opponentEnergy, CurrentAttack current) {}
+    public record Attack(
+            int selfEnergy, int opponentEnergy, int maximumEnergy,
+            int attackCost, int blockCost, int reflectCost,
+            CurrentAttack current) {}
     public record CurrentAttack(String attackId, String phase, String target, Instant warningDeadline,
             Instant overlayExpiresAt, long overlaySeed, String resolution) {}
 }

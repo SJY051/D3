@@ -24,10 +24,14 @@
   "$defs": {
     "attack": {
       "type": "object",
-      "required": ["selfEnergy", "opponentEnergy", "current"],
+      "required": ["selfEnergy", "opponentEnergy", "maximumEnergy", "attackCost", "blockCost", "reflectCost", "current"],
       "properties": {
         "selfEnergy": { "type": "integer", "minimum": 0 },
         "opponentEnergy": { "type": "integer", "minimum": 0 },
+        "maximumEnergy": { "type": "integer", "minimum": 1 },
+        "attackCost": { "type": "integer", "minimum": 1 },
+        "blockCost": { "type": "integer", "minimum": 1 },
+        "reflectCost": { "type": "integer", "minimum": 1 },
         "current": {
           "oneOf": [
             { "$ref": "#/$defs/currentAttack" },
