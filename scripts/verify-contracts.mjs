@@ -257,6 +257,23 @@ const attackCommand = {
 if (!battleCommandV3?.(attackCommand)) {
   throw new Error(`battle command v3 rejected an attack: ${ajv.errorsText(battleCommandV3?.errors)}`);
 }
+const runCommand = {
+  type: "RUN",
+  version: 3,
+  matchId: readyCommand.matchId,
+  commandId: "66666666-6666-4666-8666-666666666666",
+  sourceCode: "class Main {}",
+};
+if (!battleCommandV3(runCommand) || !battleCommandV3({ ...runCommand, type: "SUBMIT" })) {
+  throw new Error(`battle command v3 rejected a Judge command: ${ajv.errorsText(battleCommandV3.errors)}`);
+}
+for (const unsafe of [
+  { ...runCommand, sourceCode: undefined },
+  { ...runCommand, attackId: "attack-one" },
+  { ...runCommand, sourceCode: "x".repeat(65_537) },
+]) {
+  if (battleCommandV3(unsafe)) throw new Error("battle command v3 accepted an invalid Judge payload");
+}
 for (const unsafe of [
   { ...attackCommand, attackId: undefined },
   { ...attackCommand, sourceCode: "private" },

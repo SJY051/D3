@@ -14,6 +14,8 @@ import static org.mockito.Mockito.when;
 
 import com.ddd.d3.battle.application.BattleAttackService;
 import com.ddd.d3.battle.application.BattleAttackView;
+import com.ddd.d3.battle.application.BattleJudgeCommandService;
+import com.ddd.d3.battle.application.BattleJudgeGateway;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchView;
@@ -224,6 +226,38 @@ class BattleWebSocketHandlerTest {
         verify(session, never()).close(CloseStatus.BAD_DATA);
         verify(session, never()).close(CloseStatus.POLICY_VIOLATION);
     }
+    @Test
+    void d3Btl001DispatchesPrivateRunSourceOnlyToJudgeBoundary() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED));
+        BattleAttackService attacks = mock(BattleAttackService.class);
+        when(attacks.read(MATCH_ID, PLAYER_ONE)).thenReturn(attackView());
+        BattleJudgeCommandService judges = mock(BattleJudgeCommandService.class);
+        BattleMatchCommandService commands = mock(BattleMatchCommandService.class);
+        BattleConnectionService connections = mock(BattleConnectionService.class);
+        when(connections.connected(MATCH_ID, PLAYER_ONE))
+                .thenReturn(new BattleConnectionService.ConnectionLease(1));
+        BattleWebSocketHandler handler = handler(views, commands, connections, attacks, judges);
+        WebSocketSession session = session("judge-v3", PLAYER_ONE, BattleWebSocketHandler.V3_PROTOCOL);
+        handler.afterConnectionEstablished(session);
+
+        handler.handleTextMessage(session, new TextMessage("""
+                {"type":"RUN","version":3,"matchId":"%s","commandId":"%s","sourceCode":"class Main {}"}
+                """.formatted(MATCH_ID, COMMAND_ONE)));
+
+        verify(judges).handle(
+                MATCH_ID,
+                COMMAND_ONE,
+                PLAYER_ONE,
+                1,
+                BattleJudgeGateway.Mode.RUN,
+                "class Main {}");
+        verifyNoInteractions(commands);
+        verify(session, never()).close(CloseStatus.BAD_DATA);
+        verify(session, never()).close(CloseStatus.POLICY_VIOLATION);
+    }
+
 
     @Test
     void d3Sec001RejectsUnknownFieldsAndCrossMatchCommands() throws Exception {
@@ -289,7 +323,7 @@ class BattleWebSocketHandlerTest {
         oversizedHandler.afterConnectionEstablished(oversizedSession);
         oversizedHandler.handleTextMessage(
                 oversizedSession,
-                new TextMessage("x".repeat(4097)));
+                new TextMessage("x".repeat(270_001)));
 
         verifyNoInteractions(oversizedCommands);
         verify(oversizedSession).close(CloseStatus.TOO_BIG_TO_PROCESS);
@@ -386,6 +420,15 @@ class BattleWebSocketHandlerTest {
             BattleMatchCommandService commands,
             BattleConnectionService connections,
             BattleAttackService attacks) {
+        return handler(views, commands, connections, attacks, mock(BattleJudgeCommandService.class));
+    }
+
+    private BattleWebSocketHandler handler(
+            BattleMatchViewService views,
+            BattleMatchCommandService commands,
+            BattleConnectionService connections,
+            BattleAttackService attacks,
+            BattleJudgeCommandService judges) {
         return new BattleWebSocketHandler(
                 new BattleWebSocketSessionRegistry(
                         views,
@@ -398,6 +441,7 @@ class BattleWebSocketHandlerTest {
                 connections,
                 commands,
                 attacks,
+                judges,
                 objectMapper);
     }
 
