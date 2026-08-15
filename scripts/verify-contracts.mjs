@@ -20,8 +20,8 @@ function isHttpContract(label) {
 }
 
 const files = collectJson(contractsRoot);
-if (files.length !== 12) {
-  throw new Error(`Expected 12 contract documents, found ${files.length}`);
+if (files.length !== 14) {
+  throw new Error(`Expected 14 contract documents, found ${files.length}`);
 }
 
 const parsedContracts = [];
@@ -56,7 +56,8 @@ for (const file of files) {
 
   for (const reference of JSON.stringify(contract).matchAll(/"\$ref":"([^"]+)"/g)) {
     const target = reference[1];
-    if (!target.startsWith("#") && !existsSync(resolve(dirname(file), target))) {
+    const targetFile = target.split("#", 1)[0];
+    if (!target.startsWith("#") && !existsSync(resolve(dirname(file), targetFile))) {
       throw new Error(`${label} has an unresolved reference: ${target}`);
     }
   }
@@ -245,4 +246,57 @@ for (const unsafe of [
   }
 }
 
-console.log(`contracts: PASS (${files.length} JSON documents, 8 compiled JSON Schemas, privacy, Judge v1, and Battle v1/v2 samples)`);
+const battleCommandV3 = ajv.getSchema("https://d3.local/contracts/websocket/battle-command.v3.schema.json");
+const attackCommand = {
+  type: "ATTACK_LAUNCH",
+  version: 3,
+  matchId: readyCommand.matchId,
+  commandId: readyCommand.commandId,
+  attackId: "attack-one",
+};
+if (!battleCommandV3?.(attackCommand)) {
+  throw new Error(`battle command v3 rejected an attack: ${ajv.errorsText(battleCommandV3?.errors)}`);
+}
+for (const unsafe of [
+  { ...attackCommand, attackId: undefined },
+  { ...attackCommand, sourceCode: "private" },
+  { ...attackCommand, credential: "private" },
+  { ...attackCommand, type: "READY" },
+]) {
+  if (battleCommandV3(unsafe)) throw new Error("battle command v3 accepted an invalid or private field");
+}
+
+const battleSnapshotV3 = ajv.getSchema("https://d3.local/contracts/websocket/battle-event.v3.schema.json");
+const attackSnapshot = {
+  type: "BATTLE_SNAPSHOT",
+  version: 3,
+  matchId: battleSnapshotEvent.matchId,
+  sequence: 7,
+  serverTime: battleSnapshotEvent.serverTime,
+  payload: {
+    match: battleSnapshotEvent.payload,
+    attack: {
+      selfEnergy: 60,
+      opponentEnergy: 30,
+      current: {
+        attackId: "attack-one",
+        phase: "WARNING",
+        target: "OPPONENT",
+        warningDeadline: "2026-08-14T00:00:02Z",
+        overlayExpiresAt: null,
+        overlaySeed: 77,
+        resolution: null,
+      },
+    },
+  },
+};
+if (!battleSnapshotV3?.(attackSnapshot)) {
+  throw new Error(`battle event v3 rejected a snapshot: ${ajv.errorsText(battleSnapshotV3?.errors)}`);
+}
+for (const privateField of ["playerId", "opponentId", "sourceCode", "literal", "hiddenTests", "credential"]) {
+  const unsafe = structuredClone(attackSnapshot);
+  unsafe.payload.attack.current[privateField] = "private";
+  if (battleSnapshotV3(unsafe)) throw new Error(`battle event v3 accepted private field: ${privateField}`);
+}
+
+console.log(`contracts: PASS (${files.length} JSON documents, 10 compiled JSON Schemas, privacy, Judge v1, and Battle v1/v2/v3 samples)`);

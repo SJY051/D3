@@ -1,5 +1,6 @@
 package com.ddd.d3.battle.adapter.websocket;
 
+import com.ddd.d3.battle.application.BattleAttackService;
 import com.ddd.d3.battle.application.BattleMatchViewService;
 import java.io.IOException;
 import java.util.Map;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
@@ -21,6 +23,7 @@ final class BattleWebSocketSessionRegistry {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(BattleWebSocketSessionRegistry.class);
     private final BattleMatchViewService views;
+    private final BattleAttackService attacks;
     private final BattleDisconnectRetryQueue disconnects;
     private final ObjectMapper objectMapper;
     private final Map<String, Registration> sessions = new ConcurrentHashMap<>();
@@ -29,7 +32,17 @@ final class BattleWebSocketSessionRegistry {
             BattleMatchViewService views,
             BattleDisconnectRetryQueue disconnects,
             ObjectMapper objectMapper) {
+        this(views, null, disconnects, objectMapper);
+    }
+
+    @Autowired
+    BattleWebSocketSessionRegistry(
+            BattleMatchViewService views,
+            BattleAttackService attacks,
+            BattleDisconnectRetryQueue disconnects,
+            ObjectMapper objectMapper) {
         this.views = Objects.requireNonNull(views, "views must not be null");
+        this.attacks = attacks;
         this.disconnects = Objects.requireNonNull(disconnects, "disconnects must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
     }
@@ -122,6 +135,18 @@ final class BattleWebSocketSessionRegistry {
     private PreparedSnapshot prepareLatest(Registration registration) {
         try {
             var view = views.read(registration.matchId, registration.viewerId);
+            if (BattleWebSocketHandler.V3_PROTOCOL.equals(registration.session.getAcceptedProtocol())) {
+                if (attacks == null) {
+                    throw new IllegalStateException("attack service is unavailable");
+                }
+                var attack = attacks.read(registration.matchId, registration.viewerId);
+                long sequence = Math.addExact(view.aggregateVersion(), attack.sequence());
+                if (sequence <= registration.lastSequence) {
+                    return null;
+                }
+                String payload = objectMapper.writeValueAsString(BattleSnapshotMessageV3.from(view, attack));
+                return new PreparedSnapshot(sequence, new TextMessage(payload));
+            }
             if (view.aggregateVersion() <= registration.lastSequence) {
                 return null;
             }

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d3.local/contracts/websocket/battle-command.v3.schema.json",
+  "title": "Battle WebSocket Command v3",
+  "x-requirements": ["D3-BTL-003", "D3-SEC-001"],
+  "type": "object",
+  "required": ["type", "version", "matchId", "commandId"],
+  "properties": {
+    "type": { "enum": ["READY", "SURRENDER", "ATTACK_LAUNCH", "ATTACK_BLOCK", "ATTACK_REFLECT"] },
+    "version": { "type": "integer", "const": 3 },
+    "matchId": { "type": "string", "format": "uuid" },
+    "commandId": { "type": "string", "format": "uuid" },
+    "attackId": { "type": "string", "minLength": 1, "maxLength": 128 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "enum": ["ATTACK_LAUNCH", "ATTACK_BLOCK", "ATTACK_REFLECT"] } }, "required": ["type"] },
+      "then": { "properties": { "attackId": {} }, "required": ["attackId"] },
+      "else": { "properties": { "attackId": false } }
+    }
+  ],
+  "additionalProperties": false
+}

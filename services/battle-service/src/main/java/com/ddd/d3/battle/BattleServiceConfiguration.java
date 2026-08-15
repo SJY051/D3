@@ -1,11 +1,13 @@
 package com.ddd.d3.battle;
 
 import com.ddd.d3.battle.application.BattleCommandReceiptStore;
+import com.ddd.d3.battle.application.BattleAttackService;
 import com.ddd.d3.battle.application.BattleConnectionGenerationSource;
 import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.BattleMatchRepository;
 import com.ddd.d3.battle.application.BattleMatchViewService;
+import com.ddd.d3.battle.application.GarbageAttackEventStore;
 import com.ddd.d3.battle.application.BattleDeadlineClaimStore;
 import com.ddd.d3.battle.application.BattleDeadlineScheduler;
 import com.ddd.d3.battle.application.BattleDeadlineService;
@@ -15,9 +17,11 @@ import com.ddd.d3.battle.application.RankedMatchStore;
 import com.ddd.d3.battle.application.RankedMatchmakingCoordinator;
 import com.ddd.d3.battle.application.RankedQueueStore;
 import com.ddd.d3.battle.domain.RankedMatchmaker;
+import com.ddd.d3.battle.domain.attack.GarbageAttackExchange;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -93,6 +97,25 @@ class BattleServiceConfiguration {
     @Bean
     BattleMatchViewService battleMatchViewService(BattleMatchRepository matches, Clock clock) {
         return new BattleMatchViewService(matches, clock);
+    }
+
+    @Bean
+    BattleAttackService battleAttackService(
+            BattleMatchRepository matches,
+            GarbageAttackEventStore events,
+            BattleCommandReceiptStore receipts,
+            Clock clock,
+            PlatformTransactionManager transactionManager,
+            BattleSnapshotPublisher snapshots) {
+        return new BattleAttackService(
+                matches,
+                events,
+                receipts,
+                clock,
+                GarbageAttackExchange.Policy.initial(),
+                () -> ThreadLocalRandom.current().nextLong(),
+                new TransactionTemplate(transactionManager),
+                snapshots);
     }
 
     @Bean
