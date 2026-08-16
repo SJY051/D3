@@ -94,7 +94,8 @@ class CommunityControllerTest {
         when(service.matchRecord(MATCH_ID)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/v1/community/matches/{matchId}", MATCH_ID))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MATCH_RECORD_NOT_FOUND"));
     }
 
     @Test

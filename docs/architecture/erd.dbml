@@ -62,6 +62,11 @@ Enum community_post_visibility {
   PRIVATE
 }
 
+Enum community_post_kind {
+  USER
+  MATCH_RESULT
+}
+
 // Projection-local copy of the match-finished.v1 contract values.
 Enum community_match_result {
   PLAYER_ONE_WIN
@@ -470,7 +475,11 @@ Table community_db.post {
   author_user_id uuid [not null, note: 'Logical identity contract reference']
   visibility community_post_visibility [not null]
   prose_markdown text [not null]
+  rendered_html text [not null]
+  prose_character_count int [not null]
+  post_kind community_post_kind [not null]
   match_projection_id uuid
+  match_source_version bigint [note: 'Required only for MATCH_RESULT posts; authoritative match aggregate version']
   audience_circle_id uuid
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
@@ -478,7 +487,7 @@ Table community_db.post {
   Indexes {
     (author_user_id, created_at)
     (visibility, created_at)
-    (match_projection_id) [unique, note: 'At most one auto-generated result post per projected match']
+    (match_projection_id) [unique, note: 'Partial unique index for MATCH_RESULT posts only']
   }
 }
 

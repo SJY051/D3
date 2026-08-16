@@ -71,6 +71,7 @@ public final class CommunityService {
         repository.insertResultPost(new NewResultPost(
                 ids.get(),
                 event.matchId(),
+                event.aggregateVersion(),
                 event.playerIds().get(0),
                 markdown,
                 markdownPolicy.renderSanitizedHtml(markdown),
@@ -102,6 +103,7 @@ public final class CommunityService {
     public record NewResultPost(
             UUID id,
             UUID matchId,
+            long sourceVersion,
             UUID authorUserId,
             String markdown,
             String renderedHtml,

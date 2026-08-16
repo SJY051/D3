@@ -70,7 +70,7 @@ These rows summarize narrow test evidence. The issue #13 PR report remains autho
 | Replay and rebuild idempotency | PASS | Concurrent duplicates, same-version replay, stale events and `REBUILD_REQUIRED` recovery retain at most one immutable post per match |
 | Public record HTTP | PASS | Exact match and player-history reads expose ACTIVE seat order, result, ranked flag, source version and projected time without authentication or private execution fields |
 | Keyset and query indexes | PASS | Player history paginates by `(projected_at, match_id)` and V4 supplies ACTIVE player indexes plus a unique result-post match reference |
-| Migration upgrade | PASS | V4 preserves existing posts, deterministically clears duplicate legacy match references, then enforces one result post per match without changing V1–V3 |
+| Migration upgrade | PASS | V4 preserves existing linked posts as USER records, records generated-post source versions and enforces one MATCH_RESULT post per match without changing V1–V3 |
 | Unranked feature boundary | PASS | Unranked and void records remain queryable but do not activate the P1 opt-in result-post surface |
 
 ## Critical functional suites

@@ -92,6 +92,45 @@ class MatchFinishedProjectionIntegrationTest {
         assertEquals(
                 MATCH_ID,
                 communityRepository.publicFeed(Optional.empty(), 20).posts().getFirst().matchId());
+        assertEquals(7, readResultPostSourceVersion());
+    }
+
+    @Test
+    void d3Com001DoesNotLetALegacyLinkedPostBlockTheGeneratedResultPost() {
+        jdbc.sql("""
+                        insert into match_projection (
+                            match_id, player_one_user_id, player_two_user_id, projection_status,
+                            result, ranked, source_version, projected_at
+                        ) values (
+                            :matchId, :playerOne, :playerTwo, 'ACTIVE',
+                            'DRAW', true, 6, :projectedAt
+                        )
+                        """)
+                .param("matchId", MATCH_ID)
+                .param("playerOne", PLAYER_ONE)
+                .param("playerTwo", PLAYER_TWO)
+                .param("projectedAt", java.sql.Timestamp.from(RECEIVED_AT.minusSeconds(1)))
+                .update();
+        jdbc.sql("""
+                        insert into post (
+                            id, author_user_id, visibility, prose_markdown, rendered_html,
+                            prose_character_count, match_projection_id, created_at, updated_at
+                        ) values (
+                            :id, :authorUserId, 'PUBLIC', 'Legacy linked post',
+                            '<p>Legacy linked post</p>', 18, :matchId, :createdAt, :createdAt
+                        )
+                        """)
+                .param("id", UUID.fromString("44444444-4444-4444-8444-444444444445"))
+                .param("authorUserId", PLAYER_TWO)
+                .param("matchId", MATCH_ID)
+                .param("createdAt", java.sql.Timestamp.from(RECEIVED_AT.minusSeconds(1)))
+                .update();
+
+        assertTrue(projections.receive(event(EVENT_ID, 7, "PLAYER_ONE_WIN", RECEIVED_AT)));
+
+        assertEquals(2, count("post"));
+        assertEquals(1, countGeneratedResultPosts());
+        assertEquals(7, readResultPostSourceVersion());
     }
 
     @Test
@@ -148,6 +187,22 @@ class MatchFinishedProjectionIntegrationTest {
     }
 
     @Test
+    void d3Com001KeepsTheFirstGeneratedResultPostAsAnImmutableAuditRecord() {
+        assertTrue(projections.receive(event(EVENT_ID, 7, "PLAYER_ONE_WIN", RECEIVED_AT)));
+        assertTrue(projections.receive(event(
+                UUID.fromString("11111111-1111-4111-8111-111111111117"),
+                8,
+                "PLAYER_TWO_WIN",
+                RECEIVED_AT.plusSeconds(1))));
+
+        assertEquals("PLAYER_TWO_WIN", readProjection().result());
+        assertEquals(8, readProjection().sourceVersion());
+        assertEquals(1, countGeneratedResultPosts());
+        assertEquals(7, readResultPostSourceVersion());
+        assertTrue(readResultPostMarkdown().contains("Result: PLAYER_ONE_WIN"));
+    }
+
+    @Test
     void d3Stat001RebuildsAQuarantinedProjectionFromAnAuthoritativeReplay() {
         jdbc.sql("""
                         insert into match_projection (
@@ -173,10 +228,12 @@ class MatchFinishedProjectionIntegrationTest {
         jdbc.sql("""
                         insert into post (
                             id, author_user_id, visibility, prose_markdown, rendered_html,
-                            prose_character_count, match_projection_id, created_at, updated_at
+                            prose_character_count, match_projection_id, post_kind,
+                            match_source_version, created_at, updated_at
                         ) values (
                             :id, :authorUserId, 'PUBLIC', 'Original quarantined record',
-                            '<p>Original quarantined record</p>', 27, :matchId, :createdAt, :createdAt
+                            '<p>Original quarantined record</p>', 27, :matchId,
+                            'MATCH_RESULT', 7, :createdAt, :createdAt
                         )
                         """)
                 .param("id", UUID.fromString("44444444-4444-4444-8444-444444444444"))
@@ -324,9 +381,28 @@ class MatchFinishedProjectionIntegrationTest {
                         select prose_markdown
                         from post
                         where match_projection_id = :matchId
+                          and post_kind = 'MATCH_RESULT'
                         """)
                 .param("matchId", MATCH_ID)
                 .query(String.class)
+                .single();
+    }
+
+    private long readResultPostSourceVersion() {
+        return jdbc.sql("""
+                        select match_source_version
+                        from post
+                        where match_projection_id = :matchId
+                          and post_kind = 'MATCH_RESULT'
+                        """)
+                .param("matchId", MATCH_ID)
+                .query(Long.class)
+                .single();
+    }
+
+    private long countGeneratedResultPosts() {
+        return jdbc.sql("select count(*) from post where post_kind = 'MATCH_RESULT'")
+                .query(Long.class)
                 .single();
     }
 

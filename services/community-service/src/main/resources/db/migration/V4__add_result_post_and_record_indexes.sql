@@ -1,21 +1,22 @@
-with ranked_result_posts as (
-    select id,
-           row_number() over (
-               partition by match_projection_id
-               order by created_at, id
-           ) as reference_position
-    from post
-    where match_projection_id is not null
-)
-update post
-set match_projection_id = null
-from ranked_result_posts
-where post.id = ranked_result_posts.id
-  and ranked_result_posts.reference_position > 1;
+alter table post
+    add column post_kind text not null default 'USER',
+    add column match_source_version bigint,
+    add constraint post_kind_supported
+        check (post_kind in ('USER', 'MATCH_RESULT')),
+    add constraint post_match_source_version_non_negative
+        check (match_source_version is null or match_source_version >= 0),
+    add constraint post_result_metadata_consistent check (
+        (post_kind = 'USER' and match_source_version is null)
+        or (
+            post_kind = 'MATCH_RESULT'
+            and match_projection_id is not null
+            and match_source_version is not null
+        )
+    );
 
-create unique index post_match_projection_unique_idx
+create unique index post_result_match_unique_idx
     on post (match_projection_id)
-    where match_projection_id is not null;
+    where post_kind = 'MATCH_RESULT';
 
 create index match_projection_player_one_projected_idx
     on match_projection (player_one_user_id, projected_at desc, match_id desc)

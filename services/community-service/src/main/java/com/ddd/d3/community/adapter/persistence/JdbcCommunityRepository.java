@@ -63,13 +63,15 @@ public final class JdbcCommunityRepository {
         return jdbc.sql("""
                         insert into post (
                             id, author_user_id, visibility, prose_markdown, rendered_html,
-                            prose_character_count, match_projection_id, created_at, updated_at
+                            prose_character_count, match_projection_id, post_kind,
+                            match_source_version, created_at, updated_at
                         )
                         values (
                             :id, :authorUserId, 'PUBLIC', :markdown, :renderedHtml,
-                            :proseCharacterCount, :matchId, :createdAt, :updatedAt
+                            :proseCharacterCount, :matchId, 'MATCH_RESULT',
+                            :sourceVersion, :createdAt, :updatedAt
                         )
-                        on conflict (match_projection_id) where match_projection_id is not null do nothing
+                        on conflict (match_projection_id) where post_kind = 'MATCH_RESULT' do nothing
                         """)
                 .param("id", post.id())
                 .param("authorUserId", post.authorUserId())
@@ -77,6 +79,7 @@ public final class JdbcCommunityRepository {
                 .param("renderedHtml", post.renderedHtml())
                 .param("proseCharacterCount", post.proseCharacterCount())
                 .param("matchId", post.matchId())
+                .param("sourceVersion", post.sourceVersion())
                 .param("createdAt", java.sql.Timestamp.from(now))
                 .param("updatedAt", java.sql.Timestamp.from(now))
                 .update() == 1;

@@ -6,7 +6,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,8 +41,8 @@ public final class CommunityController {
     }
 
     @GetMapping("/matches/{matchId}")
-    ResponseEntity<CommunityService.MatchRecordView> matchRecord(@PathVariable UUID matchId) {
-        return ResponseEntity.of(service.matchRecord(matchId));
+    CommunityService.MatchRecordView matchRecord(@PathVariable UUID matchId) {
+        return service.matchRecord(matchId).orElseThrow(CommunityMatchRecordNotFoundException::new);
     }
 
     @GetMapping("/players/{playerId}/matches")

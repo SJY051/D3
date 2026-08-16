@@ -2,10 +2,10 @@
   "openapi": "3.1.0",
   "info": {
     "title": "D3 Community API",
-    "version": "0.1.0",
-    "description": "P0 public developer feed contract. Markdown rendering is a safe minimal subset: paragraphs, line breaks, and fenced code blocks."
+    "version": "0.2.0",
+    "description": "P0 public developer feed and privacy-safe match record contract. Markdown rendering is a safe minimal subset: paragraphs, line breaks, and fenced code blocks."
   },
-  "x-requirements": ["D3-COM-001", "D3-SEC-001"],
+  "x-requirements": ["D3-COM-001", "D3-STAT-001", "D3-SEC-001"],
   "paths": {
     "/v1/community/posts": {
       "post": {
@@ -55,6 +55,49 @@
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
+    },
+    "/v1/community/matches/{matchId}": {
+      "get": {
+        "summary": "Read one ACTIVE public match record",
+        "security": [],
+        "parameters": [
+          { "name": "matchId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public match record",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MatchRecord" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/v1/community/players/{playerId}/matches": {
+      "get": {
+        "summary": "List one player's ACTIVE public match records with keyset pagination",
+        "security": [],
+        "parameters": [
+          { "name": "playerId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "cursor", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public player match page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MatchRecordPage" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" }
+        }
+      }
     }
   },
   "components": {
@@ -68,6 +111,10 @@
       },
       "Unauthorized": {
         "description": "Authentication required",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": {
+        "description": "Match record not found",
         "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
       },
       "PayloadTooLarge": {
@@ -92,7 +139,7 @@
       },
       "Post": {
         "type": "object",
-        "required": ["id", "authorUserId", "visibility", "markdown", "renderedHtml", "proseCharacterCount", "createdAt"],
+        "required": ["id", "authorUserId", "visibility", "markdown", "renderedHtml", "proseCharacterCount", "matchId", "createdAt"],
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "authorUserId": { "type": "string", "format": "uuid" },
@@ -100,6 +147,7 @@
           "markdown": { "type": "string" },
           "renderedHtml": { "type": "string" },
           "proseCharacterCount": { "type": "integer", "minimum": 0 },
+          "matchId": { "type": ["string", "null"], "format": "uuid" },
           "createdAt": { "type": "string", "format": "date-time" }
         },
         "additionalProperties": false
@@ -109,6 +157,29 @@
         "required": ["posts"],
         "properties": {
           "posts": { "type": "array", "items": { "$ref": "#/components/schemas/Post" } },
+          "nextCursor": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "MatchRecord": {
+        "type": "object",
+        "required": ["matchId", "playerOneUserId", "playerTwoUserId", "result", "ranked", "sourceVersion", "projectedAt"],
+        "properties": {
+          "matchId": { "type": "string", "format": "uuid" },
+          "playerOneUserId": { "type": "string", "format": "uuid" },
+          "playerTwoUserId": { "type": "string", "format": "uuid" },
+          "result": { "type": "string", "enum": ["PLAYER_ONE_WIN", "PLAYER_TWO_WIN", "DRAW", "VOIDED"] },
+          "ranked": { "type": "boolean" },
+          "sourceVersion": { "type": "integer", "minimum": 0 },
+          "projectedAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "MatchRecordPage": {
+        "type": "object",
+        "required": ["matches", "nextCursor"],
+        "properties": {
+          "matches": { "type": "array", "items": { "$ref": "#/components/schemas/MatchRecord" } },
           "nextCursor": { "type": ["string", "null"] }
         },
         "additionalProperties": false
