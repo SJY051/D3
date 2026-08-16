@@ -1,5 +1,6 @@
 package com.ddd.d3.community.adapter.persistence;
 
+import com.ddd.d3.community.application.MatchFinishedProjectionService.ApplyResult;
 import com.ddd.d3.community.application.MatchFinishedProjectionService.MatchFinishedEvent;
 import com.ddd.d3.community.application.MatchFinishedProjectionService.Store;
 import java.sql.Timestamp;
@@ -15,10 +16,10 @@ public final class JdbcMatchProjectionStore implements Store {
     }
 
     @Override
-    public boolean apply(MatchFinishedEvent event) {
+    public ApplyResult apply(MatchFinishedEvent event) {
         Objects.requireNonNull(event, "event");
         if (!claim(event)) {
-            return false;
+            return ApplyResult.DUPLICATE_EVENT;
         }
 
         int projected = jdbc.sql("""
@@ -67,7 +68,7 @@ public final class JdbcMatchProjectionStore implements Store {
         if (applied != 1) {
             throw new IllegalStateException("Claimed match.finished event was not pending");
         }
-        return true;
+        return projected == 1 ? ApplyResult.PROJECTION_APPLIED : ApplyResult.EVENT_APPLIED;
     }
 
     private boolean claim(MatchFinishedEvent event) {

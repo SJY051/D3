@@ -38,4 +38,15 @@ class CommunityServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.publicFeed(Optional.of("not-a-cursor"), 20));
         verify(repository, never()).publicFeed(any(), anyInt());
     }
+
+    @Test
+    void d3Stat001RejectsInvalidMatchRecordCursorsInsteadOfFallingBackToTheFirstPage() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.playerMatches(
+                        UUID.fromString("11111111-1111-4111-8111-111111111111"),
+                        Optional.of("not-a-cursor"),
+                        20));
+        verify(repository, never()).playerMatches(any(), any(), anyInt());
+    }
 }

@@ -41,7 +41,7 @@ class CommunityDatabaseMigrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(3, migrations);
+        assertEquals(4, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -89,7 +89,7 @@ class CommunityDatabaseMigrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(2, applied);
+        assertEquals(3, applied);
         assertEquals(new PlayerSeats(playerOneId, playerTwoId), readPlayerSeats(matchId));
         assertEquals(0, jdbc.sql("""
                         select count(*)
@@ -127,7 +127,7 @@ class CommunityDatabaseMigrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(2, applied);
+        assertEquals(3, applied);
         assertEquals(4, jdbc.sql("""
                         select count(*)
                         from match_projection
@@ -156,6 +156,79 @@ class CommunityDatabaseMigrationTest {
                 .param("postId", referencingPost)
                 .query(UUID.class)
                 .single());
+    }
+
+    @Test
+    void d3Qlt001PreservesLegacyPostReferencesAndSeparatesGeneratedResultPosts() {
+        migrateOnlyThrough("3");
+        UUID matchId = UUID.randomUUID();
+        assertEquals(1, insertMatchProjection(matchId, UUID.randomUUID(), UUID.randomUUID()));
+        insertResultPostReference(UUID.fromString("11111111-1111-4111-8111-111111111111"), matchId);
+        insertResultPostReference(UUID.fromString("22222222-2222-4222-8222-222222222222"), matchId);
+
+        int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
+
+        assertEquals(1, applied);
+        assertEquals(2, jdbc.sql("""
+                        select count(*)
+                        from post
+                        where match_projection_id = :matchId
+                          and post_kind = 'USER'
+                          and match_source_version is null
+                        """)
+                .param("matchId", matchId)
+                .query(Integer.class)
+                .single());
+        insertGeneratedResultPost(
+                UUID.fromString("33333333-3333-4333-8333-333333333333"), matchId, 7);
+        assertEquals(1, jdbc.sql("""
+                        select count(*)
+                        from post
+                        where match_projection_id = :matchId
+                          and post_kind = 'MATCH_RESULT'
+                          and match_source_version = 7
+                        """)
+                .param("matchId", matchId)
+                .query(Integer.class)
+                .single());
+        assertThrows(
+                DataIntegrityViolationException.class,
+                () -> insertGeneratedResultPost(
+                        UUID.fromString("44444444-4444-4444-8444-444444444444"), matchId, 8));
+    }
+
+    private void insertResultPostReference(UUID postId, UUID matchId) {
+        jdbc.sql("""
+                        insert into post (
+                            id, author_user_id, visibility, prose_markdown, rendered_html,
+                            prose_character_count, match_projection_id, created_at, updated_at
+                        ) values (
+                            :id, :authorId, 'PUBLIC', 'legacy result', '<p>legacy result</p>',
+                            13, :matchId, now(), now()
+                        )
+                        """)
+                .param("id", postId)
+                .param("authorId", UUID.randomUUID())
+                .param("matchId", matchId)
+                .update();
+    }
+
+    private void insertGeneratedResultPost(UUID postId, UUID matchId, long sourceVersion) {
+        jdbc.sql("""
+                        insert into post (
+                            id, author_user_id, visibility, prose_markdown, rendered_html,
+                            prose_character_count, match_projection_id, post_kind,
+                            match_source_version, created_at, updated_at
+                        ) values (
+                            :id, :authorId, 'PUBLIC', 'generated result', '<p>generated result</p>',
+                            16, :matchId, 'MATCH_RESULT', :sourceVersion, now(), now()
+                        )
+                        """)
+                .param("id", postId)
+                .param("authorId", UUID.randomUUID())
+                .param("matchId", matchId)
+                .param("sourceVersion", sourceVersion)
+                .update();
     }
 
     private int insertMatchProjection(UUID playerOneId, UUID playerTwoId) {

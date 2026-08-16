@@ -22,6 +22,12 @@ public final class CommunityHttpExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "community request is invalid", request);
     }
 
+    @ExceptionHandler(CommunityMatchRecordNotFoundException.class)
+    ResponseEntity<CommunityErrorResponse> notFound(
+            CommunityMatchRecordNotFoundException exception, HttpServletRequest request) {
+        return error(HttpStatus.NOT_FOUND, "MATCH_RECORD_NOT_FOUND", "match record was not found", request);
+    }
+
     private static ResponseEntity<CommunityErrorResponse> error(
             HttpStatus status, String code, String message, HttpServletRequest request) {
         String correlationId = request.getHeader("X-Correlation-Id");
@@ -31,3 +37,5 @@ public final class CommunityHttpExceptionHandler {
         return ResponseEntity.status(status).body(new CommunityErrorResponse(code, message, correlationId));
     }
 }
+
+final class CommunityMatchRecordNotFoundException extends RuntimeException {}

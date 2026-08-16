@@ -2,7 +2,11 @@ package com.ddd.d3.community.adapter.persistence;
 
 import com.ddd.d3.community.application.CommunityService.FeedCursor;
 import com.ddd.d3.community.application.CommunityService.FeedPage;
+import com.ddd.d3.community.application.CommunityService.MatchRecordCursor;
+import com.ddd.d3.community.application.CommunityService.MatchRecordPage;
+import com.ddd.d3.community.application.CommunityService.MatchRecordView;
 import com.ddd.d3.community.application.CommunityService.NewPost;
+import com.ddd.d3.community.application.CommunityService.NewResultPost;
 import com.ddd.d3.community.application.CommunityService.PostView;
 import com.ddd.d3.community.domain.PostVisibility;
 import java.time.Clock;
@@ -50,7 +54,35 @@ public final class JdbcCommunityRepository {
                 post.markdown(),
                 post.renderedHtml(),
                 post.proseCharacterCount(),
+                null,
                 now);
+    }
+
+    public boolean insertResultPost(NewResultPost post) {
+        Instant now = clock.instant();
+        return jdbc.sql("""
+                        insert into post (
+                            id, author_user_id, visibility, prose_markdown, rendered_html,
+                            prose_character_count, match_projection_id, post_kind,
+                            match_source_version, created_at, updated_at
+                        )
+                        values (
+                            :id, :authorUserId, 'PUBLIC', :markdown, :renderedHtml,
+                            :proseCharacterCount, :matchId, 'MATCH_RESULT',
+                            :sourceVersion, :createdAt, :updatedAt
+                        )
+                        on conflict (match_projection_id) where post_kind = 'MATCH_RESULT' do nothing
+                        """)
+                .param("id", post.id())
+                .param("authorUserId", post.authorUserId())
+                .param("markdown", post.markdown())
+                .param("renderedHtml", post.renderedHtml())
+                .param("proseCharacterCount", post.proseCharacterCount())
+                .param("matchId", post.matchId())
+                .param("sourceVersion", post.sourceVersion())
+                .param("createdAt", java.sql.Timestamp.from(now))
+                .param("updatedAt", java.sql.Timestamp.from(now))
+                .update() == 1;
     }
 
     public FeedPage publicFeed(Optional<FeedCursor> cursor, int limit) {
@@ -59,7 +91,7 @@ public final class JdbcCommunityRepository {
                 : "where visibility = 'PUBLIC'";
         var query = jdbc.sql("""
                         select id, author_user_id, visibility::text, prose_markdown, rendered_html,
-                               prose_character_count, created_at
+                               prose_character_count, match_projection_id, created_at
                         from post
                         %s
                         order by created_at desc, id desc
@@ -77,6 +109,7 @@ public final class JdbcCommunityRepository {
                 rs.getString("prose_markdown"),
                 rs.getString("rendered_html"),
                 rs.getInt("prose_character_count"),
+                rs.getObject("match_projection_id", UUID.class),
                 rs.getTimestamp("created_at").toInstant()))
                 .list();
         String nextCursor = null;
@@ -86,5 +119,60 @@ public final class JdbcCommunityRepository {
             nextCursor = new FeedCursor(last.createdAt(), last.id()).encode();
         }
         return new FeedPage(rows, nextCursor);
+    }
+
+    public Optional<MatchRecordView> matchRecord(UUID matchId) {
+        return jdbc.sql("""
+                        select match_id, player_one_user_id, player_two_user_id, result,
+                               ranked, source_version, projected_at
+                        from match_projection
+                        where match_id = :matchId
+                          and projection_status = 'ACTIVE'
+                        """)
+                .param("matchId", matchId)
+                .query(JdbcCommunityRepository::mapMatchRecord)
+                .optional();
+    }
+
+    public MatchRecordPage playerMatches(UUID playerId, Optional<MatchRecordCursor> cursor, int limit) {
+        String cursorClause = cursor.isPresent()
+                ? "and (projected_at, match_id) < (:cursorProjectedAt, :cursorMatchId)"
+                : "";
+        var query = jdbc.sql("""
+                        select match_id, player_one_user_id, player_two_user_id, result,
+                               ranked, source_version, projected_at
+                        from match_projection
+                        where projection_status = 'ACTIVE'
+                          and (player_one_user_id = :playerId or player_two_user_id = :playerId)
+                        %s
+                        order by projected_at desc, match_id desc
+                        limit :limit
+                        """.formatted(cursorClause))
+                .param("playerId", playerId)
+                .param("limit", limit + 1);
+        cursor.ifPresent(value -> query
+                .param("cursorProjectedAt", java.sql.Timestamp.from(value.projectedAt()))
+                .param("cursorMatchId", value.matchId()));
+
+        List<MatchRecordView> rows = query.query(JdbcCommunityRepository::mapMatchRecord).list();
+        String nextCursor = null;
+        if (rows.size() > limit) {
+            rows.removeLast();
+            MatchRecordView last = rows.getLast();
+            nextCursor = new MatchRecordCursor(last.projectedAt(), last.matchId()).encode();
+        }
+        return new MatchRecordPage(rows, nextCursor);
+    }
+
+    private static MatchRecordView mapMatchRecord(java.sql.ResultSet resultSet, int rowNumber)
+            throws java.sql.SQLException {
+        return new MatchRecordView(
+                resultSet.getObject("match_id", UUID.class),
+                resultSet.getObject("player_one_user_id", UUID.class),
+                resultSet.getObject("player_two_user_id", UUID.class),
+                resultSet.getString("result"),
+                resultSet.getBoolean("ranked"),
+                resultSet.getLong("source_version"),
+                resultSet.getTimestamp("projected_at").toInstant());
     }
 }

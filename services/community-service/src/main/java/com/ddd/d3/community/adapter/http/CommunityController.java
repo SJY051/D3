@@ -9,6 +9,7 @@ import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,6 +38,19 @@ public final class CommunityController {
             @RequestParam Optional<String> cursor,
             @RequestParam(defaultValue = "20") int limit) {
         return service.publicFeed(cursor, limit);
+    }
+
+    @GetMapping("/matches/{matchId}")
+    CommunityService.MatchRecordView matchRecord(@PathVariable UUID matchId) {
+        return service.matchRecord(matchId).orElseThrow(CommunityMatchRecordNotFoundException::new);
+    }
+
+    @GetMapping("/players/{playerId}/matches")
+    CommunityService.MatchRecordPage playerMatches(
+            @PathVariable UUID playerId,
+            @RequestParam Optional<String> cursor,
+            @RequestParam(defaultValue = "20") int limit) {
+        return service.playerMatches(playerId, cursor, limit);
     }
 
     record CreatePostRequest(@NotBlank String markdown, PostVisibility visibility) {}

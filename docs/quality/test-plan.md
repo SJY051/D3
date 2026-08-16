@@ -60,7 +60,18 @@ These rows summarize narrow test evidence. The issue #13 PR report remains autho
 | PostgreSQL inbox and projection | PASS | Concurrent duplicates and replay are no-ops, seat order and authoritative IDs/version remain traceable, stale events do not regress state, and an authoritative replay rebuilds a quarantined row |
 | Transaction rollback | PASS | A forced failure while marking the inbox applied rolls back both the inbox claim and projection write |
 | Contract privacy | PASS | Strict parsing rejects missing required scalar fields, unknown private fields, duplicate JSON fields, trailing JSON documents and aggregate/match correlation mismatches before persistence |
-| Public record and result post | NOT RUN | User/rating projections, automatic result posts and public HTTP/UI are separate #17 slices and remain pending |
+| Public record and result post | PASS at service boundary | Issue #64 creates one immutable public post for each ranked non-void projection and exposes ACTIVE records by match or player through public HTTP; handle/rating projections and the UI trace remain pending |
+
+## Issue #64 result post and public record evidence
+
+| Slice | Current result | What it proves |
+|---|---|---|
+| Transactional result post | PASS | Projection apply and ranked non-void result-post creation share one PostgreSQL transaction; a forced post failure rolls back inbox, projection and post |
+| Replay and rebuild idempotency | PASS | Concurrent duplicates, same-version replay, stale events and `REBUILD_REQUIRED` recovery retain at most one immutable post per match |
+| Public record HTTP | PASS | Exact match and player-history reads expose ACTIVE seat order, result, ranked flag, source version and projected time without authentication or private execution fields |
+| Keyset and query indexes | PASS | Player history paginates by `(projected_at, match_id)` and V4 supplies ACTIVE player indexes plus a unique result-post match reference |
+| Migration upgrade | PASS | V4 preserves existing linked posts as USER records, records generated-post source versions and enforces one MATCH_RESULT post per match without changing V1–V3 |
+| Unranked feature boundary | PASS | Unranked and void records remain queryable but do not activate the P1 opt-in result-post surface |
 
 ## Critical functional suites
 

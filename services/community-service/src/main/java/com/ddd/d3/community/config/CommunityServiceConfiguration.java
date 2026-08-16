@@ -40,8 +40,11 @@ public class CommunityServiceConfiguration {
 
     @Bean
     MatchFinishedProjectionService matchFinishedProjectionService(
-            JdbcMatchProjectionStore store, PlatformTransactionManager transactionManager) {
-        return new MatchFinishedProjectionService(store, new TransactionTemplate(transactionManager));
+            JdbcMatchProjectionStore store,
+            CommunityService communityService,
+            PlatformTransactionManager transactionManager) {
+        return new MatchFinishedProjectionService(
+                store, new TransactionTemplate(transactionManager), communityService::createResultPost);
     }
 
     @Bean

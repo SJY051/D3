@@ -73,6 +73,9 @@ class GatewayRuntimeConfigurationTest {
         assertEquals(URI.create("lb://battle-service"), routes.get("battle-api").getUri());
         assertEquals(URI.create("lb:ws://battle-service"), routes.get("battle-websocket").getUri());
         assertEquals(URI.create("lb://community-service"), routes.get("community-api").getUri());
+        assertEquals(1, routes.get("community-api").getFilters().size());
+        assertEquals("StripPrefix", routes.get("community-api").getFilters().getFirst().getName());
+        assertEquals("1", routes.get("community-api").getFilters().getFirst().getArgs().get("_genkey_0"));
         assertTrue(routes.values().stream().noneMatch(route -> route.getUri().toString().contains("judge")));
     }
 
@@ -117,6 +120,20 @@ class GatewayRuntimeConfigurationTest {
         assertEquals(401, request("/api/v1/users/me", "trace-profile").statusCode());
         assertEquals(401, patch("/api/v1/users/me", "trace-profile-patch").statusCode());
         assertEquals(401, post("/api/v1/auth/probe", "trace-probe").statusCode());
+    }
+
+    @Test
+    void d3Stat001AllowsOnlyPublicMatchRecordReadsWithoutAuthentication() throws Exception {
+        String matchId = "11111111-1111-4111-8111-111111111111";
+        String playerId = "22222222-2222-4222-8222-222222222222";
+
+        assertEquals(503, request("/api/v1/community/matches/" + matchId, "trace-match").statusCode());
+        assertEquals(
+                503,
+                request("/api/v1/community/players/" + playerId + "/matches", "trace-player").statusCode());
+
+        assertEquals(401, request("/api/v1/community/feed", "trace-feed").statusCode());
+        assertEquals(401, post("/api/v1/community/matches/" + matchId, "trace-match-post").statusCode());
     }
 
     @Test

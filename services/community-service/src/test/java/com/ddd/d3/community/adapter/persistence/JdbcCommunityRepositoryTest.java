@@ -30,6 +30,9 @@ class JdbcCommunityRepositoryTest {
     private static final UUID USER_ONE = UUID.fromString("11111111-1111-4111-8111-111111111111");
     private static final UUID USER_TWO = UUID.fromString("22222222-2222-4222-8222-222222222222");
     private static final UUID POST_ONE = UUID.fromString("33333333-3333-4333-8333-333333333331");
+    private static final UUID MATCH_ONE = UUID.fromString("44444444-4444-4444-8444-444444444441");
+    private static final UUID MATCH_TWO = UUID.fromString("44444444-4444-4444-8444-444444444442");
+    private static final UUID MATCH_REBUILD = UUID.fromString("44444444-4444-4444-8444-444444444443");
     private static final UUID POST_TWO = UUID.fromString("33333333-3333-4333-8333-333333333332");
     private JdbcClient jdbc;
     private JdbcCommunityRepository repository;
@@ -70,5 +73,53 @@ class JdbcCommunityRepositoryTest {
                 firstPage.posts().getFirst().createdAt(), firstPage.posts().getFirst().id())), 2);
         assertEquals(List.of(POST_ONE), secondPage.posts().stream().map(post -> post.id()).toList());
         assertNull(secondPage.nextCursor());
+    }
+
+    @Test
+    void d3Stat001ReadsOnlyActivePlayerMatchesWithStableKeysetPagination() {
+        insertMatch(MATCH_ONE, USER_ONE, USER_TWO, "PLAYER_ONE_WIN", "ACTIVE", 7, "2026-08-16T01:00:00Z");
+        insertMatch(MATCH_TWO, USER_TWO, USER_ONE, "DRAW", "ACTIVE", 8, "2026-08-16T02:00:00Z");
+        insertMatch(MATCH_REBUILD, null, null, "VOIDED", "REBUILD_REQUIRED", 9, "2026-08-16T03:00:00Z");
+
+        var firstPage = repository.playerMatches(USER_ONE, Optional.empty(), 1);
+        assertEquals(List.of(MATCH_TWO), firstPage.matches().stream().map(match -> match.matchId()).toList());
+        assertFalse(firstPage.nextCursor().isBlank());
+
+        var cursor = new com.ddd.d3.community.application.CommunityService.MatchRecordCursor(
+                firstPage.matches().getFirst().projectedAt(),
+                firstPage.matches().getFirst().matchId());
+        var secondPage = repository.playerMatches(USER_ONE, Optional.of(cursor), 1);
+        assertEquals(List.of(MATCH_ONE), secondPage.matches().stream().map(match -> match.matchId()).toList());
+        assertNull(secondPage.nextCursor());
+
+        assertEquals(MATCH_ONE, repository.matchRecord(MATCH_ONE).orElseThrow().matchId());
+        assertFalse(repository.matchRecord(MATCH_REBUILD).isPresent());
+    }
+
+    private void insertMatch(
+            UUID matchId,
+            UUID playerOne,
+            UUID playerTwo,
+            String result,
+            String status,
+            long sourceVersion,
+            String projectedAt) {
+        jdbc.sql("""
+                        insert into match_projection (
+                            match_id, player_one_user_id, player_two_user_id, projection_status,
+                            result, ranked, source_version, projected_at
+                        ) values (
+                            :matchId, :playerOne, :playerTwo, :status,
+                            :result, true, :sourceVersion, :projectedAt
+                        )
+                        """)
+                .param("matchId", matchId)
+                .param("playerOne", playerOne)
+                .param("playerTwo", playerTwo)
+                .param("status", status)
+                .param("result", result)
+                .param("sourceVersion", sourceVersion)
+                .param("projectedAt", java.sql.Timestamp.from(Instant.parse(projectedAt)))
+                .update();
     }
 }

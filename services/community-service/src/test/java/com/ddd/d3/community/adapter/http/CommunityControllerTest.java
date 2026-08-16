@@ -15,6 +15,8 @@ import com.ddd.d3.community.config.CommunityRequestSizeFilter;
 import com.ddd.d3.community.CommunitySecurityConfiguration;
 import com.ddd.d3.community.domain.PostVisibility;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,16 +33,69 @@ class CommunityControllerTest {
 
     private static final UUID USER_ID = UUID.fromString("11111111-1111-4111-8111-111111111111");
     private static final UUID POST_ID = UUID.fromString("22222222-2222-4222-8222-222222222222");
+    private static final UUID MATCH_ID = UUID.fromString("33333333-3333-4333-8333-333333333333");
+    private static final UUID PLAYER_TWO = UUID.fromString("44444444-4444-4444-8444-444444444444");
 
     @Autowired MockMvc mockMvc;
     @MockitoBean CommunityService service;
     @MockitoBean JwtDecoder jwtDecoder;
-
     @Test
-    void d3Sec001RequiresAuthenticationForCommunityApis() throws Exception {
+    void d3Sec001KeepsThePublicFeedBehindAuthentication() throws Exception {
         mockMvc.perform(get("/v1/community/feed"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void d3Stat001ExposesAnActiveMatchRecordWithoutAuthentication() throws Exception {
+        when(service.matchRecord(MATCH_ID)).thenReturn(Optional.of(new CommunityService.MatchRecordView(
+                MATCH_ID,
+                USER_ID,
+                PLAYER_TWO,
+                "PLAYER_ONE_WIN",
+                true,
+                7,
+                Instant.parse("2026-08-16T01:00:00Z"))));
+
+        mockMvc.perform(get("/v1/community/matches/{matchId}", MATCH_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matchId").value(MATCH_ID.toString()))
+                .andExpect(jsonPath("$.playerOneUserId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.playerTwoUserId").value(PLAYER_TWO.toString()))
+                .andExpect(jsonPath("$.result").value("PLAYER_ONE_WIN"))
+                .andExpect(jsonPath("$.ranked").value(true))
+                .andExpect(jsonPath("$.sourceVersion").value(7))
+                .andExpect(jsonPath("$.source").doesNotExist())
+                .andExpect(jsonPath("$.hiddenTests").doesNotExist())
+                .andExpect(jsonPath("$.diagnostics").doesNotExist());
+    }
+
+    @Test
+    void d3Stat001ExposesPlayerMatchesWithKeysetPaginationWithoutAuthentication() throws Exception {
+        var record = new CommunityService.MatchRecordView(
+                MATCH_ID,
+                USER_ID,
+                PLAYER_TWO,
+                "DRAW",
+                true,
+                8,
+                Instant.parse("2026-08-16T02:00:00Z"));
+        when(service.playerMatches(USER_ID, Optional.empty(), 1))
+                .thenReturn(new CommunityService.MatchRecordPage(List.of(record), "next-record"));
+
+        mockMvc.perform(get("/v1/community/players/{playerId}/matches", USER_ID).param("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matches[0].matchId").value(MATCH_ID.toString()))
+                .andExpect(jsonPath("$.nextCursor").value("next-record"));
+    }
+
+    @Test
+    void d3Stat001ReturnsNotFoundForAnUnknownOrInactiveMatch() throws Exception {
+        when(service.matchRecord(MATCH_ID)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/v1/community/matches/{matchId}", MATCH_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MATCH_RECORD_NOT_FOUND"));
     }
 
     @Test
@@ -52,6 +107,7 @@ class CommunityControllerTest {
                 "hello",
                 "<p>hello</p>",
                 5,
+                null,
                 Instant.parse("2026-08-14T00:00:00Z")));
 
         mockMvc.perform(post("/v1/community/posts")

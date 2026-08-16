@@ -4,7 +4,7 @@ Owner: 윤서진
 
 Status: Required-source baseline; implementation and final presentation evidence pending
 
-Last verified: 2026-08-16 against origin/main at 506185a, repository sources and issue #60 PostgreSQL/Kafka evidence
+Last verified: 2026-08-16 against origin/main at 7db3811 plus issue #64 Community result-post and public-record evidence
 
 Requirement: D3-DOC-001
 
@@ -17,11 +17,11 @@ The planning PDF names the ten artifact classes below. This table is the authori
 | 1 | Requirements specification: core/optional, priority and MUST/SHOULD | [MVP specification](specs/d3-mvp.md#internal-scoring-priority-plan) | 윤서진 | Baseline | 2026-08-14 · PDF/source and AWS activation-gate cross-check | Implemented evidence per matrix item; final rubric confirmation |
 | 2 | Workflow Swimlane | [Ranked workflow](architecture/workflow.md) | 최정민 | Target baseline | 2026-08-13 · scenarios and contracts cross-check | Render review and Scenario A/B/C runtime traces |
 | 3 | System architecture | [System context](architecture/system-context.md) | 윤서진 | Baseline | 2026-08-13 · boundary source review | Running topology and final deployment substitutions |
-| 4 | Service architecture | [Service boundaries](architecture/services.md) | 윤서진 | Local platform active; identity/battle/judge P0 paths and Community match projection implemented; user/rating projections pending | 2026-08-16 · issue #60 exactly-once `match.finished.v1` PostgreSQL/Kafka evidence | Remaining Community projections, product endpoints and integrated authorization evidence |
-| 5 | Service database ERD | [Logical ERD](architecture/erd.dbml) | Service owners | Logical baseline: 32 tables, 20 intra-service refs; four forward-only Flyway chains | 2026-08-14 · fresh install, adversarial existing-data upgrade, ownership invariants and Testcontainers review | Rendered diagram, legacy cleanup validation and feature query-plan evidence |
+| 4 | Service architecture | [Service boundaries](architecture/services.md) | 윤서진 | Local platform active; identity/battle/judge P0 paths plus Community match projection, ranked result post and public record HTTP implemented; user/rating projections pending | 2026-08-16 · issue #64 transactional post, replay/rebuild and public HTTP evidence | Remaining Community user/rating projections and integrated browser authorization evidence |
+| 5 | Service database ERD | [Logical ERD](architecture/erd.dbml) | Service owners | Logical baseline: 32 tables, 20 intra-service refs; four forward-only Flyway chains | 2026-08-16 · Community V4 result-post kind/source traceability, generated-post uniqueness and ACTIVE player-record indexes | Rendered diagram, remaining legacy cleanup validation and production query-plan evidence |
 | 6 | Cloud architecture | [Cloud architecture](architecture/cloud.md) | 윤서진 | Account/region and Judge0 host bound; application-to-Judge0 source-SG route proven; application services pending | 2026-08-15 · issue #59 production-adapter private-route smoke and full temporary-resource cleanup | Application IAM, quota and deployed-resource evidence |
 | 7 | Wireframes and functions | [WF-01 through WF-08](wireframes/README.md) | 최정민 | Review required | 2026-08-13 · route/requirement mapping review | Team sign-off and styled-screen linkage/screenshots |
-| 8 | Test plan: unit, integration, load and chaos | [Test plan](quality/test-plan.md) | 최정민 and service owners | Plan baseline plus designated-host, private-route and Community match projection evidence | 2026-08-16 · issue #60 concurrent/replay/order/rollback and Kafka consumer checks | Full deployed-service activation, load and chaos reports |
+| 8 | Test plan: unit, integration, load and chaos | [Test plan](quality/test-plan.md) | 최정민 and service owners | Plan baseline plus designated-host, private-route, Community projection, result-post and public-record evidence | 2026-08-16 · issue #64 concurrent/replay/order/rebuild/rollback, migration-upgrade, Kafka and public HTTP checks | Full deployed-service activation, integrated UI, load and chaos reports |
 | 9 | Deployment plan: CI/CD, procedure and rollback | [Deployment plan](operations/deployment-plan.md) | 윤서진 | Local runtime active; developer account and Judge0 host bound; application deployment pending | 2026-08-14 · full local preflight, CI and Judge0 AWS boundary review | Application images, AWS/OIDC bindings, deploy and rollback rehearsal |
 | 10 | Source and README | [README](../README.md), repository and [public contracts](../contracts/README.md) | Team | Executable local contributor baseline | 2026-08-15 · local start/preflight, two-session golden-path runtime and repository command review | Integrated product behavior, final revision, license decision and release evidence |
 
