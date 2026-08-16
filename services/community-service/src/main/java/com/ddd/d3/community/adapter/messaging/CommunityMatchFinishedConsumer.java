@@ -71,28 +71,31 @@ public final class CommunityMatchFinishedConsumer {
     record MatchFinishedEnvelope(
             UUID eventId,
             String eventType,
-            int version,
+            Integer version,
             Instant occurredAt,
             String correlationId,
             UUID aggregateId,
-            long aggregateVersion,
+            Long aggregateVersion,
             MatchFinishedData data) {
 
         MatchFinishedEnvelope {
             Objects.requireNonNull(eventId, "eventId");
             Objects.requireNonNull(eventType, "eventType");
+            Objects.requireNonNull(version, "version");
             Objects.requireNonNull(occurredAt, "occurredAt");
             Objects.requireNonNull(correlationId, "correlationId");
             Objects.requireNonNull(aggregateId, "aggregateId");
+            Objects.requireNonNull(aggregateVersion, "aggregateVersion");
             Objects.requireNonNull(data, "data");
         }
     }
 
-    record MatchFinishedData(UUID matchId, String result, boolean ranked, List<UUID> playerIds) {
+    record MatchFinishedData(UUID matchId, String result, Boolean ranked, List<UUID> playerIds) {
 
         MatchFinishedData {
             Objects.requireNonNull(matchId, "matchId");
             Objects.requireNonNull(result, "result");
+            Objects.requireNonNull(ranked, "ranked");
             Objects.requireNonNull(playerIds, "playerIds");
             playerIds = List.copyOf(playerIds);
         }

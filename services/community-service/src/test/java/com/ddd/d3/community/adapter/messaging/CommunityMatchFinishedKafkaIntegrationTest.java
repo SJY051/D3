@@ -13,6 +13,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -25,7 +26,6 @@ import org.testcontainers.utility.DockerImageName;
 @SpringBootTest(properties = {
         "spring.cloud.config.enabled=false",
         "eureka.client.enabled=false",
-        "spring.kafka.consumer.auto-offset-reset=earliest",
         "spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer",
         "spring.kafka.consumer.value-deserializer=org.apache.kafka.common.serialization.StringDeserializer",
         "d3.community.match-finished-topic=match.finished.v1.community-test",
@@ -46,6 +46,7 @@ class CommunityMatchFinishedKafkaIntegrationTest {
             DockerImageName.parse(KAFKA_IMAGE).asCompatibleSubstituteFor("apache/kafka"));
 
     @Autowired DataSource dataSource;
+    @Autowired Environment environment;
 
     @DynamicPropertySource
     static void infrastructureProperties(DynamicPropertyRegistry registry) {
@@ -53,6 +54,11 @@ class CommunityMatchFinishedKafkaIntegrationTest {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
+    }
+
+    @Test
+    void d3Stat001StartsNewConsumerGroupsFromTheEarliestRetainedEvent() {
+        assertEquals("earliest", environment.getProperty("spring.kafka.consumer.auto-offset-reset"));
     }
 
     @Test

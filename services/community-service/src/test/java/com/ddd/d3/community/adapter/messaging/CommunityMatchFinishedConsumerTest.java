@@ -79,6 +79,18 @@ class CommunityMatchFinishedConsumerTest {
         verifyNoInteractions(service);
     }
 
+    @Test
+    void d3Stat001RejectsMissingRequiredScalarFields() {
+        MatchFinishedProjectionService service = mock(MatchFinishedProjectionService.class);
+        CommunityMatchFinishedConsumer consumer = consumer(service);
+
+        for (String field : List.of("\"version\":1,", "\"aggregateVersion\":7,", "\"ranked\":true,")) {
+            String payload = validPayload().replace(field, "");
+            assertThrows(IllegalArgumentException.class, () -> consumer.receive(payload));
+        }
+        verifyNoInteractions(service);
+    }
+
     private CommunityMatchFinishedConsumer consumer(MatchFinishedProjectionService service) {
         return new CommunityMatchFinishedConsumer(
                 service,
