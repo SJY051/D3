@@ -41,7 +41,7 @@ class CommunityDatabaseMigrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(4, migrations);
+        assertEquals(5, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -89,7 +89,7 @@ class CommunityDatabaseMigrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(3, applied);
+        assertEquals(4, applied);
         assertEquals(new PlayerSeats(playerOneId, playerTwoId), readPlayerSeats(matchId));
         assertEquals(0, jdbc.sql("""
                         select count(*)
@@ -127,7 +127,7 @@ class CommunityDatabaseMigrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(3, applied);
+        assertEquals(4, applied);
         assertEquals(4, jdbc.sql("""
                         select count(*)
                         from match_projection
@@ -168,7 +168,7 @@ class CommunityDatabaseMigrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(1, applied);
+        assertEquals(2, applied);
         assertEquals(2, jdbc.sql("""
                         select count(*)
                         from post
