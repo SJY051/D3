@@ -13,20 +13,41 @@ public final class MatchFinishedProjectionService {
             "PLAYER_ONE_WIN", "PLAYER_TWO_WIN", "DRAW", "VOIDED");
 
     private final Store store;
+    private final ResultPostPublisher resultPosts;
     private final TransactionOperations transactions;
 
-    public MatchFinishedProjectionService(Store store, TransactionOperations transactions) {
+    public MatchFinishedProjectionService(
+            Store store, TransactionOperations transactions, ResultPostPublisher resultPosts) {
         this.store = Objects.requireNonNull(store, "store");
+        this.resultPosts = Objects.requireNonNull(resultPosts, "resultPosts");
         this.transactions = Objects.requireNonNull(transactions, "transactions");
     }
 
     public boolean receive(MatchFinishedEvent event) {
         Objects.requireNonNull(event, "event");
-        return Boolean.TRUE.equals(transactions.execute(status -> store.apply(event)));
+        ApplyResult result = transactions.execute(status -> {
+            ApplyResult applied = store.apply(event);
+            if (applied == ApplyResult.PROJECTION_APPLIED && event.ranked() && !"VOIDED".equals(event.result())) {
+                resultPosts.publish(event);
+            }
+            return applied;
+        });
+        return result != null && result != ApplyResult.DUPLICATE_EVENT;
     }
 
     public interface Store {
-        boolean apply(MatchFinishedEvent event);
+        ApplyResult apply(MatchFinishedEvent event);
+    }
+
+    @FunctionalInterface
+    public interface ResultPostPublisher {
+        void publish(MatchFinishedEvent event);
+    }
+
+    public enum ApplyResult {
+        DUPLICATE_EVENT,
+        EVENT_APPLIED,
+        PROJECTION_APPLIED
     }
 
     public record MatchFinishedEvent(

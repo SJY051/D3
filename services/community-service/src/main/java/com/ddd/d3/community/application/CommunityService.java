@@ -51,6 +51,41 @@ public final class CommunityService {
                 proseCharacters));
     }
 
+    public void createResultPost(MatchFinishedProjectionService.MatchFinishedEvent event) {
+        String markdown = """
+                Ranked match %s
+                Player one: %s
+                Player two: %s
+                Result: %s
+                Ranked: %s"""
+                .formatted(
+                        event.matchId(),
+                        event.playerIds().get(0),
+                        event.playerIds().get(1),
+                        event.result(),
+                        event.ranked());
+        int proseCharacters = markdownPolicy.proseCharacterCount(markdown);
+        if (markdown.length() > markdownLimit || proseCharacters > proseLimit) {
+            throw new IllegalStateException("generated result post exceeds the configured limit");
+        }
+        repository.insertResultPost(new NewResultPost(
+                ids.get(),
+                event.matchId(),
+                event.playerIds().get(0),
+                markdown,
+                markdownPolicy.renderSanitizedHtml(markdown),
+                proseCharacters));
+    }
+
+    public Optional<MatchRecordView> matchRecord(UUID matchId) {
+        return repository.matchRecord(matchId);
+    }
+
+    public MatchRecordPage playerMatches(UUID playerId, Optional<String> cursor, int limit) {
+        Optional<MatchRecordCursor> decodedCursor = cursor.map(MatchRecordCursor::decode);
+        return repository.playerMatches(playerId, decodedCursor, clamp(limit, 1, 50));
+    }
+
     public FeedPage publicFeed(Optional<String> cursor, int limit) {
         Optional<FeedCursor> decodedCursor = cursor.map(FeedCursor::decode);
         return repository.publicFeed(decodedCursor, clamp(limit, 1, 50));
@@ -64,6 +99,14 @@ public final class CommunityService {
             String renderedHtml,
             int proseCharacterCount) {}
 
+    public record NewResultPost(
+            UUID id,
+            UUID matchId,
+            UUID authorUserId,
+            String markdown,
+            String renderedHtml,
+            int proseCharacterCount) {}
+
     public record PostView(
             UUID id,
             UUID authorUserId,
@@ -71,9 +114,21 @@ public final class CommunityService {
             String markdown,
             String renderedHtml,
             int proseCharacterCount,
+            UUID matchId,
             Instant createdAt) {}
 
     public record FeedPage(List<PostView> posts, String nextCursor) {}
+
+    public record MatchRecordView(
+            UUID matchId,
+            UUID playerOneUserId,
+            UUID playerTwoUserId,
+            String result,
+            boolean ranked,
+            long sourceVersion,
+            Instant projectedAt) {}
+
+    public record MatchRecordPage(List<MatchRecordView> matches, String nextCursor) {}
 
     public record FeedCursor(Instant createdAt, UUID id) {
         public String encode() {
@@ -88,6 +143,27 @@ public final class CommunityService {
                 return new FeedCursor(Instant.parse(parts[0]), UUID.fromString(parts[1]));
             } catch (RuntimeException exception) {
                 throw new IllegalArgumentException("feed cursor is invalid", exception);
+            }
+        }
+    }
+
+    public record MatchRecordCursor(Instant projectedAt, UUID matchId) {
+        public String encode() {
+            String raw = projectedAt + "|" + matchId;
+            return java.util.Base64.getUrlEncoder()
+                    .withoutPadding()
+                    .encodeToString(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+
+        static MatchRecordCursor decode(String cursor) {
+            try {
+                String raw = new String(
+                        java.util.Base64.getUrlDecoder().decode(cursor),
+                        java.nio.charset.StandardCharsets.UTF_8);
+                String[] parts = raw.split("\\|", 2);
+                return new MatchRecordCursor(Instant.parse(parts[0]), UUID.fromString(parts[1]));
+            } catch (RuntimeException exception) {
+                throw new IllegalArgumentException("match record cursor is invalid", exception);
             }
         }
     }

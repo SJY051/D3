@@ -478,6 +478,7 @@ Table community_db.post {
   Indexes {
     (author_user_id, created_at)
     (visibility, created_at)
+    (match_projection_id) [unique, note: 'At most one auto-generated result post per projected match']
   }
 }
 
@@ -562,6 +563,11 @@ Table community_db.match_projection {
 
   checks {
     `(projection_status = 'ACTIVE' AND player_one_user_id IS NOT NULL AND player_two_user_id IS NOT NULL AND player_one_user_id <> player_two_user_id) OR (projection_status = 'REBUILD_REQUIRED' AND player_one_user_id IS NULL AND player_two_user_id IS NULL)` [name: 'match_projection_player_state_consistent']
+  }
+
+  Indexes {
+    (player_one_user_id, projected_at, match_id) [note: 'Partial index for ACTIVE records, descending time/key in PostgreSQL']
+    (player_two_user_id, projected_at, match_id) [note: 'Partial index for ACTIVE records, descending time/key in PostgreSQL']
   }
 }
 
