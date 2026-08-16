@@ -1,8 +1,13 @@
 import { createConnection } from "node:net";
 import { resolveJudge0Request, resolveJudgeAdapter } from "./demo-preflight-targets.mjs";
+import {
+  probeGatewayCommunityRoute,
+  resolveGatewayCommunityRoute,
+} from "./demo-preflight-route.mjs";
 
 const judgeAdapter = resolveJudgeAdapter();
 const judge0Request = judgeAdapter.judge0Required ? resolveJudge0Request() : null;
+const gatewayCommunityRoute = resolveGatewayCommunityRoute();
 
 const httpTargets = [
   ["web", process.env.D3_WEB_URL ?? "http://localhost:5173", true],
@@ -59,6 +64,16 @@ const httpResults = await Promise.all(
 );
 
 const tcpResults = await Promise.all(tcpTargets.map((target) => checkTcp(...target)));
+const gatewayCommunityRouteResult = gatewayCommunityRoute.configured
+  ? await probeGatewayCommunityRoute({ url: gatewayCommunityRoute.url })
+  : {
+      name: "gateway-community-route",
+      target: gatewayCommunityRoute.target,
+      required: true,
+      kind: "configuration",
+      ok: false,
+      error: gatewayCommunityRoute.error,
+    };
 const results = [
   {
     name: "judge-adapter",
@@ -80,6 +95,7 @@ const results = [
     : []),
   ...httpResults,
   ...tcpResults,
+  gatewayCommunityRouteResult,
 ];
 
 for (const result of results) console.log(JSON.stringify(result));

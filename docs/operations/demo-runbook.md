@@ -60,10 +60,11 @@ docker compose -f infra/compose.yaml config --quiet
 pnpm local:start
 ```
 
-`pnpm local:start` runs `demo:preflight` after all local processes become healthy. Preflight requires Web, discovery, config, gateway, four domain services, PostgreSQL, Redis, Kafka, and the adapter selected for that build. The deterministic fake is the local-development default; the primary presentation must explicitly select and verify real Judge0. Archive the terminal output with the revision; a `NOT READY` result blocks the live path.
+`pnpm local:start` runs `demo:preflight` after all local processes become healthy. Preflight requires Web, discovery, config, gateway, four domain services, PostgreSQL, Redis, Kafka, and the adapter selected for that build. It also waits for the anonymous Gateway route `GET /api/v1/community/matches/00000000-0000-4000-8000-000000000000` to converge to its Community contract response: HTTP `404` with `code=MATCH_RECORD_NOT_FOUND`. Transient network and `5xx` failures are retried for a bounded interval, while another status, a missing contract marker, or retry exhaustion produces `NOT READY`. The route origin is derived from `D3_GATEWAY_HEALTH_URL`; the probe reads only the public error `code`, and output contains the code plus status/attempt metadata but never the full response body or message. The deterministic fake is the local-development default; the primary presentation must explicitly select and verify real Judge0. Archive the terminal output with the revision; a `NOT READY` result blocks the live path and browser launch.
 
 Before opening the browser, confirm:
 
+- the `gateway-community-route` preflight record is `ok: true` with `status: 404` and `contractCode: "MATCH_RECORD_NOT_FOUND"`; do not open either browser before this routed gate passes;
 - both sessions are independent and already at the sign-in screen;
 - seeded users, fixed ranked problem and deterministic attack configuration match the recorded seed;
 - clocks are synchronized enough to interpret server timestamps;
