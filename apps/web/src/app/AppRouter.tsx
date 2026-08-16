@@ -3,6 +3,7 @@ import { Navigate, RouterProvider, createBrowserRouter } from "react-router-dom"
 import { AppShell } from "../components/AppShell";
 import { ScaffoldPage } from "../pages/ScaffoldPage";
 import { LiveBattlePage } from "../pages/LiveBattlePage";
+import { GoldenPathPage } from "../pages/GoldenPathPage";
 
 const router = createBrowserRouter([
   {
@@ -10,28 +11,8 @@ const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       { index: true, element: <Navigate to="/feed" replace /> },
-      {
-        path: "sign-in",
-        element: (
-          <ScaffoldPage
-            wireframe="WF-01"
-            requirement="D3-ID-001"
-            title="Sign in"
-            sections={["Password login", "OAuth entry", "Session recovery"]}
-          />
-        ),
-      },
-      {
-        path: "feed",
-        element: (
-          <ScaffoldPage
-            wireframe="WF-02"
-            requirement="D3-COM-001"
-            title="Developer feed"
-            sections={["Composer", "Timeline", "Rank identity"]}
-          />
-        ),
-      },
+      { path: "sign-in", element: <GoldenPathPage kind="sign-in" /> },
+      { path: "feed", element: <GoldenPathPage kind="feed" /> },
       {
         path: "practice",
         element: (
@@ -43,43 +24,13 @@ const router = createBrowserRouter([
           />
         ),
       },
-      {
-        path: "ranked",
-        element: (
-          <ScaffoldPage
-            wireframe="WF-03"
-            requirement="D3-BTL-001"
-            title="Ranked matchmaking"
-            sections={["Language pool", "Queue state", "Current rank"]}
-          />
-        ),
-      },
+      { path: "ranked", element: <GoldenPathPage kind="ranked" /> },
       {
         path: "battles/:matchId",
         element: <LiveBattlePage />,
       },
-      {
-        path: "results/:matchId",
-        element: (
-          <ScaffoldPage
-            wireframe="WF-05"
-            requirement="D3-BTL-003 · D3-BTL-005"
-            title="Battle result"
-            sections={["Outcome", "Score breakdown", "Rating change"]}
-          />
-        ),
-      },
-      {
-        path: "players/:handle",
-        element: (
-          <ScaffoldPage
-            wireframe="WF-06"
-            requirement="D3-STAT-001"
-            title="Player record"
-            sections={["Tier and RP", "Public rating", "Match history"]}
-          />
-        ),
-      },
+      { path: "results/:matchId", element: <GoldenPathPage kind="result" /> },
+      { path: "players/:playerId", element: <GoldenPathPage kind="record" /> },
       {
         path: "admin/problems",
         element: (
