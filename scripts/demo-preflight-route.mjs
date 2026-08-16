@@ -1,5 +1,6 @@
 const GATEWAY_HEALTH_URL = "http://localhost:8080/actuator/health";
 const MISSING_MATCH_PATH = "/api/v1/community/matches/00000000-0000-4000-8000-000000000000";
+const MISSING_MATCH_CODE = "MATCH_RECORD_NOT_FOUND";
 const CONVERGENCE_TIMEOUT_MS = 35_000;
 const RETRY_INTERVAL_MS = 500;
 const REQUEST_TIMEOUT_MS = 1_500;
@@ -55,15 +56,30 @@ export async function probeGatewayCommunityRoute({
       });
 
       if (response.status === 404) {
+        const contractCode = await readContractCode(response);
+        if (contractCode === MISSING_MATCH_CODE) {
+          return {
+            name: "gateway-community-route",
+            target: url,
+            required: true,
+            kind: "route",
+            ok: true,
+            status: 404,
+            contractCode,
+            attempts,
+            elapsedMs: now() - startedAt,
+          };
+        }
         return {
           name: "gateway-community-route",
           target: url,
           required: true,
           kind: "route",
-          ok: true,
+          ok: false,
           status: 404,
           attempts,
           elapsedMs: now() - startedAt,
+          error: "CONTRACT_MARKER_MISSING",
         };
       }
 
@@ -104,4 +120,15 @@ export async function probeGatewayCommunityRoute({
     ...(lastStatus === undefined ? {} : { lastStatus }),
     ...(lastFailure === undefined ? {} : { lastFailure }),
   };
+}
+
+async function readContractCode(response) {
+  try {
+    const body = await response.json();
+    return typeof body === "object" && body !== null && !Array.isArray(body) && typeof body.code === "string"
+      ? body.code
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }

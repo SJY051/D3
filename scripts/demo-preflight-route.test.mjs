@@ -21,8 +21,8 @@ test("the routed probe retries transient failures until the contract 404 converg
   let currentTime = 0;
   const responses = [
     new TypeError("connection refused"),
-    { status: 503, body: "must not be inspected" },
-    { status: 404, body: "must not be inspected" },
+    { status: 503 },
+    { status: 404, json: async () => ({ code: "MATCH_RECORD_NOT_FOUND" }) },
   ];
   const requestedUrls = [];
 
@@ -49,6 +49,7 @@ test("the routed probe retries transient failures until the contract 404 converg
     kind: "route",
     ok: true,
     status: 404,
+    contractCode: "MATCH_RECORD_NOT_FOUND",
     attempts: 3,
     elapsedMs: 20,
   });
@@ -84,6 +85,30 @@ test("the routed probe fails closed when transient responses do not converge", a
     lastFailure: "HTTP_5XX",
   });
   assert.deepEqual(waits, [10, 10, 5]);
+});
+
+test("the routed probe rejects a Gateway-generated 404 without the Community contract marker", async () => {
+  const result = await probeGatewayCommunityRoute({
+    url: expectedRoute,
+    fetchImpl: async () => ({ status: 404, json: async () => ({ error: "Not Found" }) }),
+    waitImpl: async () => {
+      throw new Error("a terminal contract mismatch must not retry");
+    },
+    now: () => 0,
+    convergenceTimeoutMs: 100,
+  });
+
+  assert.deepEqual(result, {
+    name: "gateway-community-route",
+    target: expectedRoute,
+    required: true,
+    kind: "route",
+    ok: false,
+    status: 404,
+    attempts: 1,
+    elapsedMs: 0,
+    error: "CONTRACT_MARKER_MISSING",
+  });
 });
 
 test("the routed probe fails immediately on a terminal non-contract status", async () => {
