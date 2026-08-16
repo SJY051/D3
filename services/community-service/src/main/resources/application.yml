@@ -19,8 +19,15 @@ spring:
       ddl-auto: validate
   kafka:
     bootstrap-servers: ${D3_KAFKA_HOST:localhost}:${D3_KAFKA_PORT:9092}
+    consumer:
+      group-id: community-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 d3:
+  community:
+    match-finished-topic: ${D3_MATCH_FINISHED_TOPIC:match.finished.v1}
   security:
     jwk-set-uri: ${D3_JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
     issuer: ${D3_JWT_ISSUER:http://localhost:8081}

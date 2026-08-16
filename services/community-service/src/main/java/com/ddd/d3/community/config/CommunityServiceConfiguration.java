@@ -10,6 +10,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Configuration
 public class CommunityServiceConfiguration {
@@ -25,8 +27,10 @@ public class CommunityServiceConfiguration {
     }
 
     @Bean
-    JdbcCommunityRepository communityRepository(DataSource dataSource, Clock communityClock) {
-        return new JdbcCommunityRepository(JdbcClient.create(dataSource), communityClock);
+    JdbcCommunityRepository communityRepository(
+            DataSource dataSource, Clock communityClock, PlatformTransactionManager transactionManager) {
+        return new JdbcCommunityRepository(
+                JdbcClient.create(dataSource), communityClock, new TransactionTemplate(transactionManager));
     }
 
     @Bean
