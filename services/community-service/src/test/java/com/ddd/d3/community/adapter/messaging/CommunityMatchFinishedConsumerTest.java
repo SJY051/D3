@@ -80,6 +80,15 @@ class CommunityMatchFinishedConsumerTest {
     }
 
     @Test
+    void d3Sec001RejectsTrailingJsonDocuments() {
+        MatchFinishedProjectionService service = mock(MatchFinishedProjectionService.class);
+        CommunityMatchFinishedConsumer consumer = consumer(service);
+
+        assertThrows(IllegalArgumentException.class, () -> consumer.receive(validPayload() + validPayload()));
+        verifyNoInteractions(service);
+    }
+
+    @Test
     void d3Stat001RejectsMissingRequiredScalarFields() {
         MatchFinishedProjectionService service = mock(MatchFinishedProjectionService.class);
         CommunityMatchFinishedConsumer consumer = consumer(service);

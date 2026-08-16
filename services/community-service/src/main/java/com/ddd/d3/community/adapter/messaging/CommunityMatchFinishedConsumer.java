@@ -29,6 +29,7 @@ public final class CommunityMatchFinishedConsumer {
                 .rebuild()
                 .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                 .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
                 .build();
         this.clock = Objects.requireNonNull(clock, "clock");
