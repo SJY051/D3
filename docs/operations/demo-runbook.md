@@ -37,7 +37,7 @@ Credentials stay outside the repository and recording. Seeded demo identities mu
 
 | Gate | Owner | Ready when | Current state |
 |---|---|---|---|
-| Reviewed WF-01~08 | 최정민 | UI review is recorded before styled acceptance | Review required |
+| Reviewed WF-01~08 | 최정민 | UI review is recorded before styled acceptance | WF-01–06 P0 revision approved 2026-08-16; WF-07/08 review required |
 | Scenario A | Service owners | Two browsers complete ranked flow without database edits | Blocked: behavior not implemented |
 | Scenarios B and C | Battle/Judge owners | Reconnect, surrender and incident void are deterministic | PARTIAL PASS: deterministic domain and autonomous match/reconnect deadline tests pass; live two-browser evidence NOT RUN |
 | Six language runtimes | Judge owner | Versioned smoke cases pass on designated host | PASS for host: pinned Judge0 CE 1.13.1 matrix and 12/12 language cases |

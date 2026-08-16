@@ -2,9 +2,9 @@
 
 Owner: 최정민
 
-Status: Review required
+Status: WF-01–WF-06 P0 revision approved by SJY051 on 2026-08-16 for issue #18; WF-07 and WF-08 remain review required
 
-Last verified: 2026-08-13 against D3-UX-001 and the current route scaffold
+Last verified: 2026-08-16 against origin/main at 6019fcc and contracts/http + contracts/websocket v3
 
 Requirement: D3-UX-001
 
@@ -28,8 +28,8 @@ Operation:   Problem list → Inspect → Activate / bounded edit
 │              Sign in to enter the arena                      │
 │              [ Email                              ]           │
 │              [ Password                           ]           │
-│              [ Sign in ]   [ Continue with GitHub ]           │
-│              Create account · Recover access                  │
+│              [ Sign in ]                                    │
+│              Create account                                 │
 │                                                              │
 │                         service health                         │
 └──────────────────────────────────────────────────────────────┘
@@ -39,14 +39,14 @@ Operation:   Problem list → Inspect → Activate / bounded edit
 
 ```text
 ┌──────────────┬───────────────────────────────┬───────────────┐
-│ D³ navigation│ All / Following               │ Queue shortcut│
-│ Feed         │ ┌───────────────────────────┐ │ Rating / RP   │
-│ Practice     │ │ Composer: Markdown / code │ │ Recent record │
-│ Ranked       │ └───────────────────────────┘ │ Active season │
+│ D³ navigation│ Public feed                   │ Queue shortcut│
+│ Feed         │ ┌───────────────────────────┐ │ Recent record │
+│ Practice     │ │ Composer: Markdown / code │ │               │
+│ Ranked       │ └───────────────────────────┘ │               │
 │ Record       │ ┌───────────────────────────┐ │               │
-│              │ │ Author + tier · post      │ │               │
-│              │ │ code block / match card   │ │               │
-│              │ │ like · comment            │ │               │
+│              │ │ Author · post            │ │               │
+│              │ │ code block / match card  │ │               │
+│              │ │ → /results/:matchId      │ │               │
 │              │ └───────────────────────────┘ │               │
 └──────────────┴───────────────────────────────┴───────────────┘
 ```
@@ -55,14 +55,14 @@ Operation:   Problem list → Inspect → Activate / bounded edit
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ Ranked queue                                      Cancel      │
+│ Ranked queue                                                │
 │                                                              │
-│  Public rating  1420        Gold II · 64 RP                  │
-│  Language       [ Python 3 ▼ ]                               │
-│  Search range   ± 80 and widening             00:18           │
+│  Language  [ C / CPP / JAVA / PYTHON3 / JAVASCRIPT /         │
+│              TYPESCRIPT ▼ ]                                  │
+│  Status    QUEUED → MATCHED                   elapsed 00:18   │
 │                                                              │
 │  [ searching pulse with reduced-motion alternative ]         │
-│  Estimated rule: same language · rating proximity            │
+│  On MATCHED, move to /battles/:matchId.                      │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -90,29 +90,30 @@ The timer, connection state, submit lock, warning window, and attack effect requ
 ```text
 ┌──────────────────────────────────────────────────────────────┐
 │ Victory / Defeat / Draw / Voided                             │
-│ Rating 1420 → 1438       RP 64 → 82       Gold II            │
-├───────────────────────┬──────────────────────────────────────┤
-│ Outcome comparison    │ Execution evidence                   │
-│ speed      42 / 50    │ hidden tests / runtime tiers         │
-│ efficiency 27 / 35    │ static confidence: known / unknown   │
-│ attempts     9 / 15   │ attack and reconnect timeline        │
-├───────────────────────┴──────────────────────────────────────┤
-│ [View record] [Share source explicitly] [Return to feed]     │
+│ Final battle snapshot                                       │
+├──────────────────────────────────────────────────────────────┤
+│ Public match record                                          │
+│ result · ranked                                              │
+│ seat-order player IDs                                        │
+│ sourceVersion · projectedAt                                  │
+├──────────────────────────────────────────────────────────────┤
+│ [View player record] [Return to feed]                        │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-## WF-06 — Player record (`/players/:handle`)
+## WF-06 — Player record (`/players/:playerId`)
+
+Handle lookup remains gated until Identity publishes `user-profile.changed.v1`; P0 addresses players by ID.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ Avatar  handle  bio                Follow / challenge room   │
-│ Grandmaster · 2180 rating · 76 RP · leaderboard #18         │
-├──────────────────┬───────────────────────────────────────────┤
-│ Wins / losses    │ Rating history                            │
-│ win rate         │ language breakdown                        │
-│ peak tier        │ recent matches → match details            │
-├──────────────────┴───────────────────────────────────────────┤
-│ Community posts and ranked result cards                      │
+│ Player ID                                                    │
+├──────────────────────────────────────────────────────────────┤
+│ ACTIVE match records                                         │
+│ result · ranked · opponent seat · projectedAt                │
+│ → /results/:matchId                                          │
+│                                                              │
+│ [Load more] (keyset cursor)                                  │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -151,3 +152,4 @@ The timer, connection state, submit lock, warning window, and attack effect requ
 - Prefer typography, spacing, dividers, and data alignment over decorative containers.
 - Require a product reason for gradients, glass effects, oversized headings, repeated rounded cards, or non-functional copy.
 - Check 360 px community, 1280 px battle, keyboard order, focus visibility, reduced motion, and non-color state cues.
+- WF-01, WF-02, WF-03, WF-05, and WF-06 P0 implementations expose only the elements in this revision; removed elements stay hidden behind the P1 feature boundary and must not appear as mocks. WF-04 retains its existing approval and feature-boundary guidance.
