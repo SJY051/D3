@@ -8,6 +8,7 @@ import {
   type MatchRecordPage,
   type RankedLanguage,
   type RankedQueueTicket,
+  createPublicPost,
   joinRankedQueue,
   loadFeed,
   loadMatchRecord,
@@ -74,6 +75,7 @@ function Feed() {
   const resource = useResource(loadFeed, []);
   return (
     <section className="golden-stack">
+      <FeedComposer />
       <section className="golden-panel" aria-label="Public feed posts">
         <h2>Public feed</h2>
         <ResourceMessage resource={resource} empty="No public posts are available yet." success={(posts) => (
@@ -83,6 +85,22 @@ function Feed() {
       <Link className="golden-link" to="/ranked">Open ranked queue</Link>
     </section>
   );
+}
+
+function FeedComposer() {
+  const [resource, setResource] = useState<Resource<FeedPost>>({ status: "empty" });
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const markdown = String(new FormData(event.currentTarget).get("markdown") ?? "");
+    setResource({ status: "loading" });
+    try { setResource({ status: "success", value: await createPublicPost(markdown) }); }
+    catch (error) { setResource(toFailure(error)); }
+  }
+  return <form className="golden-panel golden-form" onSubmit={submit}>
+    <label>Public Markdown post<textarea name="markdown" required rows={5} /></label>
+    <button disabled={resource.status === "loading"} type="submit">{resource.status === "loading" ? "Publishing…" : "Publish"}</button>
+    <ResourceMessage resource={resource} success={(post) => `Published ${post.id}. Refresh the feed to load the latest page.`} />
+  </form>;
 }
 
 function FeedPostCard({ post }: { post: FeedPost }) {

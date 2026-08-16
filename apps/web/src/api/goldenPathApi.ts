@@ -69,8 +69,18 @@ export async function signIn(email: string, password: string): Promise<TokenResp
 }
 
 export async function loadFeed(): Promise<FeedPost[]> {
-  const response = await request<{ posts: FeedPost[] }>("/api/v1/community/feed?limit=20");
+  const response = await request<{ posts: FeedPost[] }>("/api/v1/community/feed?limit=20", {
+    headers: authenticatedHeaders(),
+  });
   return response.posts;
+}
+
+export function createPublicPost(markdown: string): Promise<FeedPost> {
+  return request<FeedPost>("/api/v1/community/posts", {
+    body: JSON.stringify({ markdown, visibility: "PUBLIC" }),
+    headers: { ...authenticatedHeaders(), "Content-Type": "application/json" },
+    method: "POST",
+  });
 }
 
 export async function joinRankedQueue(language: RankedLanguage): Promise<RankedQueueTicket> {
@@ -80,12 +90,16 @@ export async function joinRankedQueue(language: RankedLanguage): Promise<RankedQ
   return request<RankedQueueTicket>("/api/v1/battle/ranked/queue", {
     body: JSON.stringify({ language }),
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      ...authenticatedHeaders(),
       "Content-Type": "application/json",
       "Idempotency-Key": crypto.randomUUID(),
     },
     method: "POST",
   });
+}
+
+function authenticatedHeaders(): HeadersInit {
+  return accessToken === null ? {} : { Authorization: `Bearer ${accessToken}` };
 }
 
 export function loadMatchRecord(matchId: string): Promise<MatchRecord> {
