@@ -7,7 +7,7 @@ const cases: Array<[GoldenPathKind, string, string]> = [
   ["sign-in", "WF-01", "Sign in"],
   ["feed", "WF-02", "Loading authoritative data…"],
   ["ranked", "WF-03", "Join ranked queue"],
-  ["result", "WF-05", "Public match record"],
+  ["result", "WF-05", "Invalid match link"],
   ["record", "WF-06", "Player record"],
 ];
 
