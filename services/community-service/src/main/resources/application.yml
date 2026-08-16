@@ -19,6 +19,8 @@ spring:
       ddl-auto: validate
   kafka:
     bootstrap-servers: ${D3_KAFKA_HOST:localhost}:${D3_KAFKA_PORT:9092}
+    consumer:
+      auto-offset-reset: earliest
 
 d3:
   security:

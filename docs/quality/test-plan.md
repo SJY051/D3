@@ -52,6 +52,16 @@ These rows summarize narrow test evidence. The issue #13 PR report remains autho
 | Browser session cookie and key lifecycle | NOT RUN | Depends on the rebased issue #26 Identity implementation and must prove cookie flags, rotation/revocation and stable demo/deploy signing keys |
 | Identity issuance and Battle acquisition | NOT RUN | The short-lived service-token endpoint/client and positive Battle-to-Judge call remain to be integrated after issue #26 |
 
+## Issue #60 match projection evidence
+
+| Slice | Current result | What it proves |
+|---|---|---|
+| Versioned Kafka consumer | PASS | Production configuration starts a new consumer group at the earliest retained event; a real Kafka delivery of `match.finished.v1` reaches Community and replay converges to one inbox row and one ACTIVE projection |
+| PostgreSQL inbox and projection | PASS | Concurrent duplicates and replay are no-ops, seat order and authoritative IDs/version remain traceable, stale events do not regress state, and an authoritative replay rebuilds a quarantined row |
+| Transaction rollback | PASS | A forced failure while marking the inbox applied rolls back both the inbox claim and projection write |
+| Contract privacy | PASS | Strict parsing rejects missing required scalar fields, unknown private fields, duplicate JSON fields, trailing JSON documents and aggregate/match correlation mismatches before persistence |
+| Public record and result post | NOT RUN | User/rating projections, automatic result posts and public HTTP/UI are separate #17 slices and remain pending |
+
 ## Critical functional suites
 
 - D3-BTL-002: state transition, authoritative deadline, reconnect boundary, surrender, incident void and duplicate commands.
