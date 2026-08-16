@@ -4,7 +4,7 @@ Owner: 윤서진
 
 Status: Required-source baseline; implementation and final presentation evidence pending
 
-Last verified: 2026-08-16 against origin/main at 941b16b, repository sources and issue #60 PostgreSQL/Kafka evidence
+Last verified: 2026-08-16 against origin/main at 506185a, repository sources and issue #60 PostgreSQL/Kafka evidence
 
 Requirement: D3-DOC-001
 
