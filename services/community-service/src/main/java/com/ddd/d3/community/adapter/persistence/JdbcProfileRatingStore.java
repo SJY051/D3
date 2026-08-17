@@ -27,8 +27,9 @@ public final class JdbcProfileRatingStore {
     }
 
     /**
-     * Claims the event in the inbox and updates the rating projection in one transaction. Exactly-once
-     * is enforced by the inbox uniqueness; a stale or absent profile row is a no-op but still consumed.
+     * Claims the event in the inbox and upserts the rating projection in one transaction. Exactly-once
+     * is enforced by the inbox uniqueness. An absent profile row is inserted as a rating-first row; a
+     * stale (lower rating_source_version) row is left unchanged. Either way the event is consumed once.
      *
      * @return true when this delivery was applied, false when it was already claimed.
      */
