@@ -112,9 +112,9 @@ export async function joinRankedQueue(language: RankedLanguage, idempotencyKey: 
 
 export async function waitForRankedMatch(
   language: RankedLanguage,
-  options: { pollIntervalMs?: number; signal: AbortSignal; onTicket: (ticket: RankedQueueTicket) => void },
+  options: { idempotencyKey?: string; pollIntervalMs?: number; signal: AbortSignal; onTicket: (ticket: RankedQueueTicket) => void },
 ): Promise<RankedQueueTicket> {
-  const idempotencyKey = crypto.randomUUID();
+  const idempotencyKey = options.idempotencyKey ?? crypto.randomUUID();
   const pollIntervalMs = options.pollIntervalMs ?? 750;
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const ticket = await joinRankedQueue(language, idempotencyKey, options.signal);
@@ -145,7 +145,8 @@ async function request<T>(url: string, init?: RequestInit, authenticated = false
   let response: Response;
   try {
     response = authenticated ? await authenticatedFetch(url, init) : await fetch(url, { ...init, credentials: "include" });
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new ApiRequestError("The service is unreachable. Check the local gateway connection.", { disconnected: true });
   }
   if (!response.ok) {

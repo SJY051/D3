@@ -10,6 +10,7 @@ import {
   type RankedLanguage,
   type RankedQueueTicket,
   createPublicPost,
+  logout,
   isUuid,
   loadFeed,
   loadMatchRecord,
@@ -18,6 +19,7 @@ import {
   signIn,
   waitForRankedMatch,
 } from "../api/goldenPathApi";
+import { currentSessionUserId } from "../api/session";
 
 export type GoldenPathKind = "sign-in" | "feed" | "ranked" | "result" | "record";
 
@@ -83,7 +85,7 @@ function Feed() {
   const addPost = (post: FeedPost) => setResource((current) => current.status === "success" ? { status: "success", value: { ...current.value, posts: [post, ...current.value.posts] } } : { status: "success", value: { nextCursor: null, posts: [post] } });
   return <section className="golden-stack"><FeedComposer onPublished={addPost} />
     <section className="golden-panel" aria-label="Public feed posts"><h2>Public feed</h2><ResourceMessage resource={resource} empty="No public posts are available yet." success={(page) => <><div className="golden-list">{page.posts.map((post) => <FeedPostCard key={post.id} post={post} />)}</div>{page.nextCursor !== null && <button type="button" onClick={() => void loadPage(page.nextCursor, true)}>Load more</button>}</>} /></section>
-    <Link className="golden-link" to="/ranked">Open ranked queue</Link>
+    <div className="golden-route-actions"><Link className="golden-link" to="/ranked">Open ranked queue</Link><button type="button" onClick={() => void logout().then(() => navigate("/sign-in", { replace: true }))}>Sign out</button></div>
   </section>;
 }
 
@@ -93,9 +95,10 @@ function FeedComposer({ onPublished }: { onPublished: (post: FeedPost) => void }
   useSessionRedirect(resource, navigate);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const markdown = String(new FormData(event.currentTarget).get("markdown") ?? "");
+    const form = event.currentTarget;
+    const markdown = String(new FormData(form).get("markdown") ?? "");
     setResource({ status: "loading" });
-    try { const post = await createPublicPost(markdown); onPublished(post); event.currentTarget.reset(); setResource({ status: "success", value: post }); } catch (error) { setResource(toFailure(error)); }
+    try { const post = await createPublicPost(markdown); onPublished(post); form.reset(); setResource({ status: "success", value: post }); } catch (error) { setResource(toFailure(error)); }
   }
   return <form className="golden-panel golden-form" onSubmit={submit}><label>Public Markdown post<textarea name="markdown" required rows={5} /></label><button disabled={resource.status === "loading"} type="submit">{resource.status === "loading" ? "Publishing…" : "Publish"}</button><ResourceMessage resource={resource} success={() => "Published to the visible feed."} /></form>;
 }
@@ -109,20 +112,25 @@ function Ranked() {
   const abortRef = useRef<AbortController | null>(null);
   const [language, setLanguage] = useState<RankedLanguage>("PYTHON3");
   const [resource, setResource] = useState<Resource<RankedQueueTicket>>({ status: "empty" });
+  const [isPolling, setIsPolling] = useState(false);
+  const attemptKeyRef = useRef<string | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
   useSessionRedirect(resource, navigate);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    abortRef.current?.abort();
+    if (isPolling) return;
     const controller = new AbortController();
     abortRef.current = controller;
+    attemptKeyRef.current ??= crypto.randomUUID();
+    setIsPolling(true);
     setResource({ status: "loading" });
     try {
-      const ticket = await waitForRankedMatch(language, { signal: controller.signal, onTicket: (next) => setResource({ status: "success", value: next }) });
+      const ticket = await waitForRankedMatch(language, { idempotencyKey: attemptKeyRef.current ?? undefined, signal: controller.signal, onTicket: (next) => setResource({ status: "success", value: next }) });
       navigate(`/battles/${ticket.matchId}`);
-    } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setResource(toFailure(error)); }
+    } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setResource(toFailure(error)); } finally { setIsPolling(false); }
   }
-  return <form className="golden-panel golden-form" onSubmit={submit}><label>Language<select onChange={(event) => setLanguage(event.target.value as RankedLanguage)} value={language}><option value="C">C</option><option value="CPP">CPP</option><option value="JAVA">JAVA</option><option value="PYTHON3">PYTHON3</option><option value="JAVASCRIPT">JAVASCRIPT</option><option value="TYPESCRIPT">TYPESCRIPT</option></select></label><p>Queue replays one idempotency key until MATCHED, then opens the authenticated Battle v3 route.</p><button disabled={resource.status === "loading"} type="submit">{resource.status === "loading" ? "Finding a match…" : "Join ranked queue"}</button><ResourceMessage resource={resource} success={(ticket) => ticket.status === "MATCHED" ? "Match found. Opening Battle v3." : "Queued. Waiting for a matched replay."} /></form>;
+  function cancel() { abortRef.current?.abort(); abortRef.current = null; attemptKeyRef.current = null; setIsPolling(false); setResource({ status: "empty" }); }
+  return <form className="golden-panel golden-form" onSubmit={submit}><label>Language<select disabled={isPolling} onChange={(event) => setLanguage(event.target.value as RankedLanguage)} value={language}><option value="C">C</option><option value="CPP">CPP</option><option value="JAVA">JAVA</option><option value="PYTHON3">PYTHON3</option><option value="JAVASCRIPT">JAVASCRIPT</option><option value="TYPESCRIPT">TYPESCRIPT</option></select></label><p>Queue replays one idempotency key until MATCHED, then opens the authenticated Battle v3 route.</p><p className="golden-queue-state" role="status">{isPolling ? "Searching — queued attempt remains active." : "Idle — choose a language to join."}</p><button disabled={isPolling} type="submit">{isPolling ? "Finding a match…" : attemptKeyRef.current !== null ? "Retry existing queue" : "Join ranked queue"}</button>{isPolling && <button type="button" onClick={cancel}>Cancel queue</button>}<ResourceMessage resource={resource} success={(ticket) => ticket.status === "MATCHED" ? "Match found. Opening Battle v3." : "Queued. Waiting for a matched replay."} /></form>;
 }
 
 function Result() {
@@ -134,7 +142,8 @@ function Result() {
 function ResultRecord({ matchId }: { matchId: string }) {
   const resource = useResource(useCallback(() => loadMatchRecord(matchId), [matchId]), [matchId]);
   if ((resource.status === "error" || resource.status === "disconnected") && resource.statusCode === 404) return <ResultUnavailable title="Match record not found" detail="This public record is unavailable or has not been projected yet." />;
-  return <section className="golden-panel"><h2>Public match record</h2><ResourceMessage resource={resource} success={(match) => <><p className="golden-outcome">{outcomeLabel(match.result)}</p><MatchDetails match={match} /><p><Link to={`/players/${match.playerOneUserId}`}>View player record</Link> · <Link to="/feed">Return to feed</Link></p></>} /></section>;
+  const viewerId = currentSessionUserId();
+  return <section className="golden-panel"><h2>Public match record</h2><ResourceMessage resource={resource} success={(match) => { const playerId = viewerId === match.playerOneUserId || viewerId === match.playerTwoUserId ? viewerId : match.playerOneUserId; return <><p className="golden-outcome">{outcomeLabel(match.result, playerId, match)}</p><MatchDetails match={match} playerId={playerId} /><p><Link to={`/players/${playerId}`}>View player record</Link> · <Link to="/feed">Return to feed</Link></p></>; }} /></section>;
 }
 
 function ResultUnavailable({ detail, title }: { detail: string; title: string }) { return <section className="golden-panel golden-not-found"><h2>{title}</h2><p>{detail}</p><Link to="/feed">Return to feed</Link></section>; }
@@ -153,10 +162,10 @@ function Record() {
 
 function MatchDetails({ match, playerId }: { match: MatchRecord; playerId?: string }) {
   const opponent = playerId === match.playerOneUserId ? match.playerTwoUserId : match.playerOneUserId;
-  return <article className="golden-record"><p><strong>{outcomeLabel(match.result)}</strong> · {match.ranked ? "ranked" : "unranked"}</p>{playerId && <p>Opponent seat: {opponent}</p>}<p>Source version {match.sourceVersion} · projected {match.projectedAt}</p><Link to={`/results/${match.matchId}`}>View match result</Link></article>;
+  return <article className="golden-record"><p><strong>{outcomeLabel(match.result, playerId, match)}</strong> · {match.ranked ? "ranked" : "unranked"}</p>{playerId && <p>Opponent seat: {opponent}</p>}<p>Player one: {match.playerOneUserId} · Player two: {match.playerTwoUserId}</p><p>Source version {match.sourceVersion} · projected {match.projectedAt}</p><Link to={`/results/${match.matchId}`}>View match result</Link></article>;
 }
 
-function outcomeLabel(result: MatchRecord["result"]): string { return ({ PLAYER_ONE_WIN: "Victory · player one", PLAYER_TWO_WIN: "Victory · player two", DRAW: "Draw", VOIDED: "Voided" })[result]; }
+function outcomeLabel(result: MatchRecord["result"], playerId?: string, match?: MatchRecord): string { if (result === "DRAW") return "Draw"; if (result === "VOIDED") return "Voided"; if (playerId !== undefined && match !== undefined) return playerId === (result === "PLAYER_ONE_WIN" ? match.playerOneUserId : match.playerTwoUserId) ? "Victory" : "Defeat"; return result === "PLAYER_ONE_WIN" ? "Player one victory" : "Player two victory"; }
 
 function useResource<T>(loader: () => Promise<T>, dependencies: readonly unknown[]): Resource<T> {
   const [resource, setResource] = useState<Resource<T>>({ status: "loading" });

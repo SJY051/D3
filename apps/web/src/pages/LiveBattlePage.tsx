@@ -42,7 +42,7 @@ export function LiveBattlePage() {
     let socket: WebSocket | null = null;
     setConnection("CONNECTING");
 
-    void requestSessionAccessToken().then((accessToken) => {
+    void requestSessionAccessToken(reconnectAttempt > 0).then((accessToken) => {
       if (!active) {
         return;
       }

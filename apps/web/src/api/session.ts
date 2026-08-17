@@ -4,22 +4,27 @@ export interface SessionToken {
 }
 
 let accessToken: string | null = null;
+let userId: string | null = null;
 let refreshRequest: Promise<string> | null = null;
 
 export function setSession(session: SessionToken): void {
   accessToken = session.accessToken;
+  userId = session.userId;
 }
 
 export function clearSession(): void {
   accessToken = null;
+  userId = null;
 }
 
 export function hasSession(): boolean {
   return accessToken !== null;
 }
 
-export async function requestSessionAccessToken(): Promise<string> {
-  if (accessToken !== null) {
+export function currentSessionUserId(): string | null { return userId; }
+
+export async function requestSessionAccessToken(forceRefresh = false): Promise<string> {
+  if (!forceRefresh && accessToken !== null) {
     return accessToken;
   }
   if (refreshRequest === null) {
@@ -35,6 +40,7 @@ export async function requestSessionAccessToken(): Promise<string> {
         throw new Error("SESSION_UNAVAILABLE");
       }
       accessToken = value.accessToken;
+      if (typeof value.userId === "string" && value.userId.length > 0) userId = value.userId;
       return value.accessToken;
     }).finally(() => {
       refreshRequest = null;
@@ -45,11 +51,10 @@ export async function requestSessionAccessToken(): Promise<string> {
 
 export async function authenticatedFetch(url: string, init: RequestInit = {}): Promise<Response> {
   let token: string;
-  try {
-    token = await requestSessionAccessToken();
-  } catch {
+  try { token = await requestSessionAccessToken(); } catch (error) {
     clearSession();
-    return new Response(null, { status: 401 });
+    if (error instanceof Error && error.message === "SESSION_REQUIRED") return new Response(null, { status: 401 });
+    throw error;
   }
 
   let response = await fetch(url, withAuthorization(init, token));
@@ -58,11 +63,10 @@ export async function authenticatedFetch(url: string, init: RequestInit = {}): P
   }
 
   clearSession();
-  try {
-    token = await requestSessionAccessToken();
-  } catch {
+  try { token = await requestSessionAccessToken(); } catch (error) {
     clearSession();
-    return response;
+    if (error instanceof Error && error.message === "SESSION_REQUIRED") return response;
+    throw error;
   }
   response = await fetch(url, withAuthorization(init, token));
   if (response.status === 401) {

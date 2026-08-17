@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  color: #18181b;
-  background: #fafafa;
+  color: #e7edf8;
+  background: #101827;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
@@ -70,7 +70,7 @@ a {
 }
 
 .golden-page header > p:not(.golden-kicker) {
-  color: #52525b;
+  color: #b7c2d7;
 }
 
 .golden-kicker {
@@ -100,8 +100,8 @@ a {
 
 .golden-panel,
 .golden-record {
-  border: 1px solid #a1a1aa;
-  background: white;
+  border: 1px solid #50617a;
+  background: #182337;
   padding: 20px;
 }
 
@@ -129,10 +129,11 @@ a {
 }
 
 .golden-form input,
-.golden-form select {
-  border: 1px solid #71717a;
-  background: white;
-  color: #18181b;
+.golden-form select,
+.golden-form textarea {
+  border: 1px solid #70819c;
+  background: #101827;
+  color: #f5f8ff;
 }
 
 .golden-link {
@@ -177,6 +178,8 @@ a {
   padding: 10px 12px;
   color: #7f1d1d;
 }
+.golden-route-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.golden-queue-state { border-left: 4px solid #ffbf47; padding-left: 10px; }
 
 :root {
   --arena-ink: #14213d;
@@ -218,6 +221,8 @@ button:disabled {
 
 button:focus-visible,
 textarea:focus-visible,
+input:focus-visible,
+select:focus-visible,
 a:focus-visible {
   outline: 3px solid #ffbf47;
   outline-offset: 3px;

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clearSession } from "./session";
+import { clearSession, requestSessionAccessToken } from "./session";
 import { loadFeed, signIn, waitForRankedMatch } from "./goldenPathApi";
 
 function json(body: unknown, status = 200): Response {
@@ -40,5 +40,13 @@ describe("golden-path API adapter", () => {
 
     expect(ticket.status).toBe("MATCHED");
     expect(fetchMock.mock.calls[1][1].headers["Idempotency-Key"]).toBe(fetchMock.mock.calls[2][1].headers["Idempotency-Key"]);
+  });
+
+  it("forces a fresh access token for an explicit battle reconnect", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(json({ userId: "user-1", accessToken: "first-token" })).mockResolvedValueOnce(json({ userId: "user-1", accessToken: "refreshed-token" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(requestSessionAccessToken()).resolves.toBe("first-token");
+    await expect(requestSessionAccessToken(true)).resolves.toBe("refreshed-token");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

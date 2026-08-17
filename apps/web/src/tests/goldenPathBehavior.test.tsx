@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clearSession } from "../api/session";
+import { clearSession, setSession } from "../api/session";
 import { GoldenPathPage, type GoldenPathKind } from "../pages/GoldenPathPage";
 
 function json(body: unknown, status = 200): Response {
@@ -68,6 +68,21 @@ describe("P0 route behavior", () => {
     await act(async () => { container.querySelector("button")!.click(); await Promise.resolve(); });
     expect(container.querySelectorAll(".golden-record")).toHaveLength(2);
     expect(fetchMock.mock.calls[1][0]).toContain("cursor=cursor-2");
+    root.unmount();
+  });
+
+  it("keeps a published post successful and clears its composer", async () => {
+    const post = { authorUserId: "user-1", createdAt: "2026-08-17T00:00:00Z", id: "post-1", markdown: "hello", matchId: null, renderedHtml: "<p>hello</p>" };
+    setSession({ userId: "user-1", accessToken: "token" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(json({ posts: [], nextCursor: null })).mockResolvedValueOnce(json(post, 201)));
+    const { container, root } = await render("feed", "/feed");
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    const composer = container.querySelector<HTMLFormElement>("form")!;
+    const textarea = composer.querySelector<HTMLTextAreaElement>("textarea")!;
+    textarea.value = "hello";
+    await act(async () => { composer.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); await Promise.resolve(); await Promise.resolve(); });
+    expect(container.textContent).toContain("Published to the visible feed.");
+    expect(textarea.value).toBe("");
     root.unmount();
   });
 });
