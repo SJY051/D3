@@ -1,3 +1,5 @@
+import { clearActiveMatch } from "../battle/useActiveMatch";
+
 export interface SessionToken {
   accessToken: string;
   userId: string;
@@ -8,6 +10,7 @@ let userId: string | null = null;
 let refreshRequest: Promise<string> | null = null;
 
 export function setSession(session: SessionToken): void {
+  if (userId !== null && userId !== session.userId) clearActiveMatch();
   accessToken = session.accessToken;
   userId = session.userId;
 }
@@ -86,6 +89,7 @@ export async function endSession(): Promise<void> {
     throw new Error("LOGOUT_FAILED");
   }
   clearSession();
+  clearActiveMatch();
 }
 
 function withAuthorization(init: RequestInit, token: string): RequestInit {
