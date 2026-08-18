@@ -7,13 +7,22 @@ interface StoredMatch {
   owner: string | null;
 }
 
+// Session logic imports this module, so tolerate hosts without browser storage
+// (server-side or bare test environments) by degrading to "no active match".
+function storage(): Storage | null {
+  return typeof localStorage === "undefined" ? null : localStorage;
+}
+
 function emit() {
+  if (typeof window === "undefined") {
+    return;
+  }
   // storage events don't fire in the same tab; dispatch our own for in-tab subscribers.
   window.dispatchEvent(new StorageEvent("storage", { key: KEY }));
 }
 
 function read(): StoredMatch | null {
-  const raw = localStorage.getItem(KEY);
+  const raw = storage()?.getItem(KEY) ?? null;
   if (raw === null) {
     return null;
   }
@@ -32,15 +41,15 @@ export function setActiveMatch(id: string, owner: string | null = null) {
   if (current?.id === id && current.owner === owner) {
     return;
   }
-  localStorage.setItem(KEY, JSON.stringify({ id, owner }));
+  storage()?.setItem(KEY, JSON.stringify({ id, owner }));
   emit();
 }
 
 export function clearActiveMatch() {
-  if (localStorage.getItem(KEY) === null) {
+  if (storage()?.getItem(KEY) == null) {
     return;
   }
-  localStorage.removeItem(KEY);
+  storage()?.removeItem(KEY);
   emit();
 }
 
