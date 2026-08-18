@@ -8,6 +8,9 @@ import com.ddd.d3.community.application.CommunityService.MatchRecordView;
 import com.ddd.d3.community.application.CommunityService.NewPost;
 import com.ddd.d3.community.application.CommunityService.NewResultPost;
 import com.ddd.d3.community.application.CommunityService.PostView;
+import com.ddd.d3.community.application.CommunityService.ProfileCursor;
+import com.ddd.d3.community.application.CommunityService.ProfilePage;
+import com.ddd.d3.community.application.CommunityService.ProfileView;
 import com.ddd.d3.community.domain.PostVisibility;
 import java.time.Clock;
 import java.time.Instant;
@@ -119,6 +122,49 @@ public final class JdbcCommunityRepository {
             nextCursor = new FeedCursor(last.createdAt(), last.id()).encode();
         }
         return new FeedPage(rows, nextCursor);
+    }
+
+    public ProfilePage searchProfilesByHandle(String handlePrefix, Optional<ProfileCursor> cursor, int limit) {
+        // Only rows the identity projection has filled (handle not null) are searchable; a rating-first row
+        // without a handle is not yet a discoverable profile. Keyset ascends (handle, user_id).
+        String cursorClause = cursor.isPresent() ? "and (handle, user_id) > (:cursorHandle, :cursorUserId)" : "";
+        var query = jdbc.sql("""
+                        select user_id, handle, public_rating, tier
+                        from profile_projection
+                        where handle is not null
+                          and handle like :prefix escape '\\'
+                        %s
+                        order by handle asc, user_id asc
+                        limit :limit
+                        """.formatted(cursorClause))
+                .param("prefix", likePrefix(handlePrefix))
+                .param("limit", limit + 1);
+        cursor.ifPresent(value -> query
+                .param("cursorHandle", value.handle())
+                .param("cursorUserId", value.userId()));
+
+        List<ProfileView> rows = query.query((rs, rowNum) -> new ProfileView(
+                rs.getObject("user_id", UUID.class),
+                rs.getString("handle"),
+                (Integer) rs.getObject("public_rating"),
+                rs.getString("tier")))
+                .list();
+        String nextCursor = null;
+        if (rows.size() > limit) {
+            rows.removeLast();
+            ProfileView last = rows.getLast();
+            nextCursor = new ProfileCursor(last.handle(), last.userId()).encode();
+        }
+        return new ProfilePage(rows, nextCursor);
+    }
+
+    /** Escapes LIKE metacharacters so a caller's handle prefix is matched literally, then appends the wildcard. */
+    private static String likePrefix(String prefix) {
+        String escaped = prefix
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+        return escaped + "%";
     }
 
     public Optional<MatchRecordView> matchRecord(UUID matchId) {

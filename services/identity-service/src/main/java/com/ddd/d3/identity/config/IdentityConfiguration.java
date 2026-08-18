@@ -1,5 +1,7 @@
 package com.ddd.d3.identity.config;
 
+import com.ddd.d3.identity.adapter.messaging.IdentityOutboxPublisher;
+import com.ddd.d3.identity.adapter.persistence.JdbcIdentityOutboxStore;
 import com.ddd.d3.identity.adapter.persistence.JdbcIdentityRepository;
 import com.ddd.d3.identity.application.DemoUserSeeder;
 import com.ddd.d3.identity.application.DemoUserSeeder.DemoUser;
@@ -19,11 +21,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration
+@EnableScheduling
 public class IdentityConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(IdentityConfiguration.class);
@@ -49,8 +55,22 @@ public class IdentityConfiguration {
     }
 
     @Bean
-    IdentityRepository identityRepository(JdbcClient jdbcClient, TransactionTemplate transactionTemplate) {
-        return new JdbcIdentityRepository(jdbcClient, transactionTemplate);
+    IdentityRepository identityRepository(
+            JdbcClient jdbcClient, TransactionTemplate transactionTemplate, ObjectMapper objectMapper) {
+        return new JdbcIdentityRepository(jdbcClient, transactionTemplate, objectMapper);
+    }
+
+    @Bean
+    JdbcIdentityOutboxStore identityOutboxStore(DataSource dataSource) {
+        return new JdbcIdentityOutboxStore(dataSource);
+    }
+
+    @Bean
+    IdentityOutboxPublisher identityOutboxPublisher(
+            JdbcIdentityOutboxStore outboxStore,
+            KafkaTemplate<String, String> kafkaTemplate,
+            @Value("${d3.identity.user-profile-changed-topic:user-profile.changed.v1}") String topic) {
+        return new IdentityOutboxPublisher(outboxStore, kafkaTemplate, topic, Clock.systemUTC());
     }
 
     @Bean

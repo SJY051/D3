@@ -41,7 +41,7 @@ class IdentityDatabaseMigrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(2, migrations);
+        assertEquals(3, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -51,6 +51,22 @@ class IdentityDatabaseMigrationTest {
                         "refresh_session_legacy_normalization",
                         "outbox_event"),
                 tables);
+    }
+
+    @Test
+    void d3Stat001AddsMonotonicProfileVersionDefaultingToZero() {
+        UUID userId = createUser("versioned");
+
+        assertEquals(
+                0L,
+                jdbc.sql("select profile_version from user_account where id = :id")
+                        .param("id", userId)
+                        .query(Long.class)
+                        .single());
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql(
+                        "update user_account set profile_version = -1 where id = :id")
+                .param("id", userId)
+                .update());
     }
 
     @Test
@@ -130,7 +146,8 @@ class IdentityDatabaseMigrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(1, applied);
+        // V2 refresh-lineage normalization plus V3 profile_version apply forward over the V1-only schema.
+        assertEquals(2, applied);
         assertEquals(parentSessionId, jdbc.sql("""
                         select rotated_from_id
                         from refresh_session
@@ -171,6 +188,46 @@ class IdentityDatabaseMigrationTest {
                 .query(Integer.class)
                 .single());
         assertThrows(DataIntegrityViolationException.class, () -> createRefreshSession(secondUserId, parentSessionId));
+    }
+
+    @Test
+    void d3Stat001BackfillsAProfileChangedOutboxRowForAccountsThatPredateTheProducer() {
+        migrateOnlyThrough("2");
+        UUID existing = createUser("legacy");
+
+        Flyway.configure().dataSource(dataSource).load().migrate();
+
+        assertEquals(
+                1L,
+                jdbc.sql("select count(*) from outbox_event where aggregate_id = :id and event_type = 'user-profile.changed'")
+                        .param("id", existing)
+                        .query(Long.class)
+                        .single());
+        assertEquals(
+                0L,
+                jdbc.sql("select aggregate_version from outbox_event where aggregate_id = :id")
+                        .param("id", existing)
+                        .query(Long.class)
+                        .single());
+        assertEquals(
+                existing.toString(),
+                jdbc.sql("select payload->'data'->>'userId' from outbox_event where aggregate_id = :id")
+                        .param("id", existing)
+                        .query(String.class)
+                        .single());
+        assertEquals(
+                "0",
+                jdbc.sql("select payload->'data'->>'profileVersion' from outbox_event where aggregate_id = :id")
+                        .param("id", existing)
+                        .query(String.class)
+                        .single());
+        // The backfilled row is unpublished so the scheduled publisher relays it like any in-band event.
+        assertEquals(
+                1L,
+                jdbc.sql("select count(*) from outbox_event where aggregate_id = :id and published_at is null")
+                        .param("id", existing)
+                        .query(Long.class)
+                        .single());
     }
 
     private void migrateOnlyThrough(String version) {
