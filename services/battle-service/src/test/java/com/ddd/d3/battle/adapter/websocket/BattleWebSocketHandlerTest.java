@@ -21,6 +21,7 @@ import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchView;
 import com.ddd.d3.battle.application.BattleMatchViewService;
 import com.ddd.d3.battle.domain.BattleMatch;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -116,6 +117,65 @@ class BattleWebSocketHandlerTest {
         ArgumentCaptor<TextMessage> replay = ArgumentCaptor.forClass(TextMessage.class);
         verify(reconnected).sendMessage(replay.capture());
         assertEquals(5, objectMapper.readTree(replay.getValue().getPayload()).path("sequence").asLong());
+    }
+
+    @Test
+    void d3Sec001ReplacesTheSameParticipantSessionAndIgnoresLateClose() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED))
+                .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 5, BattleMatchView.ConnectionState.CONNECTED));
+        BattleConnectionService connections = mock(BattleConnectionService.class);
+        when(connections.connected(MATCH_ID, PLAYER_ONE))
+                .thenReturn(new BattleConnectionService.ConnectionLease(7))
+                .thenReturn(new BattleConnectionService.ConnectionLease(8));
+        BattleMatchCommandService commands = mock(BattleMatchCommandService.class);
+        BattleWebSocketHandler handler = handler(views, commands, connections);
+        WebSocketSession previous = session("previous", PLAYER_ONE);
+        WebSocketSession replacement = session("replacement", PLAYER_ONE);
+
+        handler.afterConnectionEstablished(previous);
+        handler.afterConnectionEstablished(replacement);
+        handler.afterConnectionClosed(previous, CloseStatus.GOING_AWAY);
+        handler.handleTransportError(previous, new IOException("late transport error"));
+
+        verify(previous).close(CloseStatus.NORMAL);
+        verify(previous).close(CloseStatus.SERVER_ERROR);
+        verify(replacement, times(1)).sendMessage(any(TextMessage.class));
+        handler.handleTextMessage(replacement, new TextMessage("""
+                {"type":"READY","version":2,"matchId":"%s","commandId":"%s"}
+                """.formatted(MATCH_ID, COMMAND_ONE)));
+        verify(commands).handle(
+                MATCH_ID,
+                COMMAND_ONE,
+                PLAYER_ONE,
+                8,
+                new BattleMatch.Ready(PLAYER_ONE.toString()));
+        verify(connections, never()).disconnected(MATCH_ID, PLAYER_ONE, 7);
+        verify(connections, never()).disconnected(MATCH_ID, PLAYER_ONE, 8);
+    }
+
+    @Test
+    void d3Sec001BoundsRegistryToOneSessionForTheSameParticipant() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED));
+        BattleConnectionService connections = mock(BattleConnectionService.class);
+        BattleWebSocketSessionRegistry sessions = new BattleWebSocketSessionRegistry(
+                views,
+                new BattleDisconnectRetryQueue(
+                        connections,
+                        mock(ScheduledExecutorService.class),
+                        Duration.ofMillis(1)),
+                objectMapper);
+        WebSocketSession previous = session("previous", PLAYER_ONE);
+        WebSocketSession replacement = session("replacement", PLAYER_ONE);
+
+        sessions.register(previous, 7);
+        sessions.register(replacement, 8);
+
+        assertEquals(1, sessions.activeSessionCount());
+        verify(previous).close(CloseStatus.NORMAL);
     }
 
     @Test
