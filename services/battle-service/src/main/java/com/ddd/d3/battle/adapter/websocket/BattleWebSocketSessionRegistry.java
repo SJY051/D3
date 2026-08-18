@@ -40,7 +40,6 @@ final class BattleWebSocketSessionRegistry {
         this(views, null, disconnects, objectMapper);
     }
 
-    @Autowired
     BattleWebSocketSessionRegistry(
             BattleMatchViewService views,
             BattleAttackService attacks,

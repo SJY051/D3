@@ -179,6 +179,33 @@ class BattleWebSocketHandlerTest {
     }
 
     @Test
+    void d3Sec001RejectsAnOlderReplacementGenerationWithoutDisconnectingTheCurrentSession() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED));
+        BattleConnectionService connections = mock(BattleConnectionService.class);
+        BattleWebSocketSessionRegistry sessions = new BattleWebSocketSessionRegistry(
+                views,
+                new BattleDisconnectRetryQueue(
+                        connections,
+                        mock(ScheduledExecutorService.class),
+                        Duration.ofMillis(1)),
+                objectMapper);
+        WebSocketSession current = session("current", PLAYER_ONE);
+        WebSocketSession stale = session("stale", PLAYER_ONE);
+
+        sessions.register(current, 8);
+        sessions.register(stale, 7);
+        sessions.remove(stale);
+
+        assertEquals(1, sessions.activeSessionCount());
+        verify(stale).close(CloseStatus.NORMAL);
+        verify(current, never()).close(any(CloseStatus.class));
+        verify(connections, never()).disconnected(MATCH_ID, PLAYER_ONE, 7);
+        verify(connections, never()).disconnected(MATCH_ID, PLAYER_ONE, 8);
+    }
+
+    @Test
     void d3Btl002MapsSocketLifecycleToAServerOwnedGeneration() throws Exception {
         BattleMatchViewService views = mock(BattleMatchViewService.class);
         when(views.read(MATCH_ID, PLAYER_ONE))
