@@ -79,8 +79,8 @@ for (const entry of readdirSync(join(root, ".claude/skills"))) {
 }
 
 const routeShell = readFileSync(join(root, "apps/web/src/components/AppShell.tsx"), "utf8");
-if (!routeShell.includes("STRUCTURAL PROTOTYPE")) {
-  throw new Error("The web shell must label itself as non-functional scaffolding");
+if (!routeShell.includes("Developer network · live coding arena")) {
+  throw new Error("The web shell must expose the D³ product identity");
 }
 
 console.log(`structure: PASS (${requiredPaths.length} paths, ${requirementIds.length} requirement markers)`);

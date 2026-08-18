@@ -15,7 +15,8 @@ import {
   overlayGlyphs,
   parseBattleSnapshot,
 } from "../battle/battleRealtime";
-import { requestSessionAccessToken } from "../api/session";
+import { currentSessionUserId, requestSessionAccessToken } from "../api/session";
+import { clearActiveMatchIfMatch, setActiveMatch } from "../battle/useActiveMatch";
 
 interface BattleArenaProps {
   connection: ConnectionState;
@@ -124,6 +125,17 @@ export function LiveBattlePage() {
       socket?.close(1000, "battle route closed");
     };
   }, [matchId, reconnectAttempt]);
+
+  useEffect(() => {
+    if (snapshot === null || snapshot.matchId !== matchId) {
+      return;
+    }
+    if (snapshot.match.state === "FINISHED") {
+      clearActiveMatchIfMatch(matchId);
+    } else {
+      setActiveMatch(matchId, currentSessionUserId());
+    }
+  }, [matchId, snapshot]);
 
   const sendCommand = (command: BattleCommand) => {
     const socket = socketRef.current;
