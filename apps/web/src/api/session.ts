@@ -76,11 +76,16 @@ export async function authenticatedFetch(url: string, init: RequestInit = {}): P
 }
 
 export async function endSession(): Promise<void> {
+  let response: Response;
   try {
-    await fetch("/api/v1/auth/logout", { credentials: "include", method: "POST" });
-  } finally {
-    clearSession();
+    response = await fetch("/api/v1/auth/logout", { credentials: "include", method: "POST" });
+  } catch {
+    throw new Error("LOGOUT_FAILED");
   }
+  if (!response.ok) {
+    throw new Error("LOGOUT_FAILED");
+  }
+  clearSession();
 }
 
 function withAuthorization(init: RequestInit, token: string): RequestInit {

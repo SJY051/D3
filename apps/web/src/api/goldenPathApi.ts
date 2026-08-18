@@ -117,7 +117,16 @@ export async function waitForRankedMatch(
   const idempotencyKey = options.idempotencyKey ?? crypto.randomUUID();
   const pollIntervalMs = options.pollIntervalMs ?? 750;
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const ticket = await joinRankedQueue(language, idempotencyKey, options.signal);
+    let ticket: RankedQueueTicket;
+    try {
+      ticket = await joinRankedQueue(language, idempotencyKey, options.signal);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 503) {
+        await delay(pollIntervalMs, options.signal);
+        continue;
+      }
+      throw error;
+    }
     options.onTicket(ticket);
     if (ticket.status === "MATCHED" && ticket.matchId !== null) {
       return ticket;

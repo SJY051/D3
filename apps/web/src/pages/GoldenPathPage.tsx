@@ -73,6 +73,7 @@ function SignIn() {
 function Feed() {
   const navigate = useNavigate();
   const [resource, setResource] = useState<Resource<FeedPage>>({ status: "loading" });
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const loadPage = useCallback(async (cursor: string | null, append: boolean) => {
     setResource((current) => append && current.status === "success" ? current : { status: "loading" });
     try {
@@ -85,7 +86,8 @@ function Feed() {
   const addPost = (post: FeedPost) => setResource((current) => current.status === "success" ? { status: "success", value: { ...current.value, posts: [post, ...current.value.posts] } } : { status: "success", value: { nextCursor: null, posts: [post] } });
   return <section className="golden-stack"><FeedComposer onPublished={addPost} />
     <section className="golden-panel" aria-label="Public feed posts"><h2>Public feed</h2><ResourceMessage resource={resource} empty="No public posts are available yet." success={(page) => <><div className="golden-list">{page.posts.map((post) => <FeedPostCard key={post.id} post={post} />)}</div>{page.nextCursor !== null && <button type="button" onClick={() => void loadPage(page.nextCursor, true)}>Load more</button>}</>} /></section>
-    <div className="golden-route-actions"><Link className="golden-link" to="/ranked">Open ranked queue</Link><button type="button" onClick={() => void logout().then(() => navigate("/sign-in", { replace: true }))}>Sign out</button></div>
+    <div className="golden-route-actions"><Link className="golden-link" to="/ranked">Open ranked queue</Link><button type="button" onClick={() => void logout().then(() => navigate("/sign-in", { replace: true })).catch(() => setLogoutError("Sign-out could not revoke the server session. Stay signed in and try again."))}>Sign out</button></div>
+    {logoutError !== null && <p className="golden-error" role="alert">{logoutError}</p>}
   </section>;
 }
 
@@ -135,9 +137,9 @@ function Ranked() {
       navigate(`/battles/${ticket.matchId}`);
     } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setResource(toFailure(error)); } finally { setIsPolling(false); }
   }
-  function cancel() { abortRef.current?.abort(); abortRef.current = null; attemptKeyRef.current = null; setIsPolling(false); setResource({ status: "empty" }); }
+  function cancel() { abortRef.current?.abort(); abortRef.current = null; setIsPolling(false); setResource({ status: "empty" }); }
   const queuedAt = resource.status === "success" && resource.value.status === "QUEUED" ? resource.value.enqueuedAt : null;
-  return <form className="golden-panel golden-form" onSubmit={submit}><label>Language<select disabled={isPolling} onChange={(event) => setLanguage(event.target.value as RankedLanguage)} value={language}><option value="C">C</option><option value="CPP">CPP</option><option value="JAVA">JAVA</option><option value="PYTHON3">PYTHON3</option><option value="JAVASCRIPT">JAVASCRIPT</option><option value="TYPESCRIPT">TYPESCRIPT</option></select></label><p>Queue replays one idempotency key until MATCHED, then opens the authenticated Battle v3 route.</p><p className="golden-queue-state" role="status">{isPolling ? "Searching — queued attempt remains active." : "Idle — choose a language to join."}{queuedAt !== null && ` Elapsed ${formatElapsed(queuedAt, now)}.`}</p><button disabled={isPolling} type="submit">{isPolling ? "Finding a match…" : attemptKeyRef.current !== null ? "Retry existing queue" : "Join ranked queue"}</button>{isPolling && <button type="button" onClick={cancel}>Cancel queue</button>}<ResourceMessage resource={resource} success={(ticket) => ticket.status === "MATCHED" ? "Match found. Opening Battle v3." : "Queued. Waiting for a matched replay."} /></form>;
+  return <form className="golden-panel golden-form" onSubmit={submit}><label>Language<select disabled={isPolling || attemptKeyRef.current !== null} onChange={(event) => setLanguage(event.target.value as RankedLanguage)} value={language}><option value="C">C</option><option value="CPP">CPP</option><option value="JAVA">JAVA</option><option value="PYTHON3">PYTHON3</option><option value="JAVASCRIPT">JAVASCRIPT</option><option value="TYPESCRIPT">TYPESCRIPT</option></select></label><p>Queue replays one idempotency key until MATCHED, then opens the authenticated Battle v3 route.</p><p className="golden-queue-state" role="status">{isPolling ? "Searching — queued attempt remains active." : attemptKeyRef.current !== null ? "Polling paused — the queued ticket stays active on the server until it matches or expires." : "Idle — choose a language to join."}{queuedAt !== null && ` Elapsed ${formatElapsed(queuedAt, now)}.`}</p><button disabled={isPolling} type="submit">{isPolling ? "Finding a match…" : attemptKeyRef.current !== null ? "Retry existing queue" : "Join ranked queue"}</button>{isPolling && <button type="button" onClick={cancel}>Cancel queue</button>}<ResourceMessage resource={resource} success={(ticket) => ticket.status === "MATCHED" ? "Match found. Opening Battle v3." : "Queued. Waiting for a matched replay."} /></form>;
 }
 
 function Result() {

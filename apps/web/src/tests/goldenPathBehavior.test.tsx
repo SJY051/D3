@@ -71,6 +71,26 @@ describe("P0 route behavior", () => {
     expect(formatElapsed("2026-08-17T00:00:00Z", Date.parse("2026-08-17T00:01:18Z"))).toBe("01:18");
   });
 
+  it("replays the same queued ticket key after a local cancel", async () => {
+    setSession({ userId: "user-1", accessToken: "token" });
+    const fetchMock = vi.fn().mockResolvedValue(json({ status: "QUEUED", matchId: null, enqueuedAt: "2026-08-18T00:00:00Z" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { container, root } = await render("ranked", "/ranked");
+
+    await act(async () => { container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); await Promise.resolve(); });
+    const buttons = () => [...container.querySelectorAll("button")];
+    await act(async () => { buttons().find((button) => button.textContent === "Cancel queue")!.click(); await Promise.resolve(); });
+
+    expect(container.querySelector("select")!.disabled).toBe(true);
+    expect(container.querySelector("button[type=submit]")!.textContent).toBe("Retry existing queue");
+
+    await act(async () => { container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); await Promise.resolve(); });
+    const queueCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("/battle/ranked/queue"));
+    expect(queueCalls.length).toBeGreaterThanOrEqual(2);
+    expect(queueCalls[1][1].headers["Idempotency-Key"]).toBe(queueCalls[0][1].headers["Idempotency-Key"]);
+    root.unmount();
+  });
+
   it("appends a player record page through its next cursor", async () => {
     const first = { matches: [{ matchId: "00000000-0000-4000-8000-000000000001", playerOneUserId: "00000000-0000-4000-8000-000000000002", playerTwoUserId: "00000000-0000-4000-8000-000000000003", result: "DRAW", ranked: true, sourceVersion: 1, projectedAt: "2026-08-17T00:00:00Z" }], nextCursor: "cursor-2" };
     const second = { matches: [{ ...first.matches[0], matchId: "00000000-0000-4000-8000-000000000004" }], nextCursor: null };
