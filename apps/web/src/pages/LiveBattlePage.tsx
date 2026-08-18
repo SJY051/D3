@@ -13,6 +13,7 @@ import {
   overlayGlyphs,
   parseBattleSnapshot,
 } from "../battle/battleRealtime";
+import { requestSessionAccessToken } from "../api/session";
 
 interface BattleArenaProps {
   connection: ConnectionState;
@@ -21,35 +22,6 @@ interface BattleArenaProps {
   onCommand: (command: BattleCommand) => void;
   onReconnect: () => void;
   snapshot: BattleSnapshot;
-}
-
-interface TokenResponse {
-  userId: string;
-  accessToken: string;
-}
-
-let accessTokenRequest: Promise<string> | null = null;
-
-function requestBattleAccessToken(): Promise<string> {
-  if (accessTokenRequest !== null) {
-    return accessTokenRequest;
-  }
-  accessTokenRequest = fetch("/api/v1/auth/refresh", {
-    method: "POST",
-    credentials: "include",
-  }).then(async (response) => {
-    if (!response.ok) {
-      throw new Error(response.status === 401 ? "SESSION_REQUIRED" : "SESSION_UNAVAILABLE");
-    }
-    const value = await response.json() as Partial<TokenResponse>;
-    if (typeof value.accessToken !== "string" || value.accessToken.length === 0) {
-      throw new Error("SESSION_UNAVAILABLE");
-    }
-    return value.accessToken;
-  }).finally(() => {
-    accessTokenRequest = null;
-  });
-  return accessTokenRequest;
 }
 
 export function LiveBattlePage() {
@@ -70,7 +42,7 @@ export function LiveBattlePage() {
     let socket: WebSocket | null = null;
     setConnection("CONNECTING");
 
-    void requestBattleAccessToken().then((accessToken) => {
+    void requestSessionAccessToken(reconnectAttempt > 0).then((accessToken) => {
       if (!active) {
         return;
       }

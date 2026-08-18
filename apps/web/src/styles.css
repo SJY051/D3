@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  color: #18181b;
-  background: #fafafa;
+  color: #e7edf8;
+  background: #101827;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
@@ -60,6 +60,130 @@ a {
   padding: 16px;
 }
 
+.golden-page {
+  max-width: 880px;
+  padding: 32px 0;
+}
+
+.golden-page header > h1 {
+  margin: 4px 0 8px;
+}
+
+.golden-page header > p:not(.golden-kicker) {
+  color: #b7c2d7;
+}
+
+.golden-kicker {
+  margin: 0;
+  color: #2457d6;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.golden-stack,
+.golden-form,
+.golden-list {
+  display: grid;
+  gap: 16px;
+}
+
+.golden-switch {
+  display: flex;
+  gap: 8px;
+}
+
+.golden-switch button[aria-pressed="true"] {
+  background: var(--arena-ink);
+  color: white;
+}
+
+.golden-panel,
+.golden-record {
+  border: 1px solid #50617a;
+  background: #182337;
+  padding: 20px;
+}
+
+.golden-panel h2,
+.golden-record p:first-child {
+  margin-top: 0;
+}
+
+.golden-form {
+  max-width: 560px;
+}
+
+.golden-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.golden-form input,
+.golden-form select,
+.golden-form button {
+  min-height: 40px;
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.golden-form input,
+.golden-form select,
+.golden-form textarea {
+  border: 1px solid #70819c;
+  background: #101827;
+  color: #f5f8ff;
+}
+
+.golden-link {
+  width: fit-content;
+  font-weight: 800;
+}
+
+.golden-record pre {
+  overflow: auto;
+  border: 1px solid #d4d4d8;
+  background: #fafafa;
+  padding: 12px;
+  white-space: pre-wrap;
+  color: #14213d;
+}
+
+.golden-markdown {
+  line-height: 1.6;
+}
+
+.golden-markdown pre {
+  overflow: auto;
+  border: 1px solid #d4d4d8;
+  background: #fafafa;
+  padding: 12px;
+  color: #14213d;
+}
+
+.golden-outcome {
+  border-left: 6px solid #2457d6;
+  background: #eff6ff;
+  padding: 14px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #14213d;
+}
+
+.golden-not-found {
+  max-width: 640px;
+}
+
+.golden-error {
+  border-left: 4px solid #b91c1c;
+  background: #fff1f2;
+  padding: 10px 12px;
+  color: #7f1d1d;
+}
+.golden-route-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.golden-queue-state { border-left: 4px solid #ffbf47; padding-left: 10px; }
+
 :root {
   --arena-ink: #14213d;
   --arena-paper: #f3f4ef;
@@ -100,6 +224,8 @@ button:disabled {
 
 button:focus-visible,
 textarea:focus-visible,
+input:focus-visible,
+select:focus-visible,
 a:focus-visible {
   outline: 3px solid #ffbf47;
   outline-offset: 3px;
