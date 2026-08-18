@@ -121,6 +121,49 @@ class CommunityControllerTest {
     }
 
     @Test
+    void d3Sec001KeepsHandleSearchBehindAuthentication() throws Exception {
+        mockMvc.perform(get("/v1/community/profiles").param("handle", "ali"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        verify(service, never()).searchProfilesByHandle(any(), any(), org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void d3Stat001SearchesProfilesByHandleWithKeysetForAuthenticatedCallers() throws Exception {
+        when(service.searchProfilesByHandle("ali", Optional.empty(), 1))
+                .thenReturn(new CommunityService.ProfilePage(
+                        List.of(new CommunityService.ProfileView(USER_ID, "alice", 1450, "GOLD")),
+                        "next-profile"));
+
+        mockMvc.perform(get("/v1/community/profiles")
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+                        .param("handle", "ali")
+                        .param("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profiles[0].userId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.profiles[0].handle").value("alice"))
+                .andExpect(jsonPath("$.profiles[0].publicRating").value(1450))
+                .andExpect(jsonPath("$.profiles[0].tier").value("GOLD"))
+                .andExpect(jsonPath("$.nextCursor").value("next-profile"))
+                // Privacy: no identity secrets or internal source versions cross the public boundary.
+                .andExpect(jsonPath("$.profiles[0].email").doesNotExist())
+                .andExpect(jsonPath("$.profiles[0].displayName").doesNotExist())
+                .andExpect(jsonPath("$.profiles[0].identitySourceVersion").doesNotExist());
+    }
+
+    @Test
+    void d3Stat001RejectsABlankHandleQuery() throws Exception {
+        when(service.searchProfilesByHandle(org.mockito.ArgumentMatchers.eq("   "), any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenThrow(new IllegalArgumentException("handle query must not be blank"));
+
+        mockMvc.perform(get("/v1/community/profiles")
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+                        .param("handle", "   "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
     void d3Sec001RejectsOversizedPostBodiesBeforeDeserialization() throws Exception {
         String oversized = "{\"markdown\":\"" + "x".repeat(CommunityRequestSizeFilter.MAX_REQUEST_BYTES) + "\"}";
 
