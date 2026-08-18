@@ -175,6 +175,7 @@ class JdbcIdentityRepositoryTest {
 
         assertTrue(repository.updateDisplayName(disabled.id(), "Changed", CLOCK.instant().plusSeconds(60)).isEmpty());
         assertEquals("Disabled", repository.findAccountById(disabled.id()).orElseThrow().displayName());
+        assertEquals(1, outboxCount(disabled.id()));
     }
 
     @Test

@@ -43,6 +43,50 @@ public final class JdbcIdentityOutboxStore {
                 .list();
     }
 
+    public int backfillMissingProfileEvents() {
+        return jdbc.sql("""
+                        with missing as materialized (
+                            select ua.id as user_id, ua.handle, ua.updated_at, ua.profile_version, gen_random_uuid() as event_id
+                            from user_account ua
+                            where not exists (
+                                select 1
+                                from outbox_event outbox
+                                where outbox.aggregate_id = ua.id
+                                  and outbox.aggregate_version = ua.profile_version
+                                  and outbox.event_type = :eventType
+                            )
+                        )
+                        insert into outbox_event (
+                            id, aggregate_id, aggregate_version, event_type, payload, occurred_at, published_at
+                        )
+                        select
+                            missing.event_id,
+                            missing.user_id,
+                            missing.profile_version,
+                            :eventType,
+                            jsonb_build_object(
+                                'eventId', missing.event_id::text,
+                                'eventType', :eventType,
+                                'version', 1,
+                                'occurredAt', to_char(missing.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+                                'correlationId', missing.user_id::text,
+                                'aggregateId', missing.user_id::text,
+                                'aggregateVersion', missing.profile_version,
+                                'data', jsonb_build_object(
+                                    'userId', missing.user_id::text,
+                                    'handle', missing.handle,
+                                    'profileVersion', missing.profile_version
+                                )
+                            ),
+                            missing.updated_at,
+                            null
+                        from missing
+                        on conflict (aggregate_id, aggregate_version, event_type) do nothing
+                        """)
+                .param("eventType", EVENT_TYPE)
+                .update();
+    }
+
     public void markPublished(UUID eventId, Instant publishedAt) {
         Objects.requireNonNull(eventId, "eventId");
         Objects.requireNonNull(publishedAt, "publishedAt");

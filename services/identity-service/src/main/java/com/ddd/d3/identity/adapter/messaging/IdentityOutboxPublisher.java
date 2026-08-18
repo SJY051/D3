@@ -50,6 +50,7 @@ public final class IdentityOutboxPublisher {
 
     /** @return the number of rows published in this batch. Package-visible so tests can drive one pass. */
     int dispatchBatch() {
+        store.backfillMissingProfileEvents();
         int published = 0;
         for (PendingProfileEvent event : store.loadUnpublished(BATCH_SIZE)) {
             send(event);
