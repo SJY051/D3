@@ -20,6 +20,7 @@ import {
   waitForRankedMatch,
 } from "../api/goldenPathApi";
 import { currentSessionUserId } from "../api/session";
+import { setActiveMatch } from "../battle/useActiveMatch";
 
 export type GoldenPathKind = "sign-in" | "feed" | "ranked" | "result" | "record";
 
@@ -134,6 +135,7 @@ function Ranked() {
     setResource({ status: "loading" });
     try {
       const ticket = await waitForRankedMatch(language, { idempotencyKey: attemptKeyRef.current ?? undefined, signal: controller.signal, onTicket: (next) => setResource({ status: "success", value: next }) });
+      if (ticket.matchId !== null) setActiveMatch(ticket.matchId, currentSessionUserId());
       navigate(`/battles/${ticket.matchId}`);
     } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setResource(toFailure(error)); } finally { setIsPolling(false); }
   }

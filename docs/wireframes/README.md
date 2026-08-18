@@ -145,6 +145,14 @@ Handle lookup remains gated until Identity publishes `user-profile.changed.v1`; 
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
+## Global shell — active-match rejoin banner
+
+```text
+[ ⚔ Match in progress — Return to battle ]   (shell-level banner, hidden on /battles/:matchId)
+```
+
+Reviewed by SJY051 on 2026-08-18 for Issue #85. The banner is a shared shell element rendered above every P0 route while the signed-in user owns a live match. It uses text plus an icon (non-color cue), one action, and disappears when the match finishes, the owner changes, or the marker expires.
+
 ## Visual review gate
 
 - Confirm the eight information hierarchies and desktop battle layout before visual components.

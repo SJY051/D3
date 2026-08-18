@@ -1,3 +1,5 @@
+import { clearActiveMatch, clearActiveMatchIfNotOwner } from "../battle/useActiveMatch";
+
 export interface SessionToken {
   accessToken: string;
   userId: string;
@@ -8,6 +10,7 @@ let userId: string | null = null;
 let refreshRequest: Promise<string> | null = null;
 
 export function setSession(session: SessionToken): void {
+  clearActiveMatchIfNotOwner(session.userId);
   accessToken = session.accessToken;
   userId = session.userId;
 }
@@ -40,7 +43,10 @@ export async function requestSessionAccessToken(forceRefresh = false): Promise<s
         throw new Error("SESSION_UNAVAILABLE");
       }
       accessToken = value.accessToken;
-      if (typeof value.userId === "string" && value.userId.length > 0) userId = value.userId;
+      if (typeof value.userId === "string" && value.userId.length > 0) {
+        clearActiveMatchIfNotOwner(value.userId);
+        userId = value.userId;
+      }
       return value.accessToken;
     }).finally(() => {
       refreshRequest = null;
@@ -86,6 +92,7 @@ export async function endSession(): Promise<void> {
     throw new Error("LOGOUT_FAILED");
   }
   clearSession();
+  clearActiveMatch();
 }
 
 function withAuthorization(init: RequestInit, token: string): RequestInit {
