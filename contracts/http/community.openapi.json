@@ -56,6 +56,29 @@
         }
       }
     },
+    "/v1/community/profiles": {
+      "get": {
+        "summary": "Search public profiles by handle prefix with keyset pagination",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "handle", "in": "query", "required": true, "schema": { "type": "string", "minLength": 1 } },
+          { "name": "cursor", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching public profiles",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProfilePage" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
     "/v1/community/matches/{matchId}": {
       "get": {
         "summary": "Read one ACTIVE public match record",
@@ -180,6 +203,26 @@
         "required": ["matches", "nextCursor"],
         "properties": {
           "matches": { "type": "array", "items": { "$ref": "#/components/schemas/MatchRecord" } },
+          "nextCursor": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "ProfileView": {
+        "type": "object",
+        "required": ["userId", "handle"],
+        "properties": {
+          "userId": { "type": "string", "format": "uuid" },
+          "handle": { "type": "string", "minLength": 1 },
+          "publicRating": { "type": ["integer", "null"] },
+          "tier": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "ProfilePage": {
+        "type": "object",
+        "required": ["profiles", "nextCursor"],
+        "properties": {
+          "profiles": { "type": "array", "items": { "$ref": "#/components/schemas/ProfileView" } },
           "nextCursor": { "type": ["string", "null"] }
         },
         "additionalProperties": false

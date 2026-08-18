@@ -40,6 +40,14 @@ public final class CommunityController {
         return service.publicFeed(cursor, limit);
     }
 
+    @GetMapping("/profiles")
+    CommunityService.ProfilePage searchProfiles(
+            @RequestParam("handle") String handle,
+            @RequestParam Optional<String> cursor,
+            @RequestParam(defaultValue = "20") int limit) {
+        return service.searchProfilesByHandle(handle, cursor, limit);
+    }
+
     @GetMapping("/matches/{matchId}")
     CommunityService.MatchRecordView matchRecord(@PathVariable UUID matchId) {
         return service.matchRecord(matchId).orElseThrow(CommunityMatchRecordNotFoundException::new);

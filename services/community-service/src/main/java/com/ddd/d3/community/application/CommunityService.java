@@ -92,6 +92,14 @@ public final class CommunityService {
         return repository.publicFeed(decodedCursor, clamp(limit, 1, 50));
     }
 
+    public ProfilePage searchProfilesByHandle(String handlePrefix, Optional<String> cursor, int limit) {
+        if (handlePrefix == null || handlePrefix.isBlank()) {
+            throw new IllegalArgumentException("handle query must not be blank");
+        }
+        Optional<ProfileCursor> decodedCursor = cursor.map(ProfileCursor::decode);
+        return repository.searchProfilesByHandle(handlePrefix.trim(), decodedCursor, clamp(limit, 1, 50));
+    }
+
     public record NewPost(
             UUID id,
             UUID authorUserId,
@@ -131,6 +139,33 @@ public final class CommunityService {
             Instant projectedAt) {}
 
     public record MatchRecordPage(List<MatchRecordView> matches, String nextCursor) {}
+
+    /** Privacy-safe public profile projection: handle plus authoritative rating/tier when present. */
+    public record ProfileView(UUID userId, String handle, Integer publicRating, String tier) {}
+
+    public record ProfilePage(List<ProfileView> profiles, String nextCursor) {}
+
+    public record ProfileCursor(String handle, UUID userId) {
+        public String encode() {
+            String raw = handle + "|" + userId;
+            return java.util.Base64.getUrlEncoder()
+                    .withoutPadding()
+                    .encodeToString(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+
+        static ProfileCursor decode(String cursor) {
+            try {
+                String raw = new String(
+                        java.util.Base64.getUrlDecoder().decode(cursor),
+                        java.nio.charset.StandardCharsets.UTF_8);
+                // handle is the keyset column and may itself contain '|', so split off only the trailing id.
+                int split = raw.lastIndexOf('|');
+                return new ProfileCursor(raw.substring(0, split), UUID.fromString(raw.substring(split + 1)));
+            } catch (RuntimeException exception) {
+                throw new IllegalArgumentException("profile cursor is invalid", exception);
+            }
+        }
+    }
 
     public record FeedCursor(Instant createdAt, UUID id) {
         public String encode() {

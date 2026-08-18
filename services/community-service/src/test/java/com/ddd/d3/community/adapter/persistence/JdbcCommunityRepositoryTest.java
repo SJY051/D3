@@ -122,4 +122,58 @@ class JdbcCommunityRepositoryTest {
                 .param("projectedAt", java.sql.Timestamp.from(Instant.parse(projectedAt)))
                 .update();
     }
+
+    @Test
+    void d3Stat001SearchesHandlesByPrefixWithKeysetAndExcludesRatingFirstRows() {
+        seedProfile(USER_ONE, "alice", 1450, "GOLD", 1L);
+        seedProfile(USER_TWO, "alan", 1600, "PLATINUM", 1L);
+        seedProfile(UUID.fromString("55555555-5555-4555-8555-555555555551"), "bob", 1200, "SILVER", 1L);
+        // A rating-first row without a handle is not yet a discoverable profile.
+        jdbc.sql("""
+                        insert into profile_projection (user_id, public_rating, rp, tier, rating_source_version, projected_at)
+                        values (:id, 1300, 30, 'SILVER', 2, now())
+                        """)
+                .param("id", UUID.fromString("55555555-5555-4555-8555-555555555552"))
+                .update();
+
+        var first = repository.searchProfilesByHandle("al", Optional.empty(), 1);
+        assertEquals(1, first.profiles().size());
+        // Ascending (handle, user_id): "alan" sorts before "alice".
+        var top = first.profiles().getFirst();
+        assertEquals("alan", top.handle());
+        assertEquals(1600, top.publicRating());
+        assertFalse(first.nextCursor().isBlank());
+
+        var cursor = new com.ddd.d3.community.application.CommunityService.ProfileCursor(top.handle(), top.userId());
+        var second = repository.searchProfilesByHandle("al", Optional.of(cursor), 10);
+        assertEquals(List.of("alice"), second.profiles().stream().map(p -> p.handle()).toList());
+        assertNull(second.nextCursor());
+    }
+
+    @Test
+    void d3Sec001TreatsHandleWildcardsAsLiteralText() {
+        seedProfile(USER_ONE, "a_b", 1000, "BRONZE", 1L);
+        seedProfile(USER_TWO, "axb", 1000, "BRONZE", 1L);
+
+        // '_' is a LIKE wildcard; escaped, "a_" must match only the literal "a_b", not "axb".
+        var page = repository.searchProfilesByHandle("a_", Optional.empty(), 10);
+        assertEquals(List.of("a_b"), page.profiles().stream().map(p -> p.handle()).toList());
+    }
+
+    private void seedProfile(UUID userId, String handle, int rating, String tier, long identityVersion) {
+        jdbc.sql("""
+                        insert into profile_projection (
+                            user_id, handle, public_rating, rp, tier,
+                            identity_source_version, rating_source_version, projected_at
+                        ) values (
+                            :id, :handle, :rating, 0, :tier, :identityVersion, 1, now()
+                        )
+                        """)
+                .param("id", userId)
+                .param("handle", handle)
+                .param("rating", rating)
+                .param("tier", tier)
+                .param("identityVersion", identityVersion)
+                .update();
+    }
 }
