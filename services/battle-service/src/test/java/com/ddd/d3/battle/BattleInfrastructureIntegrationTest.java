@@ -151,6 +151,25 @@ class BattleInfrastructureIntegrationTest {
     }
 
     @Test
+    void d3Jdg001RetiresEveryUnsupportedActiveProblemOnUpgrade() {
+        migrateOnlyThrough("11");
+        jdbc.sql("""
+                        insert into problem (id, slug, version, title, difficulty, expected_complexity, active, created_at, updated_at)
+                        values ('00000000-0000-4000-8000-000000000073', 'checkpoint-demo', 1, 'Manual rehearsal seed', 'EASY', 'O(n)', true, timestamptz '2026-08-17T00:00:00Z', timestamptz '2026-08-17T00:00:00Z'),
+                               ('11111111-1111-4111-8111-111111111111', 'stray-manual-problem', 1, 'Stray manual problem', 'EASY', 'O(n)', true, timestamptz '2026-08-16T00:00:00Z', timestamptz '2026-08-16T00:00:00Z')
+                        """)
+                .update();
+
+        Flyway.configure().dataSource(dataSource).load().migrate();
+
+        assertEquals(
+                List.of(DEMO_SUM_PROBLEM_ID),
+                jdbc.sql("select id from problem where active order by created_at, id")
+                        .query(UUID.class)
+                        .list());
+    }
+
+    @Test
     void d3Btl002PersistsRunAndSubmitCommandReceipts() {
         UUID matchId = createRunningMatch();
         UUID playerId = UUID.randomUUID();

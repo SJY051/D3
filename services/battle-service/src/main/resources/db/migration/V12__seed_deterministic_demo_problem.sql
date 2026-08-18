@@ -1,10 +1,11 @@
 -- The Judge0 catalog recognizes this exact problem ID at version 1.
--- Retire the temporary rehearsal row so upgrades converge on the reproducible seed.
+-- Retire every other active problem (manual rehearsal rows included) so
+-- upgraded databases converge on the reproducible seed the judge can score.
 update problem
 set active = false,
     updated_at = timestamptz '2026-08-18T00:00:00Z'
-where id = '00000000-0000-4000-8000-000000000073'
-  and slug = 'checkpoint-demo';
+where active is true
+  and id <> '00000000-0000-4000-8000-000000000001';
 
 insert into problem (
     id,
