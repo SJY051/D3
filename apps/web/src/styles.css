@@ -255,6 +255,13 @@ a {
   color: #0a1020;
 }
 
+.golden-panel button:disabled,
+.golden-route-actions button:disabled {
+  border-color: #384867;
+  background: #202b43;
+  color: #8b93a0;
+}
+
 .golden-panel button:hover:not(:disabled),
 .golden-route-actions button:hover:not(:disabled) {
   border-color: #c0caff;
@@ -278,6 +285,11 @@ a {
   border-color: #667db0;
   background: #202b43;
   color: #f7f9ff;
+}
+.golden-switch button[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: #91a5ff;
+  background: #91a5ff;
+  color: #0a1020;
 }
 
 .golden-link {
