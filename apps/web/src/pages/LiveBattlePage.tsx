@@ -14,7 +14,7 @@ import {
   parseBattleSnapshot,
 } from "../battle/battleRealtime";
 import { currentSessionUserId, requestSessionAccessToken } from "../api/session";
-import { clearActiveMatch, setActiveMatch } from "../battle/useActiveMatch";
+import { clearActiveMatchIfMatch, setActiveMatch } from "../battle/useActiveMatch";
 
 interface BattleArenaProps {
   connection: ConnectionState;
@@ -102,7 +102,7 @@ export function LiveBattlePage() {
       return;
     }
     if (snapshot.match.state === "FINISHED") {
-      clearActiveMatch();
+      clearActiveMatchIfMatch(matchId);
     } else {
       setActiveMatch(matchId, currentSessionUserId());
     }
