@@ -18,6 +18,7 @@
     "services/community-service/src/main/resources/db/migration/V3__add_public_post_rendering.sql": "02c54ff25c291c8996ba4822e1d05c2c64187ecd04e3af9f08b4b7f6eb0472b3",
     "services/community-service/src/main/resources/db/migration/V4__add_result_post_and_record_indexes.sql": "f86f7ed67f7efbae831ce853b95c5d42f4291faae3786d93239b4fad78e63fcb",
     "services/community-service/src/main/resources/db/migration/V5__allow_rating_first_profile_projection.sql": "11541a43b00657bc765aae2d3033cc0ce204711b2c9f222bbd90c5cc4c1c7524",
+    "services/community-service/src/main/resources/db/migration/V6__drop_profile_handle_unique.sql": "b723102105ff52e65d542681329cf2f3d0fd3281cbb1c2cc843fbe9ac1f76f55",
     "services/identity-service/src/main/resources/db/migration/V1__create_identity_tables.sql": "2df6e59c98cffc0406f611ee19da4a939fc1147bf52f816e6d2d9589cb07f5de",
     "services/identity-service/src/main/resources/db/migration/V2__strengthen_refresh_session_lineage.sql": "bdd8f2150711ee13a0b95b496eaa02ffddb8e4c8cf2874bbbf293c4eb2100fcc",
     "services/identity-service/src/main/resources/db/migration/V3__add_user_profile_version.sql": "2f7ad5a15f1d5598e592869509e5e52e3e3be6d2d3da26acf559789c35bd661d",
