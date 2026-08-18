@@ -39,12 +39,13 @@ Credentials stay outside the repository and recording. Seeded demo identities mu
 |---|---|---|---|
 | Reviewed WF-01~08 | 최정민 | UI review is recorded before styled acceptance | WF-01–06 P0 revision approved 2026-08-16; WF-07/08 review required |
 | Scenario A | Service owners | Two browsers complete ranked flow without database edits | PARTIAL PASS: full local two-session path passed on 2026-08-18, but a manual problem seed was required; no-database-edit acceptance PENDING ([Issue #73](https://github.com/SJY051/D3/issues/73)) |
-| Scenarios B and C | Battle/Judge owners | Reconnect, surrender and incident void are deterministic | PARTIAL PASS: reconnect and autonomous deadline completion observed; Surrender UI not exposed and attack exchange not exercised |
+| Scenario B | Battle owners | Reconnect, surrender and timeout loss are deterministic | PARTIAL PASS: reconnect recovery and autonomous deadline completion observed on 2026-08-18; Surrender UI not exposed, timeout-loss path not exercised live |
+| Scenario C | Battle/Judge owners | Incident void commits without rating change | NOT RUN live: deterministic domain and void tests exist, but no live platform-failure demonstration has been executed |
 | Six language runtimes | Judge owner | Versioned smoke cases pass on designated host | PASS for host: pinned Judge0 CE 1.13.1 matrix and 12/12 language cases |
 | Judge application route | 윤서진 | judge-service reaches the designated host through the source-SG-only path and repeats the sanitized six-runtime smoke | NOT RUN: private route and deployment egress PENDING |
 | Observability | 윤서진 | Health, correlation and failure views are identified | Local health and ingress correlation PASS; dashboards pending |
 | Deployment target | 윤서진 | Environment and rollback owner are bound | AWS `UNKNOWN`; isolated local path rehearsed |
-| Backup recording | 최정민 | Same build and real services are visibly labeled | NOT RECORDED; screenshot-sequence fallback prepared |
+| Backup recording | 최정민 | Same build and real services are visibly labeled | NOT RECORDED: D3-UX-002 requires a clearly identified local backup recording; record the pre-checkpoint run. The screenshot sequence is only an interim degraded fallback and does not satisfy this gate |
 
 All gates required by the chosen live path must be green before announcing demo readiness.
 
