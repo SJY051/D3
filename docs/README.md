@@ -10,10 +10,11 @@ Last verified: 2026-08-18
 
 ### 평가자이거나 프로젝트를 처음 보시나요?
 
-1. [프로젝트 README](../README.md) — D³의 목적, 골든 패스, 현재 구현 범위와 실행 방법
-2. [MVP 명세](specs/d3-mvp.md) — 핵심·선택 요구사항과 우선순위
-3. [시스템 컨텍스트](architecture/system-context.md) — 사용자와 외부 시스템을 포함한 전체 경계
-4. [산출물 상태](artifact-status.md) — 제출 산출물별 현재 상태와 남은 증거
+1. [D³ 한 장 개요](overview.md) — 제품 목적, 골든 패스 여정과 아키텍처 한 장 그림
+2. [프로젝트 README](../README.md) — 현재 구현 범위와 실행 방법
+3. [MVP 명세](specs/d3-mvp.md) — 핵심·선택 요구사항과 우선순위
+4. [시스템 컨텍스트](architecture/system-context.md) — 사용자와 외부 시스템을 포함한 전체 경계
+5. [산출물 상태](artifact-status.md) — 제출 산출물별 현재 상태와 남은 증거
 
 ### 개발자로 참여하나요?
 

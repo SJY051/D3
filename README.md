@@ -20,7 +20,7 @@ Last verified: 2026-08-18 against the isolated two-browser rehearsal evidence
 
 - 요구 사항: Java 21, Node.js 24, pnpm 11, Docker Compose
 - `pnpm install`
-- `pnpm local:start` — `demo-preflight: READY`가 표시되면 준비 완료
+- `pnpm local:start` — `demo-preflight: READY`가 표시되면 준비 완료 (V12 migration이 시연 문제를 자동 seed합니다)
 
 시연 계정과 5분 시연 순서는 [데모 런북](docs/operations/demo-runbook.md)을 따릅니다.
 
@@ -28,6 +28,7 @@ Last verified: 2026-08-18 against the isolated two-browser rehearsal evidence
 
 전체 문서는 [문서 인덱스](docs/README.md)에서 목적별로 찾을 수 있습니다.
 
+- [D³ 한 장 개요 — 처음이라면 여기부터](docs/overview.md)
 - [MVP 요구사항·관찰 시나리오](docs/specs/d3-mvp.md)
 - [랭크 매치 스윔레인](docs/architecture/workflow.md)
 - [시스템 컨텍스트](docs/architecture/system-context.md)
@@ -35,9 +36,9 @@ Last verified: 2026-08-18 against the isolated two-browser rehearsal evidence
 
 ## 현재 증거 상태
 
-현재 권위 있는 판정은 [산출물 현황](docs/artifact-status.md)을 따릅니다. 2026-08-18 기준 P0 골든 패스는 격리된 환경의 두 브라우저 세션과 로컬 결정론적 fake judge로 리허설했습니다. 회원가입·로그인, fenced code를 포함한 Markdown 피드, 동일 언어 매칭, Run·Submit·공격 오버레이·재접속, 결과·전적, rating·RP 반영과 자동 결과 게시까지 확인했습니다.
+현재 권위 있는 판정은 [산출물 현황](docs/artifact-status.md)을 따릅니다. 2026-08-18 기준 P0 골든 패스는 격리된 환경의 두 브라우저 세션과 로컬 결정론적 fake judge로 리허설했습니다. 회원가입·로그인, fenced code를 포함한 Markdown 피드, 동일 언어 매칭, Run·Submit·재접속, 결과·전적, rating·RP 반영과 자동 결과 게시까지 확인했습니다. 공격 교환과 Surrender는 라이브로 실증하지 않았으며 **NOT RUN**입니다.
 
-fake judge 결과는 실제 코드 실행 증거가 아닙니다. Judge0 실행 호스트 자체는 격리된 AWS 환경에서 검증했지만 애플리케이션에서 Judge0까지의 사설 경로는 **NOT RUN**입니다.
+fake judge 결과는 실제 코드 실행 증거가 아닙니다. Judge0 실행 호스트와 source-security-group 전용 사설 경로 자체는 격리된 AWS 환경에서 smoke로 검증했지만(issue #59), 배포된 judge-service가 그 경로로 실행하는 것은 **NOT RUN**입니다.
 
 | 영역 | 현재 증거 | 판정 |
 |---|---|---|
