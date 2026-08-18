@@ -14,8 +14,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.socket.TextMessage;
@@ -64,6 +68,47 @@ class BattleSnapshotResynchronizerTest {
         verify(session, never()).close(org.springframework.web.socket.CloseStatus.SERVER_ERROR);
     }
 
+    @Test
+    void d3Btl002RetainsRejectedMatchesUntilTheBoundedExecutorRecovers() {
+        BattleWebSocketSessionRegistry sessions = mock(BattleWebSocketSessionRegistry.class);
+        UUID secondMatchId = UUID.fromString("33333333-3333-4333-8333-333333333333");
+        when(sessions.activeMatchIds()).thenReturn(Set.of(MATCH_ID, secondMatchId));
+        ManualExecutor executor = new ManualExecutor();
+        executor.reject = true;
+        BattleSnapshotResynchronizer resynchronizer = new BattleSnapshotResynchronizer(sessions, executor);
+
+        resynchronizer.resynchronize();
+        executor.reject = false;
+        resynchronizer.resynchronize();
+        executor.runAll();
+
+        verify(sessions).publish(MATCH_ID);
+        verify(sessions).publish(secondMatchId);
+    }
+
+    @Test
+    void d3Btl002ReschedulesOneLatestReadWhenANotificationArrivesDuringDelivery() {
+        BattleWebSocketSessionRegistry sessions = mock(BattleWebSocketSessionRegistry.class);
+        when(sessions.activeMatchIds()).thenReturn(Set.of(MATCH_ID));
+        ManualExecutor executor = new ManualExecutor();
+        BattleSnapshotResynchronizer resynchronizer = new BattleSnapshotResynchronizer(sessions, executor);
+        AtomicBoolean firstDelivery = new AtomicBoolean(true);
+        org.mockito.Mockito.doAnswer(ignored -> {
+            if (firstDelivery.getAndSet(false)) {
+                resynchronizer.resynchronize();
+            }
+            return null;
+        }).when(sessions).publish(MATCH_ID);
+
+        resynchronizer.resynchronize();
+        resynchronizer.resynchronize();
+        executor.runNext();
+        executor.runAll();
+
+        assertEquals(2, executor.executed);
+        verify(sessions, times(2)).publish(MATCH_ID);
+    }
+
     private static WebSocketSession session() {
         WebSocketSession session = mock(WebSocketSession.class);
         Map<String, Object> attributes = new HashMap<>();
@@ -88,5 +133,31 @@ class BattleSnapshotResynchronizerTest {
                 new BattleMatchView.Participant(
                         PLAYER_TWO, true, BattleMatchView.ConnectionState.CONNECTED, null),
                 null);
+    }
+
+    private static final class ManualExecutor implements Executor {
+        private final java.util.ArrayDeque<Runnable> tasks = new java.util.ArrayDeque<>();
+        private boolean reject;
+        private int executed;
+
+        @Override
+        public void execute(Runnable command) {
+            if (reject) {
+                throw new RejectedExecutionException("executor is saturated");
+            }
+            tasks.add(command);
+        }
+
+        private void runNext() {
+            Runnable task = tasks.remove();
+            executed++;
+            task.run();
+        }
+
+        private void runAll() {
+            while (!tasks.isEmpty()) {
+                runNext();
+            }
+        }
     }
 }
