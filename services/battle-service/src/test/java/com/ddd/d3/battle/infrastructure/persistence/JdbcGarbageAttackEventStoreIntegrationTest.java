@@ -89,7 +89,7 @@ class JdbcGarbageAttackEventStoreIntegrationTest {
                 .param("occurredAt", Timestamp.from(Instant.parse("2026-08-15T00:00:00Z")))
                 .update());
 
-        assertEquals(4, Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted);
+        assertEquals(5, Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted);
 
         assertEquals(0, jdbc.sql("select count(*) from attack_event where id = :id")
                 .param("id", eventId)

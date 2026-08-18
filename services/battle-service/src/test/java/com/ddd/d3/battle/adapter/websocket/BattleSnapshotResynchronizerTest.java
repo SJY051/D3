@@ -87,6 +87,23 @@ class BattleSnapshotResynchronizerTest {
     }
 
     @Test
+    void d3Btl002DrainsARejectedMatchWithoutWaitingForTheNextScan() {
+        BattleWebSocketSessionRegistry sessions = mock(BattleWebSocketSessionRegistry.class);
+        UUID secondMatchId = UUID.fromString("44444444-4444-4444-8444-444444444444");
+        when(sessions.activeMatchIds())
+                .thenReturn(new java.util.LinkedHashSet<>(java.util.List.of(MATCH_ID, secondMatchId)));
+        ManualExecutor executor = new ManualExecutor();
+        executor.capacity = 1;
+        BattleSnapshotResynchronizer resynchronizer = new BattleSnapshotResynchronizer(sessions, executor);
+
+        resynchronizer.resynchronize();
+        executor.runAll();
+
+        verify(sessions).publish(MATCH_ID);
+        verify(sessions).publish(secondMatchId);
+    }
+
+    @Test
     void d3Btl002ReschedulesOneLatestReadWhenANotificationArrivesDuringDelivery() {
         BattleWebSocketSessionRegistry sessions = mock(BattleWebSocketSessionRegistry.class);
         when(sessions.activeMatchIds()).thenReturn(Set.of(MATCH_ID));
@@ -138,11 +155,12 @@ class BattleSnapshotResynchronizerTest {
     private static final class ManualExecutor implements Executor {
         private final java.util.ArrayDeque<Runnable> tasks = new java.util.ArrayDeque<>();
         private boolean reject;
+        private int capacity;
         private int executed;
 
         @Override
         public void execute(Runnable command) {
-            if (reject) {
+            if (reject || (capacity > 0 && tasks.size() >= capacity)) {
                 throw new RejectedExecutionException("executor is saturated");
             }
             tasks.add(command);
