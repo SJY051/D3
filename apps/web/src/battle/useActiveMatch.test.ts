@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clearActiveMatch, getActiveMatch, setActiveMatch } from "./useActiveMatch";
+import { clearActiveMatch, clearActiveMatchIfNotOwner, getActiveMatch, setActiveMatch } from "./useActiveMatch";
 
 afterEach(() => {
   localStorage.clear();
@@ -32,5 +32,19 @@ describe("active-match store", () => {
 
     window.removeEventListener("storage", handler);
     expect(handler).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears a match owned by a different user but keeps the owner's own", () => {
+    setActiveMatch("m-4", "user-a");
+    clearActiveMatchIfNotOwner("user-a");
+    expect(getActiveMatch()).toBe("m-4");
+    clearActiveMatchIfNotOwner("user-b");
+    expect(getActiveMatch()).toBeNull();
+  });
+
+  it("leaves a match with an unknown owner alone on user resolution", () => {
+    setActiveMatch("m-5"); // owner unknown
+    clearActiveMatchIfNotOwner("user-b");
+    expect(getActiveMatch()).toBe("m-5");
   });
 });

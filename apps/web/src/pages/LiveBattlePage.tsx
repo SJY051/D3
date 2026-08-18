@@ -13,7 +13,7 @@ import {
   overlayGlyphs,
   parseBattleSnapshot,
 } from "../battle/battleRealtime";
-import { requestSessionAccessToken } from "../api/session";
+import { currentSessionUserId, requestSessionAccessToken } from "../api/session";
 import { clearActiveMatch, setActiveMatch } from "../battle/useActiveMatch";
 
 interface BattleArenaProps {
@@ -104,7 +104,7 @@ export function LiveBattlePage() {
     if (snapshot.match.state === "FINISHED") {
       clearActiveMatch();
     } else {
-      setActiveMatch(matchId);
+      setActiveMatch(matchId, currentSessionUserId());
     }
   }, [matchId, snapshot]);
 
