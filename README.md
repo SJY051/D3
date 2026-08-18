@@ -4,11 +4,11 @@
 
 Owner: D³ team
 
-Status: Local runtime active; Judge vertical slice partially implemented
+Status: Local runtime active; P0 golden path rehearsed with the local fake judge
 
-Last verified: 2026-08-14 against repository commands, paths, scaffold evidence and the lead developer AWS identity
+Last verified: 2026-08-18 against main `35ee063`, CI 5/5 and the isolated two-browser rehearsal evidence
 
-> **현재 상태 (2026-08-14): 로컬 플랫폼 활성, Judge 경계 부분 구현.** 단일 로컬 명령이 Web, Gateway, Config, Discovery, 네 도메인 서비스와 PostgreSQL·Redis·Kafka를 기동하고 preflight를 수행합니다. Gateway의 명시적 라우트, correlation ID, 서비스별 Flyway 스키마와 컨테이너 연결 증거가 있습니다. AWS Judge0 호스트의 6개 런타임 스모크는 PASS지만 애플리케이션의 사설 경로 호출은 NOT RUN이며, 로그인·매칭·대전·커뮤니티를 잇는 시나리오는 아직 완료되지 않았습니다. 상세 상태와 필요한 증거는 [산출물 현황](docs/artifact-status.md)을 따릅니다.
+> **현재 상태 (2026-08-18): 로컬 플랫폼 활성, P0 골든 패스 리허설 실증.** 격리된 fresh-volume 환경에서 두 브라우저 세션으로 회원가입·로그인부터 피드 게시·교차 조회, 동일 언어 랭크 매칭, Battle v3 제출·재접속·종료, viewer-relative 결과·전적과 자동 결과 게시까지 확인했습니다. 판정은 로컬의 결정론적 fake judge를 사용했으므로 실제 코드 실행 증거가 아닙니다. `rating.changed.v1` 두 건과 Community `profile_projection`의 rating-first 반영도 확인했습니다. 다만 fresh DB용 시연 문제 seed가 없어 리허설에서는 수동 INSERT 1행을 사용했으며 [Issue #73](https://github.com/SJY051/D3/issues/73)에서 추적합니다. handle 검색과 Identity `user-profile.changed.v1` 투영은 미구현이고, 수동 DB 편집 없는 최종 two-session 인수는 [Issue #19](https://github.com/SJY051/D3/issues/19)에서 PENDING입니다. 상세 상태와 필요한 증거는 [산출물 현황](docs/artifact-status.md)을 따릅니다.
 
 ## 왜 D³인가
 
@@ -26,12 +26,12 @@ Last verified: 2026-08-14 against repository commands, paths, scaffold evidence 
 | 영역 | 현재 증거 | 판정 |
 |---|---|---|
 | 제품 요구사항 | 16개 요구사항 ID와 4개 관찰 시나리오 | 초기 기준선 |
-| Web | React 라우트 셸과 WF-01~08 매핑 | 구조만 존재 |
-| Backend | 4개 도메인 서비스와 3개 플랫폼 앱; Judge HTTP·비동기 평가·outbox 경로 | Judge 부분 구현; 나머지 수직 경로 미구현 |
-| Contracts | HTTP 4개, event 5개, WebSocket 1개 문서 | Judge HTTP v1 활성; Battle consumer 등은 미구현 |
+| Web | 승인된 WF-01/02/03/05/06 API-backed 화면(PR #28): 인증, 피드, 랭크 큐, 대전, 결과·전적 | 두 브라우저 리허설 PASS; 최종 two-session 인수는 Issue #19 PENDING |
+| Backend | Identity 등록·세션, Battle 매칭·실시간 대전·결과 확정, Judge 판정 경계, Community 피드·전적·rating projection 수직 경로 | 로컬 fake judge 기반 골든 패스 리허설 PASS; handle 검색·Identity 프로필 투영 미구현 |
+| Contracts | HTTP 4개, event 5개, WebSocket 1개 문서 | 골든 패스의 Identity·Battle·Judge·Community HTTP, Battle WebSocket, `rating.changed.v1` 경로 실증; 전체 계약 인수는 PENDING |
 | Data | 서비스별 PostgreSQL 소유권, 논리 ERD와 forward-only Flyway 체인 | 네 서비스 fresh-install/upgrade migration PASS; 서비스 간 DB 공유 없음 |
 | Local infra | PostgreSQL, Redis, Kafka, Config, Discovery, Gateway, 네 서비스와 Web | 전체 로컬 기동 및 dependency preflight PASS |
-| Quality | 요구사항 스캐폴드, Gateway/config 테스트와 서비스별 컨테이너 연결 테스트 | 로컬 플랫폼 PASS; 제품 브라우저 시나리오는 NOT RUN/SKIP |
+| Quality | 요구사항 스캐폴드, CI 5/5와 격리된 두 브라우저 리허설 | 로컬 플랫폼과 fake-judge 골든 패스 PASS; 문제 seed 없는 fresh DB 인수는 PENDING |
 | Cloud/Judge0 | 전용 zero-ingress Judge0 호스트와 고정 6개 런타임; real adapter 코드 경로 | 호스트 PASS; 애플리케이션 사설 연결 PENDING/NOT RUN |
 
 ## 아키텍처
@@ -79,13 +79,13 @@ docker compose -f infra/compose.yaml ps
 
 `.env.example`의 값은 로컬 전용 기본값입니다. 공유·배포 환경의 비밀로 재사용하지 않습니다. 컨테이너 구성과 선택 프로필은 [인프라 안내](infra/README.md)를 확인합니다.
 
-### 구조 Web 확인
+### Web 개발 서버 확인
 
 ```bash
 pnpm --filter @d3/web dev
 ```
 
-Vite가 출력한 로컬 주소에서 `/feed`, `/practice`, `/ranked` 등의 구조 라우트를 확인할 수 있습니다. 표시되는 화면은 `STRUCTURAL PROTOTYPE`이며 실제 API 동작을 증명하지 않습니다.
+Vite가 출력한 로컬 주소에서 `/feed`, `/ranked`, 대전, 결과·전적 등 승인된 API-backed 화면을 확인할 수 있습니다. 개발 서버만 기동한 경우 API 요청에는 별도로 실행 중인 로컬 플랫폼이 필요합니다.
 
 ### 전체 로컬 런타임
 
@@ -93,9 +93,9 @@ Vite가 출력한 로컬 주소에서 `/feed`, `/practice`, `/ranked` 등의 구
 pnpm local:start
 ```
 
-이 명령은 공용 인프라가 healthy가 될 때까지 기다리고, 애플리케이션 JAR 빌드, Config·Discovery 선행 기동, Web·Gateway·도메인 서비스 기동과 `demo:preflight`까지 순서대로 수행합니다. 네 서비스의 JDBC URL은 공통 `D3_POSTGRES_HOST`와 `D3_POSTGRES_PORT`에서 생성됩니다. 모든 로컬 JVM은 기본적으로 `127.0.0.1`에만 바인딩되고 Eureka에도 같은 loopback 주소를 광고합니다. `READY` 후 `Ctrl+C`는 애플리케이션 프로세스를 종료하고 데이터 컨테이너는 유지합니다. 인프라는 필요할 때 `docker compose -f infra/compose.yaml stop`으로 중지합니다.
+이 명령은 공용 인프라가 healthy가 될 때까지 기다리고, 애플리케이션 JAR 빌드, Config·Discovery 선행 기동, Web·Gateway·도메인 서비스 기동과 `demo:preflight`까지 순서대로 수행합니다. 다른 로컬 스택과 격리하려면 `COMPOSE_PROJECT_NAME=d3checkpoint pnpm local:start`처럼 Compose project 이름을 지정할 수 있습니다. 네 서비스의 JDBC URL은 공통 `D3_POSTGRES_HOST`와 `D3_POSTGRES_PORT`에서 생성됩니다. 모든 로컬 JVM은 기본적으로 `127.0.0.1`에만 바인딩되고 Eureka에도 같은 loopback 주소를 광고합니다. `READY` 후 `Ctrl+C`는 애플리케이션 프로세스를 종료하고 데이터 컨테이너는 유지합니다. 인프라는 필요할 때 `docker compose -f infra/compose.yaml stop`으로 중지합니다.
 
-judge-service는 로컬에서 결정론적 fake adapter를 기본으로 사용하며, 이는 API·영속성·이벤트 개발용이지 실제 코드 실행 증거가 아닙니다. real Judge0 adapter는 명시적으로 선택하고 사설 연결 preflight를 통과한 환경에서만 live 증거로 기록합니다. 로그인부터 결과 투영까지의 제품 시나리오는 아직 제공하지 않습니다.
+judge-service는 로컬에서 결정론적 fake adapter를 기본으로 사용하며, 이는 API·영속성·이벤트 개발용이지 실제 코드 실행 증거가 아닙니다. real Judge0 adapter는 명시적으로 선택하고 사설 연결 preflight를 통과한 환경에서만 live 증거로 기록합니다. 또한 fresh DB에는 demonstration problem seed가 없어 랭크 매칭이 진행되지 않으므로, 수동 DB 편집 없는 시작 절차는 [Issue #73](https://github.com/SJY051/D3/issues/73)이 해결될 때까지 PENDING입니다.
 
 ## 검증
 
