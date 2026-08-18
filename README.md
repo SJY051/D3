@@ -40,6 +40,14 @@ Last verified: 2026-08-18 against the isolated two-browser rehearsal evidence
 
 fake judge 결과는 실제 코드 실행 증거가 아닙니다. Judge0 실행 호스트와 source-security-group 전용 사설 경로 자체는 격리된 AWS 환경에서 smoke로 검증했지만(issue #59), 배포된 judge-service가 그 경로로 실행하는 것은 **NOT RUN**입니다.
 
+## 골든 패스 시각 정체성
+
+Issue #84는 승인된 화면 정보 구조와 API 경계를 바꾸지 않고, D³의 dark-first 제품
+정체성으로 골든 패스와 battle 표면을 정리합니다. 아래 비교에서 왼쪽은 기존 scaffold
+화면(Before), 오른쪽은 D³ 헤더·제품 히어로·상태 체계를 적용한 화면(After)입니다.
+
+![Golden path visual identity — Before on the left, After on the right](docs/assets/golden-path-visual-identity-before-after.png)
+
 | 영역 | 현재 증거 | 판정 |
 |---|---|---|
 | 제품 요구사항 | 16개 요구사항 ID와 4개 관찰 시나리오 | 초기 기준선 |

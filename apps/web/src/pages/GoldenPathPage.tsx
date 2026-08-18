@@ -39,8 +39,8 @@ const screens: Record<GoldenPathKind, readonly [string, string, string]> = {
 
 export function GoldenPathPage({ kind }: { kind: GoldenPathKind }) {
   const [wireframe, requirement, title] = screens[kind];
-  return <article className="golden-page" data-requirement={requirement} data-wireframe={wireframe}>
-    <header><p className="golden-kicker">{wireframe} · {requirement}</p><h1>{title}</h1><p>Connected through the versioned API contract. No preview records are rendered.</p></header>
+  return <article className={`golden-page golden-page--${kind}`} data-requirement={requirement} data-wireframe={wireframe}>
+    <header className="golden-heading"><p className="golden-kicker">{wireframe} · {requirement}</p><h1>{title}</h1><p>{kind === "sign-in" ? "A developer network where reputation is earned live, one coding battle at a time — connected through the versioned API contract." : "Connected through the versioned API contract. No preview records are rendered."}</p>{kind === "sign-in" && <div className="golden-hero-metrics" aria-label="D cubed product features"><span>BUILD</span><i aria-hidden="true" /><span>BATTLE</span><i aria-hidden="true" /><span>BECOME</span></div>}</header>
     {kind === "sign-in" && <SignIn />}{kind === "feed" && <Feed />}{kind === "ranked" && <Ranked />}{kind === "result" && <Result />}{kind === "record" && <Record />}
   </article>;
 }
