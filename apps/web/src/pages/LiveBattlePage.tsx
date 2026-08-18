@@ -3,6 +3,8 @@ import { useParams } from "react-router-dom";
 
 import {
   BATTLE_PROTOCOL,
+  BATTLE_HEARTBEAT_INTERVAL_MILLIS,
+  BATTLE_RECONNECT_DELAY_MILLIS,
   type BattleCommand,
   type BattleCommandType,
   type BattleSnapshot,
@@ -31,6 +33,7 @@ export function LiveBattlePage() {
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [messageRevision, setMessageRevision] = useState(0);
   const socketRef = useRef<WebSocket | null>(null);
+  const automaticReconnects = useRef(0);
 
   useEffect(() => {
     if (!isMatchId(matchId)) {
@@ -40,6 +43,14 @@ export function LiveBattlePage() {
 
     let active = true;
     let socket: WebSocket | null = null;
+    let heartbeat: number | undefined;
+    let reconnect: number | undefined;
+    const stopHeartbeat = () => {
+      if (heartbeat !== undefined) {
+        window.clearInterval(heartbeat);
+        heartbeat = undefined;
+      }
+    };
     setConnection("CONNECTING");
 
     void requestSessionAccessToken(reconnectAttempt > 0).then((accessToken) => {
@@ -54,7 +65,13 @@ export function LiveBattlePage() {
       socketRef.current = socket;
       socket.onopen = () => {
         if (active) {
+          automaticReconnects.current = 0;
           setConnection("LIVE");
+          heartbeat = window.setInterval(() => {
+            if (socket?.readyState === WebSocket.OPEN) {
+              socket.send(JSON.stringify(createBattleCommand(matchId, "HEARTBEAT")));
+            }
+          }, BATTLE_HEARTBEAT_INTERVAL_MILLIS);
         }
       };
       socket.onmessage = (event) => {
@@ -77,8 +94,16 @@ export function LiveBattlePage() {
       };
       socket.onclose = () => {
         if (active) {
+          stopHeartbeat();
           socketRef.current = null;
           setConnection((current) => current === "PROTOCOL_ERROR" ? current : "DISCONNECTED");
+          if (automaticReconnects.current === 0) {
+            automaticReconnects.current += 1;
+            reconnect = window.setTimeout(
+              () => setReconnectAttempt((attempt) => attempt + 1),
+              BATTLE_RECONNECT_DELAY_MILLIS,
+            );
+          }
         }
       };
     }).catch((error: unknown) => {
@@ -91,6 +116,10 @@ export function LiveBattlePage() {
 
     return () => {
       active = false;
+      stopHeartbeat();
+      if (reconnect !== undefined) {
+        window.clearTimeout(reconnect);
+      }
       socketRef.current = null;
       socket?.close(1000, "battle route closed");
     };

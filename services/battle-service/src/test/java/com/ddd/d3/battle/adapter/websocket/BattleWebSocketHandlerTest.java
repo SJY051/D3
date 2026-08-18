@@ -230,6 +230,30 @@ class BattleWebSocketHandlerTest {
         verify(session, never()).close(CloseStatus.BAD_DATA);
         verify(session, never()).close(CloseStatus.POLICY_VIOLATION);
     }
+
+    @Test
+    void d3Btl002AcceptsHeartbeatWithoutMutatingMatchState() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(PLAYER_ONE, PLAYER_TWO, 1, BattleMatchView.ConnectionState.CONNECTED));
+        BattleAttackService attacks = mock(BattleAttackService.class);
+        when(attacks.read(MATCH_ID, PLAYER_ONE)).thenReturn(attackView());
+        BattleMatchCommandService commands = mock(BattleMatchCommandService.class);
+        BattleConnectionService connections = mock(BattleConnectionService.class);
+        when(connections.connected(MATCH_ID, PLAYER_ONE))
+                .thenReturn(new BattleConnectionService.ConnectionLease(1));
+        BattleWebSocketHandler handler = handler(views, commands, connections, attacks);
+        WebSocketSession session = session("heartbeat-v3", PLAYER_ONE, BattleWebSocketHandler.V3_PROTOCOL);
+        handler.afterConnectionEstablished(session);
+
+        handler.handleTextMessage(session, new TextMessage("""
+                {"type":"HEARTBEAT","version":3,"matchId":"%s","commandId":"%s"}
+                """.formatted(MATCH_ID, COMMAND_ONE)));
+
+        verifyNoInteractions(commands);
+        verify(session, never()).close(CloseStatus.BAD_DATA);
+        verify(session, never()).close(CloseStatus.POLICY_VIOLATION);
+    }
     @Test
     void d3Btl001DispatchesPrivateRunSourceOnlyToJudgeBoundary() throws Exception {
         BattleMatchViewService views = mock(BattleMatchViewService.class);

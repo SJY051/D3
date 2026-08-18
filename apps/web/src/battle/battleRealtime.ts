@@ -1,4 +1,6 @@
 export const BATTLE_PROTOCOL = "d3.battle.v3";
+export const BATTLE_HEARTBEAT_INTERVAL_MILLIS = 20_000;
+export const BATTLE_RECONNECT_DELAY_MILLIS = 1_000;
 
 export type ConnectionState = "CONNECTING" | "LIVE" | "DISCONNECTED" | "SESSION_REQUIRED" | "PROTOCOL_ERROR";
 export type MatchState = "LOBBY" | "READY" | "RUNNING" | "JUDGING" | "FINISHED";
@@ -46,6 +48,7 @@ export interface BattleSnapshot {
 }
 
 export type BattleCommandType =
+  | "HEARTBEAT"
   | "READY"
   | "SURRENDER"
   | "RUN"

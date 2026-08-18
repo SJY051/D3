@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   battleSocketUrl,
+  BATTLE_HEARTBEAT_INTERVAL_MILLIS,
+  BATTLE_RECONNECT_DELAY_MILLIS,
   createBattleCommand,
   overlayGlyphs,
   parseBattleSnapshot,
@@ -101,6 +103,13 @@ describe("Battle v3 realtime boundary", () => {
       commandId: "33333333-3333-4333-8333-333333333333",
       attackId: "attack-7",
     });
+    expect(createBattleCommand(MATCH_ID, "HEARTBEAT")).toMatchObject({
+      type: "HEARTBEAT",
+      version: 3,
+      matchId: MATCH_ID,
+    });
+    expect(BATTLE_HEARTBEAT_INTERVAL_MILLIS).toBeLessThan(60_000);
+    expect(BATTLE_RECONNECT_DELAY_MILLIS).toBeGreaterThan(0);
     vi.unstubAllGlobals();
   });
 });
