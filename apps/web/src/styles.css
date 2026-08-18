@@ -48,6 +48,28 @@ a {
   padding: 32px 0;
 }
 
+.rejoin-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #a1a1aa;
+  font-weight: 600;
+}
+
+.rejoin-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--arena-coral, #c4445d);
+}
+
+.rejoin-action {
+  margin-left: auto;
+  font-weight: 800;
+}
+
 .scaffold-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

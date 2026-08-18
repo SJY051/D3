@@ -1,4 +1,6 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+
+import { useActiveMatch } from "../battle/useActiveMatch";
 
 const routes = [
   ["/sign-in", "Sign in"],
@@ -7,6 +9,10 @@ const routes = [
 ] as const;
 
 export function AppShell() {
+  const activeMatchId = useActiveMatch();
+  const { pathname } = useLocation();
+  const showRejoin = activeMatchId !== null && pathname !== `/battles/${activeMatchId}`;
+
   return (
     <div className="scaffold-shell">
       <header className="scaffold-header">
@@ -21,6 +27,15 @@ export function AppShell() {
           </NavLink>
         ))}
       </nav>
+      {showRejoin && (
+        <div className="rejoin-banner" role="status">
+          <span className="rejoin-dot" aria-hidden="true" />
+          <span>Match in progress</span>
+          <Link className="rejoin-action" to={`/battles/${activeMatchId}`}>
+            Return to your match →
+          </Link>
+        </div>
+      )}
       <main>
         <Outlet />
       </main>
