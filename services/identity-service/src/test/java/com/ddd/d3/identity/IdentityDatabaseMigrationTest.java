@@ -41,7 +41,7 @@ class IdentityDatabaseMigrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(2, migrations);
+        assertEquals(3, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -51,6 +51,22 @@ class IdentityDatabaseMigrationTest {
                         "refresh_session_legacy_normalization",
                         "outbox_event"),
                 tables);
+    }
+
+    @Test
+    void d3Stat001AddsMonotonicProfileVersionDefaultingToZero() {
+        UUID userId = createUser("versioned");
+
+        assertEquals(
+                0L,
+                jdbc.sql("select profile_version from user_account where id = :id")
+                        .param("id", userId)
+                        .query(Long.class)
+                        .single());
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql(
+                        "update user_account set profile_version = -1 where id = :id")
+                .param("id", userId)
+                .update());
     }
 
     @Test
@@ -130,7 +146,8 @@ class IdentityDatabaseMigrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(1, applied);
+        // V2 refresh-lineage normalization plus V3 profile_version apply forward over the V1-only schema.
+        assertEquals(2, applied);
         assertEquals(parentSessionId, jdbc.sql("""
                         select rotated_from_id
                         from refresh_session

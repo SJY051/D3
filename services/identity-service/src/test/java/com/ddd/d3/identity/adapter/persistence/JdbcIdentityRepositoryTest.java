@@ -33,6 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import tools.jackson.databind.ObjectMapper;
 
 @Testcontainers
 class JdbcIdentityRepositoryTest {
@@ -54,7 +55,8 @@ class JdbcIdentityRepositoryTest {
         Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
         Flyway.configure().dataSource(dataSource).load().migrate();
         jdbc = JdbcClient.create(dataSource);
-        repository = new JdbcIdentityRepository(jdbc, new TransactionTemplate(new DataSourceTransactionManager(dataSource)));
+        repository = new JdbcIdentityRepository(
+                jdbc, new TransactionTemplate(new DataSourceTransactionManager(dataSource)), new ObjectMapper());
         service = new IdentityService(
                 repository,
                 new BCryptPasswordEncoder(),
@@ -173,6 +175,78 @@ class JdbcIdentityRepositoryTest {
 
         assertTrue(repository.updateDisplayName(disabled.id(), "Changed", CLOCK.instant().plusSeconds(60)).isEmpty());
         assertEquals("Disabled", repository.findAccountById(disabled.id()).orElseThrow().displayName());
+    }
+
+    @Test
+    void d3Stat001RegistrationEmitsProfileChangedOutboxAtVersionZero() {
+        Account account = account("dev@d3.dev", "dev");
+
+        repository.saveAccount(account);
+
+        assertEquals(0L, profileVersion(account.id()));
+        assertEquals(1, outboxCount(account.id()));
+        assertEquals(0L, outboxAggregateVersion(account.id()));
+        assertEquals("user-profile.changed", outboxField(account.id(), "eventType"));
+        assertEquals(account.id().toString(), outboxDataField(account.id(), "userId"));
+        assertEquals("dev", outboxDataField(account.id(), "handle"));
+        assertEquals("0", outboxDataField(account.id(), "profileVersion"));
+    }
+
+    @Test
+    void d3Stat001ProfileChangesEmitMonotonicOutboxVersionsInSameTransaction() {
+        Account account = account("dev@d3.dev", "dev");
+        repository.saveAccount(account);
+
+        repository.updateDisplayName(account.id(), "Dev One", CLOCK.instant().plusSeconds(60)).orElseThrow();
+        repository.updateDisplayName(account.id(), "Dev Two", CLOCK.instant().plusSeconds(120)).orElseThrow();
+
+        // Registration (v0) plus two changes (v1, v2): monotonic, one outbox row each, no gaps or reuse.
+        assertEquals(2L, profileVersion(account.id()));
+        assertEquals(3, outboxCount(account.id()));
+        assertEquals(
+                java.util.List.of(0L, 1L, 2L),
+                jdbc.sql("select aggregate_version from outbox_event where aggregate_id = :id order by aggregate_version")
+                        .param("id", account.id())
+                        .query(Long.class)
+                        .list());
+        assertEquals(2L, outboxAggregateVersion(account.id()));
+    }
+
+    private long profileVersion(UUID id) {
+        return jdbc.sql("select profile_version from user_account where id = :id")
+                .param("id", id)
+                .query(Long.class)
+                .single();
+    }
+
+    private long outboxCount(UUID aggregateId) {
+        return jdbc.sql("select count(*) from outbox_event where aggregate_id = :id and event_type = 'user-profile.changed'")
+                .param("id", aggregateId)
+                .query(Long.class)
+                .single();
+    }
+
+    private long outboxAggregateVersion(UUID aggregateId) {
+        return jdbc.sql("select max(aggregate_version) from outbox_event where aggregate_id = :id")
+                .param("id", aggregateId)
+                .query(Long.class)
+                .single();
+    }
+
+    private String outboxField(UUID aggregateId, String field) {
+        return jdbc.sql("select payload->>:field from outbox_event where aggregate_id = :id order by aggregate_version desc limit 1")
+                .param("field", field)
+                .param("id", aggregateId)
+                .query(String.class)
+                .single();
+    }
+
+    private String outboxDataField(UUID aggregateId, String field) {
+        return jdbc.sql("select payload->'data'->>:field from outbox_event where aggregate_id = :id order by aggregate_version desc limit 1")
+                .param("field", field)
+                .param("id", aggregateId)
+                .query(String.class)
+                .single();
     }
 
     private static Account account(String email, String handle) {
