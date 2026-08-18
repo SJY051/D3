@@ -147,6 +147,7 @@ a {
   background: #fafafa;
   padding: 12px;
   white-space: pre-wrap;
+  color: #14213d;
 }
 
 .golden-markdown {
@@ -158,6 +159,7 @@ a {
   border: 1px solid #d4d4d8;
   background: #fafafa;
   padding: 12px;
+  color: #14213d;
 }
 
 .golden-outcome {
@@ -166,6 +168,7 @@ a {
   padding: 14px;
   font-size: 1.25rem;
   font-weight: 800;
+  color: #14213d;
 }
 
 .golden-not-found {

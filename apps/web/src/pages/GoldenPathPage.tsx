@@ -33,7 +33,7 @@ const screens: Record<GoldenPathKind, readonly [string, string, string]> = {
   "sign-in": ["WF-01", "D3-ID-001", "Sign in"],
   feed: ["WF-02", "D3-COM-001", "Public feed"],
   ranked: ["WF-03", "D3-BTL-001", "Ranked queue"],
-  result: ["WF-05", "D3-BTL-003 · D3-BTL-005", "Match result"],
+  result: ["WF-05", "D3-BTL-003 · D3-BTL-005 · D3-STAT-001", "Match result"],
   record: ["WF-06", "D3-STAT-001", "Player record"],
 };
 
@@ -113,8 +113,14 @@ function Ranked() {
   const [language, setLanguage] = useState<RankedLanguage>("PYTHON3");
   const [resource, setResource] = useState<Resource<RankedQueueTicket>>({ status: "empty" });
   const [isPolling, setIsPolling] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const attemptKeyRef = useRef<string | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => {
+    if (!isPolling) return undefined;
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [isPolling]);
   useSessionRedirect(resource, navigate);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,7 +136,8 @@ function Ranked() {
     } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setResource(toFailure(error)); } finally { setIsPolling(false); }
   }
   function cancel() { abortRef.current?.abort(); abortRef.current = null; attemptKeyRef.current = null; setIsPolling(false); setResource({ status: "empty" }); }
-  return <form className="golden-panel golden-form" onSubmit={submit}><label>Language<select disabled={isPolling} onChange={(event) => setLanguage(event.target.value as RankedLanguage)} value={language}><option value="C">C</option><option value="CPP">CPP</option><option value="JAVA">JAVA</option><option value="PYTHON3">PYTHON3</option><option value="JAVASCRIPT">JAVASCRIPT</option><option value="TYPESCRIPT">TYPESCRIPT</option></select></label><p>Queue replays one idempotency key until MATCHED, then opens the authenticated Battle v3 route.</p><p className="golden-queue-state" role="status">{isPolling ? "Searching — queued attempt remains active." : "Idle — choose a language to join."}</p><button disabled={isPolling} type="submit">{isPolling ? "Finding a match…" : attemptKeyRef.current !== null ? "Retry existing queue" : "Join ranked queue"}</button>{isPolling && <button type="button" onClick={cancel}>Cancel queue</button>}<ResourceMessage resource={resource} success={(ticket) => ticket.status === "MATCHED" ? "Match found. Opening Battle v3." : "Queued. Waiting for a matched replay."} /></form>;
+  const queuedAt = resource.status === "success" && resource.value.status === "QUEUED" ? resource.value.enqueuedAt : null;
+  return <form className="golden-panel golden-form" onSubmit={submit}><label>Language<select disabled={isPolling} onChange={(event) => setLanguage(event.target.value as RankedLanguage)} value={language}><option value="C">C</option><option value="CPP">CPP</option><option value="JAVA">JAVA</option><option value="PYTHON3">PYTHON3</option><option value="JAVASCRIPT">JAVASCRIPT</option><option value="TYPESCRIPT">TYPESCRIPT</option></select></label><p>Queue replays one idempotency key until MATCHED, then opens the authenticated Battle v3 route.</p><p className="golden-queue-state" role="status">{isPolling ? "Searching — queued attempt remains active." : "Idle — choose a language to join."}{queuedAt !== null && ` Elapsed ${formatElapsed(queuedAt, now)}.`}</p><button disabled={isPolling} type="submit">{isPolling ? "Finding a match…" : attemptKeyRef.current !== null ? "Retry existing queue" : "Join ranked queue"}</button>{isPolling && <button type="button" onClick={cancel}>Cancel queue</button>}<ResourceMessage resource={resource} success={(ticket) => ticket.status === "MATCHED" ? "Match found. Opening Battle v3." : "Queued. Waiting for a matched replay."} /></form>;
 }
 
 function Result() {
@@ -143,7 +150,7 @@ function ResultRecord({ matchId }: { matchId: string }) {
   const resource = useResource(useCallback(() => loadMatchRecord(matchId), [matchId]), [matchId]);
   if ((resource.status === "error" || resource.status === "disconnected") && resource.statusCode === 404) return <ResultUnavailable title="Match record not found" detail="This public record is unavailable or has not been projected yet." />;
   const viewerId = currentSessionUserId();
-  return <section className="golden-panel"><h2>Public match record</h2><ResourceMessage resource={resource} success={(match) => { const playerId = viewerId === match.playerOneUserId || viewerId === match.playerTwoUserId ? viewerId : match.playerOneUserId; return <><p className="golden-outcome">{outcomeLabel(match.result, playerId, match)}</p><MatchDetails match={match} playerId={playerId} /><p><Link to={`/players/${playerId}`}>View player record</Link> · <Link to="/feed">Return to feed</Link></p></>; }} /></section>;
+  return <section className="golden-panel"><h2>Public match record</h2><ResourceMessage resource={resource} success={(match) => { const playerId = viewerId === match.playerOneUserId || viewerId === match.playerTwoUserId ? viewerId : undefined; return <><p className="golden-outcome">{outcomeLabel(match.result, playerId, match)}</p><MatchDetails match={match} playerId={playerId} /><p><Link to={`/players/${playerId ?? match.playerOneUserId}`}>{playerId === undefined ? "View player-one record" : "View player record"}</Link> · <Link to="/feed">Return to feed</Link></p></>; }} /></section>;
 }
 
 function ResultUnavailable({ detail, title }: { detail: string; title: string }) { return <section className="golden-panel golden-not-found"><h2>{title}</h2><p>{detail}</p><Link to="/feed">Return to feed</Link></section>; }
@@ -166,6 +173,11 @@ function MatchDetails({ match, playerId }: { match: MatchRecord; playerId?: stri
 }
 
 function outcomeLabel(result: MatchRecord["result"], playerId?: string, match?: MatchRecord): string { if (result === "DRAW") return "Draw"; if (result === "VOIDED") return "Voided"; if (playerId !== undefined && match !== undefined) return playerId === (result === "PLAYER_ONE_WIN" ? match.playerOneUserId : match.playerTwoUserId) ? "Victory" : "Defeat"; return result === "PLAYER_ONE_WIN" ? "Player one victory" : "Player two victory"; }
+
+export function formatElapsed(enqueuedAt: string, now: number): string {
+  const totalSeconds = Math.max(0, Math.floor((now - Date.parse(enqueuedAt)) / 1_000));
+  return `${Math.floor(totalSeconds / 60).toString().padStart(2, "0")}:${(totalSeconds % 60).toString().padStart(2, "0")}`;
+}
 
 function useResource<T>(loader: () => Promise<T>, dependencies: readonly unknown[]): Resource<T> {
   const [resource, setResource] = useState<Resource<T>>({ status: "loading" });

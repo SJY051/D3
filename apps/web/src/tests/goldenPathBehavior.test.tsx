@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { clearSession, setSession } from "../api/session";
-import { GoldenPathPage, type GoldenPathKind } from "../pages/GoldenPathPage";
+import { formatElapsed, GoldenPathPage, type GoldenPathKind } from "../pages/GoldenPathPage";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" }, status });
@@ -56,6 +56,19 @@ describe("P0 route behavior", () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(container.textContent).toContain("Match record not found");
     root.unmount();
+  });
+
+  it("uses a neutral outcome label before a reloaded result identifies the viewer", async () => {
+    const match = { matchId: "00000000-0000-4000-8000-000000000001", playerOneUserId: "00000000-0000-4000-8000-000000000002", playerTwoUserId: "00000000-0000-4000-8000-000000000003", result: "PLAYER_ONE_WIN", ranked: true, sourceVersion: 1, projectedAt: "2026-08-17T00:00:00Z" };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json(match)));
+    const { container, root } = await render("result", "/results/00000000-0000-4000-8000-000000000001");
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(container.textContent).toContain("Player one victory");
+    root.unmount();
+  });
+
+  it("formats the approved queue elapsed state from the authoritative enqueue time", () => {
+    expect(formatElapsed("2026-08-17T00:00:00Z", Date.parse("2026-08-17T00:01:18Z"))).toBe("01:18");
   });
 
   it("appends a player record page through its next cursor", async () => {
