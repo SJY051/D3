@@ -2,7 +2,7 @@
 
 Owner: 최정민
 
-Status: Two-session local rehearsal passed with one manual problem seed; no-database-edit acceptance remains pending
+Status: Version-controlled demo seed added; fresh-stack rehearsal evidence remains pending
 
 Last verified: 2026-08-18 on frozen `25359ad` in an isolated `d3checkpoint` Compose project
 
@@ -10,7 +10,7 @@ Requirement: D3-UX-002
 
 Related: [presentation outline](../presentation/outline.md), [test plan](../quality/test-plan.md), [deployment plan](deployment-plan.md)
 
-The checkpoint allocation is 10 minutes of presentation, 5 minutes of live demonstration, and 5 minutes of questions. 최정민 leads; service owners answer technical questions.
+The checkpoint allocation is 10 minutes of presentation, 5 minutes of live demonstration, and 5 minutes of questions. 최정민 leads; service owners answer technical questions. The Battle-owned V12 migration seeds the Judge-compatible `demo-sum-v1` problem (`00000000-0000-4000-8000-000000000001`, version 1) for fresh databases.
 
 ## Evidence boundary
 
@@ -80,18 +80,9 @@ COMPOSE_PROJECT_NAME=d3checkpoint docker compose -f infra/compose.yaml exec -T p
   "select id, slug, version from problem where active is true order by created_at;"
 ```
 
-If the fresh database returns no active row, record the deviation and insert the temporary rehearsal seed:
+The fresh database must return exactly the version-controlled seed. If it does not, record the deviation and stop the rehearsal; do not insert a manual replacement.
 
-```bash
-COMPOSE_PROJECT_NAME=d3checkpoint docker compose -f infra/compose.yaml exec -T postgres \
-  psql -U d3_admin -d d3_battle -c \
-  "insert into problem (id, slug, version, title, difficulty, active, created_at, updated_at)
-   values ('00000000-0000-4000-8000-000000000073', 'checkpoint-demo', 1,
-           'Checkpoint demonstration problem', 'EASY', true, now(), now())
-   on conflict (slug) do update set active = true, updated_at = excluded.updated_at;"
-```
-
-Re-run the query and record the returned ID with the frozen revision. This manual seed is the temporary procedure tracked by [Issue #73](https://github.com/SJY051/D3/issues/73); any run using it must be labeled accordingly and must **not** claim Scenario A's “no manual database edits” acceptance.
+The expected row is `00000000-0000-4000-8000-000000000001 | demo-sum-v1 | 1`. Record it with the frozen revision. The previous `checkpoint-demo` row is historical manual-rehearsal evidence and cannot be used as fresh-stack acceptance evidence.
 
 Before opening the browser, confirm:
 
@@ -134,7 +125,7 @@ Do not attempt attack exchange, Surrender or handle search during this five-minu
 6. At 03:30, use the pre-finished rehearsal match and show the committed outcome, rating/RP, automatic result post and player record.
 7. Keep attack exchange, Surrender and handle search out of the live path until each has evidence.
 
-A manual seed may unblock rehearsal only under the documented Issue #73 procedure and disclosure above; it does not satisfy the no-database-edit acceptance. No other manual database edit, hidden operator API or prewritten result may substitute for a live step.
+If the V12 seed verification fails, stop and fix the migration path; a manual database edit never substitutes for the version-controlled seed. No other manual database edit, hidden operator API or prewritten result may substitute for a live step.
 
 ## Recovery matrix
 

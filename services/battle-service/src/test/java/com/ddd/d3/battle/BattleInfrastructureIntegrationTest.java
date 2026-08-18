@@ -69,6 +69,9 @@ import org.testcontainers.utility.DockerImageName;
 @Testcontainers
 class BattleInfrastructureIntegrationTest {
 
+    private static final UUID DEMO_SUM_PROBLEM_ID =
+            UUID.fromString("00000000-0000-4000-8000-000000000001");
+
     @Container
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17.10-alpine");
 
@@ -99,7 +102,7 @@ class BattleInfrastructureIntegrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(12, migrations);
+        assertEquals(13, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -117,6 +120,53 @@ class BattleInfrastructureIntegrationTest {
                         "outbox_event",
                         "inbox_event"),
                 tables);
+    }
+
+    @Test
+    void d3Jdg001SeedsTheJudgeCompatibleDemoProblemForFreshRankedMatches() {
+        assertEquals(
+                List.of(DEMO_SUM_PROBLEM_ID),
+                jdbc.sql("select id from problem where active order by created_at, id")
+                        .query(UUID.class)
+                        .list());
+        assertEquals(
+                List.of("demo-sum-v1|Deterministic demonstration sum|EASY|O(n)|1"),
+                jdbc.sql("""
+                                select slug || '|' || title || '|' || difficulty || '|'
+                                       || expected_complexity || '|' || version
+                                from problem
+                                where id = :problemId
+                                """)
+                        .param("problemId", DEMO_SUM_PROBLEM_ID)
+                        .query(String.class)
+                        .list());
+
+        JdbcRankedMatchStore store = new JdbcRankedMatchStore(
+                dataSource, new DataSourceTransactionManager(dataSource));
+        RankedMatchStore.RankedMatch match = store.create(
+                new RankedMatchmaker.Pair(rankedEntry(1, 11, 1_000, 1), rankedEntry(2, 22, 1_050, 2)),
+                Instant.parse("2026-08-18T00:00:00Z"));
+
+        assertEquals(DEMO_SUM_PROBLEM_ID, match.problemId());
+    }
+
+    @Test
+    void d3Jdg001RetiresEveryUnsupportedActiveProblemOnUpgrade() {
+        migrateOnlyThrough("11");
+        jdbc.sql("""
+                        insert into problem (id, slug, version, title, difficulty, expected_complexity, active, created_at, updated_at)
+                        values ('00000000-0000-4000-8000-000000000073', 'checkpoint-demo', 1, 'Manual rehearsal seed', 'EASY', 'O(n)', true, timestamptz '2026-08-17T00:00:00Z', timestamptz '2026-08-17T00:00:00Z'),
+                               ('11111111-1111-4111-8111-111111111111', 'stray-manual-problem', 1, 'Stray manual problem', 'EASY', 'O(n)', true, timestamptz '2026-08-16T00:00:00Z', timestamptz '2026-08-16T00:00:00Z')
+                        """)
+                .update();
+
+        Flyway.configure().dataSource(dataSource).load().migrate();
+
+        assertEquals(
+                List.of(DEMO_SUM_PROBLEM_ID),
+                jdbc.sql("select id from problem where active order by created_at, id")
+                        .query(UUID.class)
+                        .list());
     }
 
     @Test
@@ -911,7 +961,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(11, applied);
+        assertEquals(12, applied);
         assertEquals(1, jdbc.sql("""
                         select count(*)
                         from judge_job_reference
@@ -1090,7 +1140,7 @@ class BattleInfrastructureIntegrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(11, applied);
+        assertEquals(12, applied);
         assertEquals(1, jdbc.sql("select count(*) from match where id = :id")
                 .param("id", matchId)
                 .query(Integer.class)

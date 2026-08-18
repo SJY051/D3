@@ -69,6 +69,16 @@ Deploy digest-pinned application images behind the ALB with no traffic or the sm
 
 Record deployment ID, image digests, migration version, configuration version, operator and start time.
 
+### Battle WebSocket ingress guardrails (issue #37)
+
+Before exposing the Gateway route `/ws/v1/battle/**`, bind the following controls in the reviewed ALB/WAF deployment configuration and record their final values with the deployment evidence:
+
+- Limit WebSocket upgrade requests at the edge to **12 per source IP per minute**, with a burst of **6**. This limits repeated unauthenticated handshakes before Gateway JWT validation; it is not a substitute for Battle's authenticated `(matchId, viewerId)` one-session ownership.
+- Set the ALB idle timeout to **900 seconds**. This covers the current ten-minute authoritative match window without silently severing an otherwise healthy, quiet match. If the match duration changes, review this timeout with the lifecycle owner.
+- Retain ALB/Gateway upgrade rejections and Battle's `d3_battle_websocket_sessions_active` gauge. Alert investigation begins on sustained edge throttling, abnormal close rates, or a per-instance session count that does not fall after a match completes.
+
+The local Compose topology has no public ingress and therefore does not emulate these ALB/WAF controls. The application route must not be promoted until the cloud binding is recorded; production values are a deployment configuration, not a claim that this document configured AWS.
+
 ### 6. Verify and promote
 
 Require readiness for gateway and all domain services, database/broker/cache connectivity, contract smoke, one sanitized identity request and `pnpm demo:preflight` against the target. A Judge deployment additionally requires the pinned six-language smoke matrix and resource-limit/isolation checks.

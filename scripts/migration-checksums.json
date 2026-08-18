@@ -13,6 +13,7 @@
     "services/battle-service/src/main/resources/db/migration/V9__persist_judge_evidence.sql": "fc8efe53818de1033489b06a461f56ac8fc438746741cb2761690d94114fae97",
     "services/battle-service/src/main/resources/db/migration/V10__commit_match_results_and_rating.sql": "a1ba772847a881acdccc43ab7cddd135cdfc32eab6c1195f7b26222f4e62d5fe",
     "services/battle-service/src/main/resources/db/migration/V11__allow_judge_command_receipts.sql": "cd0f3d57034ae8680e2c47f4c4073035d5ce977c44a819673bdf1f61db7ef009",
+    "services/battle-service/src/main/resources/db/migration/V12__seed_deterministic_demo_problem.sql": "7cdb17b2c0d7a98462450a8a33919869f7a7d971817d6ffba72f697269be6df4",
     "services/community-service/src/main/resources/db/migration/V1__create_community_tables.sql": "0efcae33992a0869904ded0afc3f10b723bb3730af920a7734e9e696a89847a7",
     "services/community-service/src/main/resources/db/migration/V2__normalize_match_projection_players.sql": "ecdd6315246e6b54b59bf460c86f0a520c5bd75935775123564af9897cbcc14a",
     "services/community-service/src/main/resources/db/migration/V3__add_public_post_rendering.sql": "02c54ff25c291c8996ba4822e1d05c2c64187ecd04e3af9f08b4b7f6eb0472b3",
