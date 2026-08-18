@@ -190,6 +190,46 @@ class IdentityDatabaseMigrationTest {
         assertThrows(DataIntegrityViolationException.class, () -> createRefreshSession(secondUserId, parentSessionId));
     }
 
+    @Test
+    void d3Stat001BackfillsAProfileChangedOutboxRowForAccountsThatPredateTheProducer() {
+        migrateOnlyThrough("2");
+        UUID existing = createUser("legacy");
+
+        Flyway.configure().dataSource(dataSource).load().migrate();
+
+        assertEquals(
+                1L,
+                jdbc.sql("select count(*) from outbox_event where aggregate_id = :id and event_type = 'user-profile.changed'")
+                        .param("id", existing)
+                        .query(Long.class)
+                        .single());
+        assertEquals(
+                0L,
+                jdbc.sql("select aggregate_version from outbox_event where aggregate_id = :id")
+                        .param("id", existing)
+                        .query(Long.class)
+                        .single());
+        assertEquals(
+                existing.toString(),
+                jdbc.sql("select payload->'data'->>'userId' from outbox_event where aggregate_id = :id")
+                        .param("id", existing)
+                        .query(String.class)
+                        .single());
+        assertEquals(
+                "0",
+                jdbc.sql("select payload->'data'->>'profileVersion' from outbox_event where aggregate_id = :id")
+                        .param("id", existing)
+                        .query(String.class)
+                        .single());
+        // The backfilled row is unpublished so the scheduled publisher relays it like any in-band event.
+        assertEquals(
+                1L,
+                jdbc.sql("select count(*) from outbox_event where aggregate_id = :id and published_at is null")
+                        .param("id", existing)
+                        .query(Long.class)
+                        .single());
+    }
+
     private void migrateOnlyThrough(String version) {
         Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
         Flyway.configure().dataSource(dataSource).target(version).load().migrate();
