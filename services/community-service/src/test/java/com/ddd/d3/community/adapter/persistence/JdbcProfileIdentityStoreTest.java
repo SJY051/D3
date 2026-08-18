@@ -27,6 +27,7 @@ class JdbcProfileIdentityStoreTest {
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17.10-alpine");
 
     private static final UUID USER = UUID.fromString("11111111-1111-4111-8111-111111111111");
+    private static final UUID OTHER_USER = UUID.fromString("22222222-2222-4222-8222-222222222222");
     private static final UUID EVENT = UUID.fromString("55555555-5555-4555-8555-555555555551");
     private static final Instant AT = Instant.parse("2026-08-16T00:00:00Z");
 
@@ -121,8 +122,22 @@ class JdbcProfileIdentityStoreTest {
                 .param("id", USER).query(Long.class).optional().orElse(null));
     }
 
+    @Test
+    void d3Stat001DoesNotRejectAReusedHandleAcrossProjectedUsers() {
+        assertTrue(store.apply(event(EVENT, USER, 0L, "alice")));
+        assertTrue(store.apply(event(other(2), OTHER_USER, 0L, "alice")));
+
+        assertEquals(2, jdbc.sql("select count(*) from profile_projection where handle = 'alice'")
+                .query(Integer.class)
+                .single());
+    }
+
     private static UserProfileChangedEvent event(UUID eventId, long version, String handle) {
-        return new UserProfileChangedEvent(eventId, USER, version, USER, handle, AT);
+        return event(eventId, USER, version, handle);
+    }
+
+    private static UserProfileChangedEvent event(UUID eventId, UUID userId, long version, String handle) {
+        return new UserProfileChangedEvent(eventId, userId, version, userId, handle, AT);
     }
 
     private static UUID other(int suffix) {

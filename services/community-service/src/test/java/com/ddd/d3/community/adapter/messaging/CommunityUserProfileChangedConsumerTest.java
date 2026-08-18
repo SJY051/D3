@@ -29,6 +29,10 @@ class CommunityUserProfileChangedConsumerTest {
     }
 
     private static String validPayload() {
+        return validPayload(7);
+    }
+
+    private static String validPayload(long profileVersion) {
         return """
                 {
                   "eventId":"11111111-1111-4111-8111-111111111111",
@@ -37,14 +41,14 @@ class CommunityUserProfileChangedConsumerTest {
                   "occurredAt":"2026-08-16T01:59:00Z",
                   "correlationId":"22222222-2222-4222-8222-222222222222",
                   "aggregateId":"22222222-2222-4222-8222-222222222222",
-                  "aggregateVersion":7,
+                  "aggregateVersion":%d,
                   "data":{
                     "userId":"22222222-2222-4222-8222-222222222222",
                     "handle":"alice",
-                    "profileVersion":7
+                    "profileVersion":%d
                   }
                 }
-                """;
+                """.formatted(profileVersion, profileVersion);
     }
 
     @Test
@@ -61,6 +65,18 @@ class CommunityUserProfileChangedConsumerTest {
         assertEquals(7L, event.getValue().aggregateVersion());
         assertEquals("alice", event.getValue().handle());
         assertEquals(RECEIVED_AT, event.getValue().receivedAt());
+    }
+
+    @Test
+    void d3Stat001AcceptsMatchingProfileVersionsOutsideTheLongCache() {
+        JdbcProfileIdentityStore store = mock(JdbcProfileIdentityStore.class);
+        when(store.apply(any())).thenReturn(true);
+
+        consumer(store).receive(validPayload(128));
+
+        ArgumentCaptor<UserProfileChangedEvent> event = ArgumentCaptor.forClass(UserProfileChangedEvent.class);
+        verify(store).apply(event.capture());
+        assertEquals(128L, event.getValue().aggregateVersion());
     }
 
     @Test

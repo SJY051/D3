@@ -68,7 +68,7 @@ public final class CommunityUserProfileChangedConsumer {
             if (envelope.aggregateVersion() < 0
                     || envelope.correlationId().isBlank()
                     || !envelope.aggregateId().equals(data.userId())
-                    || envelope.aggregateVersion() != data.profileVersion()
+                    || !envelope.aggregateVersion().equals(data.profileVersion())
                     || data.handle().isBlank()) {
                 throw new IllegalArgumentException("invalid user-profile.changed payload");
             }

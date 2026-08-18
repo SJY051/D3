@@ -4,7 +4,7 @@ Owner: 윤서진
 
 Status: Required-source baseline; implementation and final presentation evidence pending
 
-Last verified: 2026-08-16 against origin/main at 7db3811 plus issue #64 Community result-post and public-record evidence
+Last verified: 2026-08-18 against origin/main at 25359ad plus PR #28 golden-path UI and PR #70 rating projection merges
 
 Requirement: D3-DOC-001
 
@@ -20,15 +20,15 @@ The planning PDF names the ten artifact classes below. This table is the authori
 | 4 | Service architecture | [Service boundaries](architecture/services.md) | 윤서진 | Local platform active; identity/battle/judge P0 paths plus Community match projection, ranked result post, public record HTTP, rating projection, user-profile projection and handle search implemented | 2026-08-18 · Community `user-profile.changed.v1` consumer and `profile_projection` handle search with duplicate/replay/out-of-order/concurrency Kafka/PostgreSQL evidence (Identity producer PR #75) | Remaining integrated browser authorization evidence (#18/#19) |
 | 5 | Service database ERD | [Logical ERD](architecture/erd.dbml) | Service owners | Logical baseline: 32 tables, 20 intra-service refs; four forward-only Flyway chains | 2026-08-17 · Community V5 rating-first nullable identity fields with V1–V4 checksum preservation | Rendered diagram, remaining legacy cleanup validation and production query-plan evidence |
 | 6 | Cloud architecture | [Cloud architecture](architecture/cloud.md) | 윤서진 | Account/region and Judge0 host bound; application-to-Judge0 source-SG route proven; application services pending | 2026-08-15 · issue #59 production-adapter private-route smoke and full temporary-resource cleanup | Application IAM, quota and deployed-resource evidence |
-| 7 | Wireframes and functions | [WF-01 through WF-08](wireframes/README.md) | 최정민 | WF-01–06 P0 revision approved 2026-08-16; WF-07/08 review required | 2026-08-16 · this PR commit · P0 revision aligned with current HTTP and WebSocket contracts | Styled-screen linkage/screenshots; WF-07/08 review |
+| 7 | Wireframes and functions | [WF-01 through WF-08](wireframes/README.md) | 최정민 | WF-01–06 P0 revision approved 2026-08-16; styled WF-01/02/03/05/06 screens merged (PR #28); WF-07/08 review required | 2026-08-18 · PR #28 merge `25359ad` · styled routes name their WF IDs with browser/test evidence | Integrated two-session screenshots/recording (#19); WF-07/08 review |
 | 8 | Test plan: unit, integration, load and chaos | [Test plan](quality/test-plan.md) | 최정민 and service owners | Plan baseline plus designated-host, private-route, Community projection, result-post and public-record evidence | 2026-08-16 · issue #64 concurrent/replay/order/rebuild/rollback, migration-upgrade, Kafka and public HTTP checks | Full deployed-service activation, integrated UI, load and chaos reports |
 | 9 | Deployment plan: CI/CD, procedure and rollback | [Deployment plan](operations/deployment-plan.md) | 윤서진 | Local runtime active; developer account and Judge0 host bound; application deployment pending | 2026-08-14 · full local preflight, CI and Judge0 AWS boundary review | Application images, AWS/OIDC bindings, deploy and rollback rehearsal |
-| 10 | Source and README | [README](../README.md), repository and [public contracts](../contracts/README.md) | Team | Executable local contributor baseline | 2026-08-15 · local start/preflight, two-session golden-path runtime and repository command review | Integrated product behavior, final revision, license decision and release evidence |
+| 10 | Source and README | [README](../README.md), repository and [public contracts](../contracts/README.md) | Team | Executable local contributor baseline | 2026-08-18 · two-session golden-path rehearsal on frozen 25359ad and README refresh | Integrated product behavior, final revision, license decision and release evidence |
 
 ## Supporting presentation sources
 
 - [Presentation outline](presentation/outline.md): narrative baseline; exact mandatory order remains `UNKNOWN`.
-- [Demo runbook](operations/demo-runbook.md): rehearsal and recovery procedure; live Scenario A and recording are pending.
+- [Demo runbook](operations/demo-runbook.md): isolated preflight and two-session rehearsal completed on frozen `25359ad`; final two-session acceptance and recording remain pending.
 - [Security review](quality/security-review.md): required boundary; implementation-targeted review remains pending.
 - [Submission checklist](requirements/submission-checklist.md): operational freeze and packaging gates.
 

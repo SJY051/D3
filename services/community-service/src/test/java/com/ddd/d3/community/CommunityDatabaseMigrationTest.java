@@ -41,7 +41,7 @@ class CommunityDatabaseMigrationTest {
                 .query(String.class)
                 .list());
 
-        assertEquals(5, migrations);
+        assertEquals(6, migrations);
         assertEquals(
                 Set.of(
                         "flyway_schema_history",
@@ -56,6 +56,16 @@ class CommunityDatabaseMigrationTest {
                         "match_projection_rebuild_queue",
                         "inbox_event"),
                 tables);
+    }
+
+    @Test
+    void d3Stat001DoesNotMakeCommunityProjectionAuthoritativeForHandleUniqueness() {
+        insertProfileProjection(UUID.randomUUID(), "alice");
+        insertProfileProjection(UUID.randomUUID(), "alice");
+
+        assertEquals(2, jdbc.sql("select count(*) from profile_projection where handle = 'alice'")
+                .query(Integer.class)
+                .single());
     }
 
     @Test
@@ -89,7 +99,7 @@ class CommunityDatabaseMigrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(4, applied);
+        assertEquals(5, applied);
         assertEquals(new PlayerSeats(playerOneId, playerTwoId), readPlayerSeats(matchId));
         assertEquals(0, jdbc.sql("""
                         select count(*)
@@ -127,7 +137,7 @@ class CommunityDatabaseMigrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(4, applied);
+        assertEquals(5, applied);
         assertEquals(4, jdbc.sql("""
                         select count(*)
                         from match_projection
@@ -168,7 +178,7 @@ class CommunityDatabaseMigrationTest {
 
         int applied = Flyway.configure().dataSource(dataSource).load().migrate().migrationsExecuted;
 
-        assertEquals(2, applied);
+        assertEquals(3, applied);
         assertEquals(2, jdbc.sql("""
                         select count(*)
                         from post
@@ -248,6 +258,19 @@ class CommunityDatabaseMigrationTest {
                 .param("matchId", matchId)
                 .param("playerOneId", playerOneId)
                 .param("playerTwoId", playerTwoId)
+                .update();
+    }
+
+    private void insertProfileProjection(UUID userId, String handle) {
+        jdbc.sql("""
+                        insert into profile_projection (
+                            user_id, handle, identity_source_version, projected_at
+                        ) values (
+                            :userId, :handle, 0, now()
+                        )
+                        """)
+                .param("userId", userId)
+                .param("handle", handle)
                 .update();
     }
 
