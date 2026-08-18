@@ -2,6 +2,7 @@ package com.ddd.d3.community.config;
 
 import com.ddd.d3.community.adapter.persistence.JdbcCommunityRepository;
 import com.ddd.d3.community.adapter.persistence.JdbcMatchProjectionStore;
+import com.ddd.d3.community.adapter.persistence.JdbcProfileRatingStore;
 import com.ddd.d3.community.application.CommunityService;
 import com.ddd.d3.community.application.MatchFinishedProjectionService;
 import com.ddd.d3.community.domain.MarkdownPolicy;
@@ -45,6 +46,13 @@ public class CommunityServiceConfiguration {
             PlatformTransactionManager transactionManager) {
         return new MatchFinishedProjectionService(
                 store, new TransactionTemplate(transactionManager), communityService::createResultPost);
+    }
+
+    @Bean
+    JdbcProfileRatingStore profileRatingStore(
+            DataSource dataSource, PlatformTransactionManager transactionManager) {
+        return new JdbcProfileRatingStore(
+                JdbcClient.create(dataSource), new TransactionTemplate(transactionManager));
     }
 
     @Bean

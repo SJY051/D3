@@ -545,14 +545,14 @@ Table community_db.post_like {
 
 Table community_db.profile_projection {
   user_id uuid [pk, note: 'Logical identity aggregate reference']
-  handle text [not null, unique]
+  handle text [unique, note: 'Null on a rating-first row (V5) until the Identity projection applies']
   display_name text [note: 'Null until an enriched Identity contract is applied']
   public_rating int
   rp int
   tier text
   division text [note: 'Null until a versioned Battle contract supplies division independently from tier']
   peak_tier text
-  identity_source_version bigint [not null]
+  identity_source_version bigint [note: 'Null on a rating-first row (V5) until the Identity projection applies']
   rating_source_version bigint [note: 'Null until the first Battle rating projection is applied']
   projected_at timestamptz [not null]
 }
