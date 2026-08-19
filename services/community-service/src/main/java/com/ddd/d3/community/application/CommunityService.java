@@ -107,6 +107,26 @@ public final class CommunityService {
         return repository.followState(targetUserId, viewerUserId);
     }
 
+    public void like(UUID userId, UUID postId) {
+        requirePublicPost(postId);
+        repository.insertLike(userId, postId);
+    }
+
+    public void unlike(UUID userId, UUID postId) {
+        repository.deleteLike(userId, postId);
+    }
+
+    public LikeState likeState(UUID postId, Optional<UUID> viewerUserId) {
+        requirePublicPost(postId);
+        return repository.likeState(postId, viewerUserId);
+    }
+
+    private void requirePublicPost(UUID postId) {
+        if (!repository.publicPostExists(postId)) {
+            throw new PostNotFoundException();
+        }
+    }
+
     public ProfilePage searchProfilesByHandle(String handlePrefix, Optional<String> cursor, int limit) {
         if (handlePrefix == null || handlePrefix.isBlank()) {
             throw new IllegalArgumentException("handle query must not be blank");
@@ -162,6 +182,8 @@ public final class CommunityService {
     public record ProfilePage(List<ProfileView> profiles, String nextCursor) {}
 
     public record FollowState(long followerCount, long followingCount, boolean viewerFollowing) {}
+
+    public record LikeState(long likeCount, boolean viewerLiked) {}
 
     public record ProfileCursor(String handle, UUID userId) {
         public String encode() {

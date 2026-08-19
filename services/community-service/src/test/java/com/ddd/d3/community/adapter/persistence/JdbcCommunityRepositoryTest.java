@@ -202,6 +202,41 @@ class JdbcCommunityRepositoryTest {
         assertFalse(afterUnfollow.viewerFollowing());
     }
 
+    @Test
+    void d3Com001LikeIsIdempotentAndCountsPerViewer() {
+        repository.insertPost(new NewPost(POST_ONE, USER_ONE, PostVisibility.PUBLIC, "post", "<p>post</p>", 4));
+        assertTrue(repository.publicPostExists(POST_ONE));
+
+        repository.insertLike(USER_TWO, POST_ONE);
+        repository.insertLike(USER_TWO, POST_ONE); // idempotent
+        repository.insertLike(USER_ONE, POST_ONE);
+
+        var state = repository.likeState(POST_ONE, Optional.of(USER_TWO));
+        assertEquals(2, state.likeCount());
+        assertTrue(state.viewerLiked());
+        assertFalse(repository.likeState(POST_ONE, Optional.empty()).viewerLiked());
+
+        repository.deleteLike(USER_TWO, POST_ONE);
+        repository.deleteLike(USER_TWO, POST_ONE); // idempotent
+        assertEquals(1, repository.likeState(POST_ONE, Optional.of(USER_TWO)).likeCount());
+    }
+
+    @Test
+    void d3Com001TreatsOnlyPublicPostsAsLikeable() {
+        jdbc.sql("""
+                        insert into post (
+                            id, author_user_id, visibility, prose_markdown, rendered_html,
+                            prose_character_count, created_at, updated_at
+                        )
+                        values (:id, :author, 'PRIVATE', 'hidden', '<p>hidden</p>', 6, now(), now())
+                        """)
+                .param("id", POST_ONE)
+                .param("author", USER_ONE)
+                .update();
+        assertFalse(repository.publicPostExists(POST_ONE));
+        assertFalse(repository.publicPostExists(POST_TWO)); // absent post
+    }
+
     private void seedProfile(UUID userId, String handle, int rating, String tier, long identityVersion) {
         jdbc.sql("""
                         insert into profile_projection (

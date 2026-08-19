@@ -69,6 +69,23 @@ public final class CommunityController {
         return service.followState(userId, Optional.of(UUID.fromString(jwt.getSubject())));
     }
 
+    @PostMapping("/posts/{postId}/likes")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void like(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID postId) {
+        service.like(UUID.fromString(jwt.getSubject()), postId);
+    }
+
+    @DeleteMapping("/posts/{postId}/likes")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void unlike(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID postId) {
+        service.unlike(UUID.fromString(jwt.getSubject()), postId);
+    }
+
+    @GetMapping("/posts/{postId}/like-state")
+    CommunityService.LikeState likeState(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID postId) {
+        return service.likeState(postId, Optional.of(UUID.fromString(jwt.getSubject())));
+    }
+
     @GetMapping("/matches/{matchId}")
     CommunityService.MatchRecordView matchRecord(@PathVariable UUID matchId) {
         return service.matchRecord(matchId).orElseThrow(CommunityMatchRecordNotFoundException::new);

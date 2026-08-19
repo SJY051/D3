@@ -2,6 +2,7 @@ package com.ddd.d3.community.adapter.persistence;
 
 import com.ddd.d3.community.application.CommunityService.FeedCursor;
 import com.ddd.d3.community.application.CommunityService.FollowState;
+import com.ddd.d3.community.application.CommunityService.LikeState;
 import com.ddd.d3.community.application.CommunityService.FeedPage;
 import com.ddd.d3.community.application.CommunityService.MatchRecordCursor;
 import com.ddd.d3.community.application.CommunityService.MatchRecordPage;
@@ -179,6 +180,47 @@ public final class JdbcCommunityRepository {
 
     private long count(String sql, UUID id) {
         return jdbc.sql(sql).param("id", id).query(Long.class).single();
+    }
+
+    public boolean publicPostExists(UUID postId) {
+        return jdbc.sql("select exists (select 1 from post where id = :id and visibility = 'PUBLIC')")
+                .param("id", postId)
+                .query(Boolean.class)
+                .single();
+    }
+
+    public void insertLike(UUID userId, UUID postId) {
+        jdbc.sql("""
+                        insert into post_like (post_id, user_id, created_at)
+                        values (:postId, :userId, :createdAt)
+                        on conflict (post_id, user_id) do nothing
+                        """)
+                .param("postId", postId)
+                .param("userId", userId)
+                .param("createdAt", java.sql.Timestamp.from(clock.instant()))
+                .update();
+    }
+
+    public void deleteLike(UUID userId, UUID postId) {
+        jdbc.sql("delete from post_like where post_id = :postId and user_id = :userId")
+                .param("postId", postId)
+                .param("userId", userId)
+                .update();
+    }
+
+    public LikeState likeState(UUID postId, Optional<UUID> viewerUserId) {
+        long likes = count("select count(*) from post_like where post_id = :id", postId);
+        boolean viewerLiked = viewerUserId.map(viewer -> jdbc.sql("""
+                        select exists (
+                            select 1 from post_like where post_id = :post and user_id = :viewer
+                        )
+                        """)
+                .param("post", postId)
+                .param("viewer", viewer)
+                .query(Boolean.class)
+                .single())
+                .orElse(false);
+        return new LikeState(likes, viewerLiked);
     }
 
     public ProfilePage searchProfilesByHandle(String handlePrefix, Optional<ProfileCursor> cursor, int limit) {

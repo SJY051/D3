@@ -198,6 +198,49 @@ class CommunityControllerTest {
     }
 
     @Test
+    void d3Com001LikesAndUnlikesForTheAuthenticatedSubject() throws Exception {
+        mockMvc.perform(post("/v1/community/posts/{postId}/likes", POST_ID)
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
+                .andExpect(status().isNoContent());
+        verify(service).like(USER_ID, POST_ID);
+
+        mockMvc.perform(delete("/v1/community/posts/{postId}/likes", POST_ID)
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
+                .andExpect(status().isNoContent());
+        verify(service).unlike(USER_ID, POST_ID);
+    }
+
+    @Test
+    void d3Com001ReturnsNotFoundWhenLikingANonPublicPost() throws Exception {
+        org.mockito.Mockito.doThrow(new com.ddd.d3.community.application.PostNotFoundException())
+                .when(service).like(USER_ID, POST_ID);
+
+        mockMvc.perform(post("/v1/community/posts/{postId}/likes", POST_ID)
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("POST_NOT_FOUND"));
+    }
+
+    @Test
+    void d3Com001ExposesLikeStateForTheViewer() throws Exception {
+        when(service.likeState(POST_ID, Optional.of(USER_ID)))
+                .thenReturn(new CommunityService.LikeState(5, true));
+
+        mockMvc.perform(get("/v1/community/posts/{postId}/like-state", POST_ID)
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.likeCount").value(5))
+                .andExpect(jsonPath("$.viewerLiked").value(true));
+    }
+
+    @Test
+    void d3Sec001KeepsLikingBehindAuthentication() throws Exception {
+        mockMvc.perform(post("/v1/community/posts/{postId}/likes", POST_ID))
+                .andExpect(status().isUnauthorized());
+        verify(service, never()).like(any(), any());
+    }
+
+    @Test
     void d3Sec001KeepsHandleSearchBehindAuthentication() throws Exception {
         mockMvc.perform(get("/v1/community/profiles").param("handle", "ali"))
                 .andExpect(status().isUnauthorized())
