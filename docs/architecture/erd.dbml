@@ -530,6 +530,7 @@ Table community_db.comment {
   post_id uuid [not null]
   author_user_id uuid [not null, note: 'Logical identity contract reference']
   body_markdown text [not null]
+  rendered_html text [not null, note: 'Server-sanitized HTML rendered once at write, mirroring post rendering']
   created_at timestamptz [not null]
 }
 
