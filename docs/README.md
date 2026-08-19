@@ -4,7 +4,7 @@ Owner: Team
 
 Status: Current documentation index; artifact completion follows the authoritative status inventory
 
-Last verified: 2026-08-19 against `2915d0f`
+Last verified: 2026-08-19 against `c738cd8`
 
 ## 무엇을 찾고 있나요?
 
@@ -43,6 +43,6 @@ Last verified: 2026-08-19 against `2915d0f`
 | 7 | [`wireframes/README.md`](wireframes/README.md) | WF-01~WF-08 화면의 기능, 상태와 이동을 정의한다. | 평가자, 디자이너, 프런트엔드 개발자 | **WF-01~06 승인·구현** — global rejoin banner와 self-verdict/accepted lock 반영; WF-07/08 검토와 final capture가 남아 있다. |
 | 8 | [`quality/test-plan.md`](quality/test-plan.md) | 단위·통합·부하·장애 시험의 범위와 증거 방식을 정의한다. | QA, 개발자, 운영자 | **계획 + 로컬 P0 증거** — final RC, deployed live-Judge0, 부하·장애 보고가 남아 있다. |
 | 9 | [`operations/deployment-plan.md`](operations/deployment-plan.md) | CI/CD, 배포 절차와 롤백 계획을 정리한다. | 운영자, 개발자 | **로컬 실행 가능** — 이미지·AWS/OIDC 애플리케이션 배포와 롤백 리허설이 남아 있다. |
-| 10 | [`../README.md`](../README.md), [`../contracts/README.md`](../contracts/README.md), 저장소 소스 | 프로젝트 소개·실행 안내와 공개 계약을 실제 구현 소스에 연결한다. | 모든 독자 | **실행 가능한 로컬 P0 기준선** — `2915d0f` 치환, final acceptance·recording·release evidence가 남아 있다. |
+| 10 | [`../README.md`](../README.md), [`../contracts/README.md`](../contracts/README.md), 저장소 소스 | 프로젝트 소개·실행 안내와 공개 계약을 실제 구현 소스에 연결한다. | 모든 독자 | **실행 가능한 로컬 P0 기준선** — `c738cd8` 치환, final acceptance·recording·release evidence가 남아 있다. |
 
 > 산출물의 소유자, 상태, 검증 시점과 남은 증거에 대한 권위 있는 기준은 [`artifact-status.md`](artifact-status.md)입니다.
