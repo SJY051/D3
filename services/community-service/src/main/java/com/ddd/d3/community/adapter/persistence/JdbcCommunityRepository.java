@@ -1,6 +1,7 @@
 package com.ddd.d3.community.adapter.persistence;
 
 import com.ddd.d3.community.application.CommunityService.FeedCursor;
+import com.ddd.d3.community.application.CommunityService.FollowState;
 import com.ddd.d3.community.application.CommunityService.FeedPage;
 import com.ddd.d3.community.application.CommunityService.MatchRecordCursor;
 import com.ddd.d3.community.application.CommunityService.MatchRecordPage;
@@ -138,6 +139,46 @@ public final class JdbcCommunityRepository {
                 .query(String.class)
                 .optional()
                 .orElse(null);
+    }
+
+    public void insertFollow(UUID followerUserId, UUID followedUserId) {
+        jdbc.sql("""
+                        insert into follow (follower_user_id, followed_user_id, created_at)
+                        values (:follower, :followed, :createdAt)
+                        on conflict (follower_user_id, followed_user_id) do nothing
+                        """)
+                .param("follower", followerUserId)
+                .param("followed", followedUserId)
+                .param("createdAt", java.sql.Timestamp.from(clock.instant()))
+                .update();
+    }
+
+    public void deleteFollow(UUID followerUserId, UUID followedUserId) {
+        jdbc.sql("delete from follow where follower_user_id = :follower and followed_user_id = :followed")
+                .param("follower", followerUserId)
+                .param("followed", followedUserId)
+                .update();
+    }
+
+    public FollowState followState(UUID targetUserId, Optional<UUID> viewerUserId) {
+        long followers = count("select count(*) from follow where followed_user_id = :id", targetUserId);
+        long following = count("select count(*) from follow where follower_user_id = :id", targetUserId);
+        boolean viewerFollowing = viewerUserId.map(viewer -> jdbc.sql("""
+                        select exists (
+                            select 1 from follow
+                            where follower_user_id = :viewer and followed_user_id = :target
+                        )
+                        """)
+                .param("viewer", viewer)
+                .param("target", targetUserId)
+                .query(Boolean.class)
+                .single())
+                .orElse(false);
+        return new FollowState(followers, following, viewerFollowing);
+    }
+
+    private long count(String sql, UUID id) {
+        return jdbc.sql(sql).param("id", id).query(Long.class).single();
     }
 
     public ProfilePage searchProfilesByHandle(String handlePrefix, Optional<ProfileCursor> cursor, int limit) {

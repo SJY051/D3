@@ -92,6 +92,21 @@ public final class CommunityService {
         return repository.publicFeed(decodedCursor, clamp(limit, 1, 50));
     }
 
+    public void follow(UUID followerUserId, UUID followedUserId) {
+        if (followerUserId.equals(followedUserId)) {
+            throw new IllegalArgumentException("a user cannot follow themselves");
+        }
+        repository.insertFollow(followerUserId, followedUserId);
+    }
+
+    public void unfollow(UUID followerUserId, UUID followedUserId) {
+        repository.deleteFollow(followerUserId, followedUserId);
+    }
+
+    public FollowState followState(UUID targetUserId, Optional<UUID> viewerUserId) {
+        return repository.followState(targetUserId, viewerUserId);
+    }
+
     public ProfilePage searchProfilesByHandle(String handlePrefix, Optional<String> cursor, int limit) {
         if (handlePrefix == null || handlePrefix.isBlank()) {
             throw new IllegalArgumentException("handle query must not be blank");
@@ -145,6 +160,8 @@ public final class CommunityService {
     public record ProfileView(UUID userId, String handle, Integer publicRating, String tier) {}
 
     public record ProfilePage(List<ProfileView> profiles, String nextCursor) {}
+
+    public record FollowState(long followerCount, long followingCount, boolean viewerFollowing) {}
 
     public record ProfileCursor(String handle, UUID userId) {
         public String encode() {

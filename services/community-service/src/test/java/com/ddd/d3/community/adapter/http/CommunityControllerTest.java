@@ -5,6 +5,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -141,6 +142,59 @@ class CommunityControllerTest {
                 .andExpect(jsonPath("$.authorHandle").value("alice"))
                 .andExpect(jsonPath("$.visibility").value("PUBLIC"))
                 .andExpect(jsonPath("$.renderedHtml").value("<p>hello</p>"));
+    }
+
+    @Test
+    void d3Com001FollowsForTheAuthenticatedSubjectNotTheRequestBody() throws Exception {
+        mockMvc.perform(post("/v1/community/follows")
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"followedUserId\":\"" + PLAYER_TWO + "\"}"))
+                .andExpect(status().isNoContent());
+        verify(service).follow(USER_ID, PLAYER_TWO);
+    }
+
+    @Test
+    void d3Com001UnfollowsForTheAuthenticatedSubject() throws Exception {
+        mockMvc.perform(delete("/v1/community/follows/{followedUserId}", PLAYER_TWO)
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
+                .andExpect(status().isNoContent());
+        verify(service).unfollow(USER_ID, PLAYER_TWO);
+    }
+
+    @Test
+    void d3Com001RejectsSelfFollowAsBadRequest() throws Exception {
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("a user cannot follow themselves"))
+                .when(service).follow(USER_ID, USER_ID);
+
+        mockMvc.perform(post("/v1/community/follows")
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"followedUserId\":\"" + USER_ID + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void d3Sec001KeepsFollowingBehindAuthentication() throws Exception {
+        mockMvc.perform(post("/v1/community/follows")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"followedUserId\":\"" + PLAYER_TWO + "\"}"))
+                .andExpect(status().isUnauthorized());
+        verify(service, never()).follow(any(), any());
+    }
+
+    @Test
+    void d3Com001ExposesFollowStateForTheViewer() throws Exception {
+        when(service.followState(PLAYER_TWO, Optional.of(USER_ID)))
+                .thenReturn(new CommunityService.FollowState(3, 1, true));
+
+        mockMvc.perform(get("/v1/community/profiles/{userId}/follow-state", PLAYER_TWO)
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.followerCount").value(3))
+                .andExpect(jsonPath("$.followingCount").value(1))
+                .andExpect(jsonPath("$.viewerFollowing").value(true));
     }
 
     @Test

@@ -4,16 +4,20 @@ import com.ddd.d3.community.application.CommunityService;
 import com.ddd.d3.community.domain.PostVisibility;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -48,6 +52,23 @@ public final class CommunityController {
         return service.searchProfilesByHandle(handle, cursor, limit);
     }
 
+    @PostMapping("/follows")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void follow(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody FollowRequest request) {
+        service.follow(UUID.fromString(jwt.getSubject()), request.followedUserId());
+    }
+
+    @DeleteMapping("/follows/{followedUserId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void unfollow(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID followedUserId) {
+        service.unfollow(UUID.fromString(jwt.getSubject()), followedUserId);
+    }
+
+    @GetMapping("/profiles/{userId}/follow-state")
+    CommunityService.FollowState followState(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID userId) {
+        return service.followState(userId, Optional.of(UUID.fromString(jwt.getSubject())));
+    }
+
     @GetMapping("/matches/{matchId}")
     CommunityService.MatchRecordView matchRecord(@PathVariable UUID matchId) {
         return service.matchRecord(matchId).orElseThrow(CommunityMatchRecordNotFoundException::new);
@@ -62,4 +83,6 @@ public final class CommunityController {
     }
 
     record CreatePostRequest(@NotBlank String markdown, PostVisibility visibility) {}
+
+    record FollowRequest(@NotNull UUID followedUserId) {}
 }

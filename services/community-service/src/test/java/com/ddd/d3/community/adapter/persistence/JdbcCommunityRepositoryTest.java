@@ -3,6 +3,7 @@ package com.ddd.d3.community.adapter.persistence;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ddd.d3.community.application.CommunityService.NewPost;
 import com.ddd.d3.community.application.CommunityService.NewResultPost;
@@ -175,6 +176,30 @@ class JdbcCommunityRepositoryTest {
         // '_' is a LIKE wildcard; escaped, "a_" must match only the literal "a_b", not "axb".
         var page = repository.searchProfilesByHandle("a_", Optional.empty(), 10);
         assertEquals(List.of("a_b"), page.profiles().stream().map(p -> p.handle()).toList());
+    }
+
+    @Test
+    void d3Com001FollowIsIdempotentAndReportsDirectionalCountsAndViewerState() {
+        UUID userThree = UUID.fromString("55555555-5555-4555-8555-555555555553");
+        repository.insertFollow(USER_ONE, USER_TWO);
+        repository.insertFollow(USER_ONE, USER_TWO); // idempotent: no duplicate, no error
+        repository.insertFollow(userThree, USER_TWO);
+
+        var followed = repository.followState(USER_TWO, Optional.of(USER_ONE));
+        assertEquals(2, followed.followerCount());
+        assertEquals(0, followed.followingCount());
+        assertTrue(followed.viewerFollowing());
+
+        var follower = repository.followState(USER_ONE, Optional.of(USER_TWO));
+        assertEquals(0, follower.followerCount());
+        assertEquals(1, follower.followingCount());
+        assertFalse(follower.viewerFollowing());
+
+        repository.deleteFollow(USER_ONE, USER_TWO);
+        repository.deleteFollow(USER_ONE, USER_TWO); // idempotent delete
+        var afterUnfollow = repository.followState(USER_TWO, Optional.of(USER_ONE));
+        assertEquals(1, afterUnfollow.followerCount());
+        assertFalse(afterUnfollow.viewerFollowing());
     }
 
     private void seedProfile(UUID userId, String handle, int rating, String tier, long identityVersion) {
