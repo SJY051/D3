@@ -100,6 +100,16 @@ final class BattleWebSocketSessionRegistry {
         Registration previous = replaced.get();
         if (previous != null) {
             closeQuietly(previous.session, CloseStatus.NORMAL);
+            // Inherit the verdict-bump offset so the participant's sequence stream stays
+            // monotonic across transports; otherwise a reconnecting client's stale filter
+            // (which keeps the highest sequence it has seen) drops post-reconnect frames.
+            long inheritedOffset;
+            synchronized (previous) {
+                inheritedOffset = previous.sequenceOffset;
+            }
+            synchronized (registration) {
+                registration.sequenceOffset = Math.max(registration.sequenceOffset, inheritedOffset);
+            }
         }
         try {
             sendLatest(registration);
