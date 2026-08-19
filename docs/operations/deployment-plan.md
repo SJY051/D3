@@ -4,7 +4,7 @@ Owner: 윤서진
 
 Status: Local runtime active; developer account and isolated Judge0 host bound; application cloud resources and pipeline pending
 
-Last verified: 2026-08-19 against `2915d0f`, the local Compose/CI model and issue #59 source-SG route smoke
+Last verified: 2026-08-19 against `c738cd8`, the local Compose/CI model and issue #59 source-SG route smoke
 
 Related: [cloud architecture](../architecture/cloud.md), [AWS CLI developer profile](aws-cli-setup.md), [local infrastructure](../../infra/README.md), [test plan](../quality/test-plan.md)
 

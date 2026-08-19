@@ -38,7 +38,7 @@ Credentials stay outside the repository and recording. Seeded demo identities mu
 | Gate | Owner | Ready when | Current state |
 |---|---|---|---|
 | Reviewed WF-01~08 | 최정민 | UI review is recorded before styled acceptance | WF-01–06 P0 revision approved 2026-08-16; WF-07/08 review required |
-| Scenario A | Service owners | Two browsers complete ranked flow without database edits | PARTIAL PASS: full local two-session path passed on 2026-08-18, but a manual problem seed was required; no-database-edit acceptance PENDING ([Issue #73](https://github.com/SJY051/D3/issues/73)) |
+| Scenario A | Service owners | Two browsers complete ranked flow without database edits | PASS: fresh RC `c738cd8` two-session golden path completed on 2026-08-19 with zero manual database edits (V12 seed, match `30e8b599`) |
 | Scenario B | Battle owners | Reconnect, surrender and timeout loss are deterministic | PARTIAL PASS: reconnect recovery and autonomous deadline completion observed on 2026-08-18; Surrender UI not exposed, timeout-loss path not exercised live |
 | Scenario C | Battle/Judge owners | Incident void commits without rating change | NOT RUN live: deterministic domain and void tests exist, but no live platform-failure demonstration has been executed |
 | Six language runtimes | Judge owner | Versioned smoke cases pass on designated host | PASS for host: pinned Judge0 CE 1.13.1 matrix and 12/12 language cases |
