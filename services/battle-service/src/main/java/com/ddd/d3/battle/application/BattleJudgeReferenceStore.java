@@ -11,9 +11,7 @@ public interface BattleJudgeReferenceStore {
 
     Optional<Reference> findByCommandId(UUID commandId);
 
-    default Optional<SubmissionVerdict> findLatestSubmissionVerdict(UUID matchId, UUID playerId) {
-        return Optional.empty();
-    }
+    Optional<SubmissionVerdict> findLatestSubmissionVerdict(UUID matchId, UUID playerId);
 
     void record(Reference reference);
 
