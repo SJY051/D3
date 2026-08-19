@@ -4,7 +4,7 @@ Owner: 최정민
 
 Status: WF-01–WF-06 approved and implemented for P0; global rejoin banner and self-verdict/accepted-lock states merged; WF-07/WF-08 review required
 
-Last verified: 2026-08-19 against `2915d0f`, PRs #28/#76/#91/#92/#96 and HTTP/WebSocket v3 contracts
+Last verified: 2026-08-19 against `c738cd8`, PRs #28/#76/#91/#92/#96 and HTTP/WebSocket v3 contracts
 
 Requirement: D3-UX-001
 
@@ -87,7 +87,7 @@ Status: Approved by SJY051 for Issue #48; visual polish and self-submission verd
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-The timer, connection state, self-only verdict with attempt number, accepted submit lock, warning window, and attack effect require text or shape in addition to color. The implementation keeps the deterministic garbage effect in a pointer-free display layer above the editor so the controlled source buffer remains unchanged.
+The timer, connection state, self-only verdict with attempt number, accepted submit lock, warning window, and attack effect require text or shape in addition to color. An accepted submit locks only that player's accepted submission; when both players hold accepted submits, the server advances to `JUDGING` early, otherwise the server deadline remains authoritative. The implementation keeps the deterministic garbage effect in a pointer-free display layer above the editor so the controlled source buffer remains unchanged.
 
 ## WF-05 — Match result (`/results/:matchId`)
 

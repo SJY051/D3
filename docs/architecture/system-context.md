@@ -4,7 +4,7 @@ Owner: 윤서진
 
 Status: Local P0 topology active; application cloud deployment pending
 
-Last verified: 2026-08-19 against `2915d0f` and the active service boundaries
+Last verified: 2026-08-19 against `c738cd8` and the active service boundaries
 
 ```mermaid
 flowchart TB
