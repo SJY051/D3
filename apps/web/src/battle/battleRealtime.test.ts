@@ -78,6 +78,27 @@ describe("Battle v3 realtime boundary", () => {
     expect(parseBattleSnapshot(snapshot({}, Number.MAX_SAFE_INTEGER + 2))).not.toBeNull();
   });
 
+  it("maps the self-scoped submission verdict and degrades malformed verdicts to null", () => {
+    expect(parseBattleSnapshot(snapshot())?.submission).toBeNull();
+
+    const wrongAnswer = JSON.parse(snapshot()) as { payload: Record<string, unknown> };
+    wrongAnswer.payload.submission = { verdict: "WRONG_ANSWER", attemptNumber: 1, acceptedLocked: false };
+    expect(parseBattleSnapshot(JSON.stringify(wrongAnswer))?.submission).toEqual({
+      verdict: "WRONG_ANSWER",
+      attemptNumber: 1,
+      acceptedLocked: false,
+    });
+
+    const accepted = JSON.parse(snapshot()) as { payload: Record<string, unknown> };
+    accepted.payload.submission = { verdict: "ACCEPTED", attemptNumber: 2, acceptedLocked: true };
+    const lockedFrame = parseBattleSnapshot(JSON.stringify(accepted));
+    expect(lockedFrame?.submission?.acceptedLocked).toBe(true);
+
+    const malformed = JSON.parse(snapshot()) as { payload: Record<string, unknown> };
+    malformed.payload.submission = { verdict: 7, attemptNumber: "two" };
+    expect(parseBattleSnapshot(JSON.stringify(malformed))?.submission).toBeNull();
+  });
+
   it("derives repeatable display noise without reading or rewriting source", () => {
     const first = overlayGlyphs(9123);
     const replay = overlayGlyphs(9123);

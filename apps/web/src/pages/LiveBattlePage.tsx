@@ -294,6 +294,18 @@ export function BattleArena({
               )}
             </div>
           </div>
+          {snapshot.submission !== null && (
+            <p
+              className={`submission-verdict submission-verdict-${snapshot.submission.verdict === "ACCEPTED" ? "accepted" : "rejected"}`}
+              role="status"
+              aria-live="polite"
+            >
+              <strong>{snapshot.submission.verdict.replaceAll("_", " ")}</strong>
+              {" - attempt "}
+              {snapshot.submission.attemptNumber}
+              {snapshot.submission.acceptedLocked ? " - submissions locked" : ""}
+            </p>
+          )}
           <div className={`source-layer${isIncomingWarning ? " source-layer-warning" : ""}`}>
             <textarea
               aria-label="Solution source"
@@ -364,10 +376,11 @@ export function BattleArena({
               || snapshot.match.state !== "RUNNING"
               || source.trim().length === 0
               || pendingCommand !== null
+              || snapshot.submission?.acceptedLocked === true
             }
             onClick={() => command("SUBMIT", { sourceCode: source })}
           >
-            Submit
+            {snapshot.submission?.acceptedLocked ? "Accepted - locked" : "Submit"}
           </button>
           <span className="action-divider" aria-hidden="true" />
           <button

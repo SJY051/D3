@@ -65,6 +65,11 @@ class BattleJudgedSubmissionServiceTest {
     }
 
     private static final class FakeReferences implements BattleJudgeReferenceStore {
+        @Override
+        public Optional<SubmissionVerdict> findLatestSubmissionVerdict(UUID matchId, UUID playerId) {
+            return Optional.empty();
+        }
+
         private final Reference reference = new Reference(
                 SUBMISSION_ID,
                 MATCH_ID,

@@ -2,21 +2,62 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://d3.local/contracts/websocket/battle-event.v3.schema.json",
   "title": "Battle WebSocket Snapshot v3",
-  "x-requirements": ["D3-BTL-003", "D3-SEC-001"],
+  "x-requirements": [
+    "D3-BTL-003",
+    "D3-SEC-001"
+  ],
   "type": "object",
-  "required": ["type", "version", "matchId", "sequence", "serverTime", "payload"],
+  "required": [
+    "type",
+    "version",
+    "matchId",
+    "sequence",
+    "serverTime",
+    "payload"
+  ],
   "properties": {
-    "type": { "const": "BATTLE_SNAPSHOT" },
-    "version": { "type": "integer", "const": 3 },
-    "matchId": { "type": "string", "format": "uuid" },
-    "sequence": { "type": "integer", "minimum": 0 },
-    "serverTime": { "type": "string", "format": "date-time" },
+    "type": {
+      "const": "BATTLE_SNAPSHOT"
+    },
+    "version": {
+      "type": "integer",
+      "const": 3
+    },
+    "matchId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "serverTime": {
+      "type": "string",
+      "format": "date-time"
+    },
     "payload": {
       "type": "object",
-      "required": ["match", "attack"],
+      "required": [
+        "match",
+        "attack"
+      ],
       "properties": {
-        "match": { "$ref": "battle-event.v2.schema.json#/$defs/matchSnapshot" },
-        "attack": { "$ref": "#/$defs/attack" }
+        "match": {
+          "$ref": "battle-event.v2.schema.json#/$defs/matchSnapshot"
+        },
+        "attack": {
+          "$ref": "#/$defs/attack"
+        },
+        "submission": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/submission"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       },
       "additionalProperties": false
     }
@@ -24,18 +65,48 @@
   "$defs": {
     "attack": {
       "type": "object",
-      "required": ["selfEnergy", "opponentEnergy", "maximumEnergy", "attackCost", "blockCost", "reflectCost", "current"],
+      "required": [
+        "selfEnergy",
+        "opponentEnergy",
+        "maximumEnergy",
+        "attackCost",
+        "blockCost",
+        "reflectCost",
+        "current"
+      ],
       "properties": {
-        "selfEnergy": { "type": "integer", "minimum": 0 },
-        "opponentEnergy": { "type": "integer", "minimum": 0 },
-        "maximumEnergy": { "type": "integer", "minimum": 1 },
-        "attackCost": { "type": "integer", "minimum": 1 },
-        "blockCost": { "type": "integer", "minimum": 1 },
-        "reflectCost": { "type": "integer", "minimum": 1 },
+        "selfEnergy": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "opponentEnergy": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximumEnergy": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "attackCost": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "blockCost": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reflectCost": {
+          "type": "integer",
+          "minimum": 1
+        },
         "current": {
           "oneOf": [
-            { "$ref": "#/$defs/currentAttack" },
-            { "type": "null" }
+            {
+              "$ref": "#/$defs/currentAttack"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       },
@@ -43,30 +114,166 @@
     },
     "currentAttack": {
       "type": "object",
-      "required": ["attackId", "phase", "target", "warningDeadline", "overlayExpiresAt", "overlaySeed", "resolution"],
+      "required": [
+        "attackId",
+        "phase",
+        "target",
+        "warningDeadline",
+        "overlayExpiresAt",
+        "overlaySeed",
+        "resolution"
+      ],
       "properties": {
-        "attackId": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "phase": { "enum": ["WARNING", "ACTIVE", "RESOLVED"] },
-        "target": { "enum": ["SELF", "OPPONENT"] },
-        "warningDeadline": { "type": "string", "format": "date-time" },
-        "overlayExpiresAt": { "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] },
-        "overlaySeed": { "type": "integer" },
-        "resolution": { "oneOf": [{ "enum": ["BLOCKED", "EXPIRED"] }, { "type": "null" }] }
+        "attackId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "phase": {
+          "enum": [
+            "WARNING",
+            "ACTIVE",
+            "RESOLVED"
+          ]
+        },
+        "target": {
+          "enum": [
+            "SELF",
+            "OPPONENT"
+          ]
+        },
+        "warningDeadline": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "overlayExpiresAt": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "overlaySeed": {
+          "type": "integer"
+        },
+        "resolution": {
+          "oneOf": [
+            {
+              "enum": [
+                "BLOCKED",
+                "EXPIRED"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "phase": { "const": "WARNING" } }, "required": ["phase"] },
-          "then": { "properties": { "overlayExpiresAt": { "type": "null" }, "resolution": { "type": "null" } } }
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "WARNING"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "overlayExpiresAt": {
+                "type": "null"
+              },
+              "resolution": {
+                "type": "null"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "phase": { "const": "ACTIVE" } }, "required": ["phase"] },
-          "then": { "properties": { "overlayExpiresAt": { "type": "string", "format": "date-time" }, "resolution": { "type": "null" } } }
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ACTIVE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "overlayExpiresAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "resolution": {
+                "type": "null"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "phase": { "const": "RESOLVED" } }, "required": ["phase"] },
-          "then": { "properties": { "resolution": { "enum": ["BLOCKED", "EXPIRED"] } } }
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "RESOLVED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "resolution": {
+                "enum": [
+                  "BLOCKED",
+                  "EXPIRED"
+                ]
+              }
+            }
+          }
         }
       ],
+      "additionalProperties": false
+    },
+    "submission": {
+      "type": "object",
+      "required": [
+        "verdict",
+        "attemptNumber",
+        "acceptedLocked"
+      ],
+      "properties": {
+        "verdict": {
+          "enum": [
+            "QUEUED",
+            "RUNNING",
+            "ACCEPTED",
+            "WRONG_ANSWER",
+            "COMPILATION_ERROR",
+            "RUNTIME_ERROR",
+            "TIME_LIMIT",
+            "MEMORY_LIMIT",
+            "PLATFORM_FAILURE"
+          ]
+        },
+        "attemptNumber": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "acceptedLocked": {
+          "type": "boolean"
+        }
+      },
       "additionalProperties": false
     }
   },

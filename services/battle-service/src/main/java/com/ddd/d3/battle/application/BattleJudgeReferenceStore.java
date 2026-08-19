@@ -11,6 +11,8 @@ public interface BattleJudgeReferenceStore {
 
     Optional<Reference> findByCommandId(UUID commandId);
 
+    Optional<SubmissionVerdict> findLatestSubmissionVerdict(UUID matchId, UUID playerId);
+
     void record(Reference reference);
 
     boolean receiveJudgedEvent(JudgedEvent event);
@@ -47,6 +49,8 @@ public interface BattleJudgeReferenceStore {
             Instant receivedAt) {}
 
     record PendingJudgedEvent(UUID eventId, UUID submissionId) {}
+
+    record SubmissionVerdict(UUID submissionId, String status, int attemptNumber, Instant completedAt) {}
 
     record Evidence(
             UUID submissionId,
