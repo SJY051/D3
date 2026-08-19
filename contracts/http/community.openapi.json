@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "D3 Community API",
-    "version": "0.2.0",
-    "description": "P0 public developer feed and privacy-safe match record contract. Markdown rendering is a safe minimal subset: paragraphs, line breaks, and fenced code blocks."
+    "version": "0.3.0",
+    "description": "P0 public developer feed and privacy-safe match record contract, plus the P1 social interactions (follow, like, comment) activated over the already-recognized persistence. Markdown rendering is a safe minimal subset: paragraphs, line breaks, and fenced code blocks."
   },
   "x-requirements": ["D3-COM-001", "D3-STAT-001", "D3-SEC-001"],
   "paths": {
@@ -121,6 +121,180 @@
           "400": { "$ref": "#/components/responses/InvalidRequest" }
         }
       }
+    },
+    "/v1/community/follows": {
+      "post": {
+        "summary": "Follow another user",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FollowRequest" }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "Follow recorded; repeating an existing follow is an idempotent no-op" },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" }
+        }
+      }
+    },
+    "/v1/community/follows/{followedUserId}": {
+      "delete": {
+        "summary": "Unfollow a user",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "followedUserId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "204": { "description": "Follow removed; removing a missing follow is an idempotent no-op" },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/v1/community/profiles/{userId}/follow-state": {
+      "get": {
+        "summary": "Read follow counts and the viewer's follow state for a user",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Follow state",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FollowState" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/v1/community/posts/{postId}/likes": {
+      "post": {
+        "summary": "Like a public post",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "postId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "204": { "description": "Like recorded; repeating an existing like is an idempotent no-op" },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/PostNotFound" }
+        }
+      },
+      "delete": {
+        "summary": "Remove a like from a public post",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "postId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "204": { "description": "Like removed; removing a missing like is an idempotent no-op" },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/PostNotFound" }
+        }
+      }
+    },
+    "/v1/community/posts/{postId}/like-state": {
+      "get": {
+        "summary": "Read like count and the viewer's like state for a post",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "postId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Like state",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LikeState" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/PostNotFound" }
+        }
+      }
+    },
+    "/v1/community/posts/{postId}/comments": {
+      "post": {
+        "summary": "Add a comment to a public post",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "postId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateCommentRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created comment",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Comment" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/PostNotFound" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" }
+        }
+      },
+      "get": {
+        "summary": "List a public post's comments with keyset pagination",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "postId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "cursor", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comment page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CommentPage" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/PostNotFound" }
+        }
+      }
+    },
+    "/v1/community/posts/{postId}/comments/{commentId}": {
+      "delete": {
+        "summary": "Delete the viewer's own comment",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "postId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "commentId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "204": { "description": "Comment deleted" },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/CommentNotFound" }
+        }
+      }
     }
   },
   "components": {
@@ -142,6 +316,14 @@
       },
       "PayloadTooLarge": {
         "description": "Request body is too large",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "PostNotFound": {
+        "description": "Post is not a public post or does not exist (code POST_NOT_FOUND)",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "CommentNotFound": {
+        "description": "Comment does not exist under this post or is not owned by the requester (code COMMENT_NOT_FOUND)",
         "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
       }
     },
@@ -224,6 +406,64 @@
         "required": ["profiles", "nextCursor"],
         "properties": {
           "profiles": { "type": "array", "items": { "$ref": "#/components/schemas/ProfileView" } },
+          "nextCursor": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "FollowRequest": {
+        "type": "object",
+        "required": ["followedUserId"],
+        "properties": {
+          "followedUserId": { "type": "string", "format": "uuid" }
+        },
+        "additionalProperties": false
+      },
+      "FollowState": {
+        "type": "object",
+        "required": ["followerCount", "followingCount", "viewerFollowing"],
+        "properties": {
+          "followerCount": { "type": "integer", "minimum": 0 },
+          "followingCount": { "type": "integer", "minimum": 0 },
+          "viewerFollowing": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "LikeState": {
+        "type": "object",
+        "required": ["likeCount", "viewerLiked"],
+        "properties": {
+          "likeCount": { "type": "integer", "minimum": 0 },
+          "viewerLiked": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "CreateCommentRequest": {
+        "type": "object",
+        "required": ["markdown"],
+        "properties": {
+          "markdown": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      },
+      "Comment": {
+        "type": "object",
+        "required": ["id", "postId", "authorUserId", "authorHandle", "bodyMarkdown", "renderedHtml", "createdAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "postId": { "type": "string", "format": "uuid" },
+          "authorUserId": { "type": "string", "format": "uuid" },
+          "authorHandle": { "type": ["string", "null"], "minLength": 1 },
+          "bodyMarkdown": { "type": "string" },
+          "renderedHtml": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "CommentPage": {
+        "type": "object",
+        "required": ["comments", "nextCursor"],
+        "properties": {
+          "comments": { "type": "array", "items": { "$ref": "#/components/schemas/Comment" } },
           "nextCursor": { "type": ["string", "null"] }
         },
         "additionalProperties": false
