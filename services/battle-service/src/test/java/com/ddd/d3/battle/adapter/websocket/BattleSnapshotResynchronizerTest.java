@@ -119,6 +119,110 @@ class BattleSnapshotResynchronizerTest {
     }
 
     @Test
+    void d3Btl003DeliversTheNextAuthoritativeFrameAfterAVerdictOnlyBump() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(4))
+                .thenReturn(view(4))
+                .thenReturn(view(5));
+        com.ddd.d3.battle.application.BattleAttackService attacks =
+                mock(com.ddd.d3.battle.application.BattleAttackService.class);
+        when(attacks.read(MATCH_ID, PLAYER_ONE)).thenReturn(new com.ddd.d3.battle.application.BattleAttackView(
+                MATCH_ID, 3, NOW, 50, 50, 100, 40, 20, 30, null));
+        com.ddd.d3.battle.application.BattleSubmissionViewService submissions =
+                mock(com.ddd.d3.battle.application.BattleSubmissionViewService.class);
+        UUID submissionId = UUID.fromString("66666666-6666-4666-8666-666666666666");
+        when(submissions.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(java.util.Optional.empty())
+                .thenReturn(java.util.Optional.of(
+                        new com.ddd.d3.battle.application.BattleJudgeReferenceStore.SubmissionVerdict(
+                                submissionId, "ACCEPTED", 1, NOW.plusSeconds(1))))
+                .thenReturn(java.util.Optional.of(
+                        new com.ddd.d3.battle.application.BattleJudgeReferenceStore.SubmissionVerdict(
+                                submissionId, "ACCEPTED", 1, NOW.plusSeconds(1))));
+        BattleWebSocketSessionRegistry sessions = new BattleWebSocketSessionRegistry(
+                views,
+                attacks,
+                submissions,
+                new BattleDisconnectRetryQueue(
+                        mock(BattleConnectionService.class),
+                        mock(ScheduledExecutorService.class),
+                        Duration.ofMillis(1)),
+                new ObjectMapper());
+        WebSocketSession session = session();
+        when(session.getAcceptedProtocol()).thenReturn(BattleWebSocketHandler.V3_PROTOCOL);
+        sessions.register(session, 1);
+
+        sessions.publish(MATCH_ID); // baseline: natural sequence 7
+        sessions.publish(MATCH_ID); // verdict-only change: bumped to 8
+        sessions.publish(MATCH_ID); // authoritative version bump (e.g. FINISHED): must NOT be swallowed
+
+        ArgumentCaptor<TextMessage> messages = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session, times(3)).sendMessage(messages.capture());
+        ObjectMapper objectMapper = new ObjectMapper();
+        long[] sequences = messages.getAllValues().stream()
+                .mapToLong(message -> objectMapper.readTree(message.getPayload()).path("sequence").asLong())
+                .toArray();
+        assertEquals(7, sequences[0]);
+        assertEquals(8, sequences[1]);
+        assertEquals(9, sequences[2],
+                "the verdict bump must persist as an offset so the next authoritative frame is delivered");
+    }
+
+    @Test
+    void d3Btl002KeepsTheSequenceStreamMonotonicAcrossAReconnect() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(view(4))
+                .thenReturn(view(4))
+                .thenReturn(view(4))
+                .thenReturn(view(5));
+        com.ddd.d3.battle.application.BattleAttackService attacks =
+                mock(com.ddd.d3.battle.application.BattleAttackService.class);
+        when(attacks.read(MATCH_ID, PLAYER_ONE)).thenReturn(new com.ddd.d3.battle.application.BattleAttackView(
+                MATCH_ID, 3, NOW, 50, 50, 100, 40, 20, 30, null));
+        com.ddd.d3.battle.application.BattleSubmissionViewService submissions =
+                mock(com.ddd.d3.battle.application.BattleSubmissionViewService.class);
+        UUID submissionId = UUID.fromString("77777777-7777-4777-8777-777777777777");
+        when(submissions.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(java.util.Optional.empty())
+                .thenReturn(java.util.Optional.of(
+                        new com.ddd.d3.battle.application.BattleJudgeReferenceStore.SubmissionVerdict(
+                                submissionId, "ACCEPTED", 1, NOW.plusSeconds(1))))
+                .thenReturn(java.util.Optional.of(
+                        new com.ddd.d3.battle.application.BattleJudgeReferenceStore.SubmissionVerdict(
+                                submissionId, "ACCEPTED", 1, NOW.plusSeconds(1))));
+        BattleWebSocketSessionRegistry sessions = new BattleWebSocketSessionRegistry(
+                views,
+                attacks,
+                submissions,
+                new BattleDisconnectRetryQueue(
+                        mock(BattleConnectionService.class),
+                        mock(ScheduledExecutorService.class),
+                        Duration.ofMillis(1)),
+                new ObjectMapper());
+        WebSocketSession first = session();
+        when(first.getAcceptedProtocol()).thenReturn(BattleWebSocketHandler.V3_PROTOCOL);
+        sessions.register(first, 1);
+        sessions.publish(MATCH_ID); // baseline 7 on the first transport
+        sessions.publish(MATCH_ID); // verdict-only bump to 8 on the first transport
+
+        WebSocketSession second = session();
+        when(second.getId()).thenReturn("local-session-2");
+        when(second.getAcceptedProtocol()).thenReturn(BattleWebSocketHandler.V3_PROTOCOL);
+        sessions.register(second, 2); // reconnect supersedes the first transport
+        sessions.publish(MATCH_ID);   // authoritative bump: natural 8 + inherited offset
+
+        ArgumentCaptor<TextMessage> messages = ArgumentCaptor.forClass(TextMessage.class);
+        verify(second, org.mockito.Mockito.atLeastOnce()).sendMessage(messages.capture());
+        ObjectMapper objectMapper = new ObjectMapper();
+        long last = objectMapper.readTree(messages.getAllValues()
+                .get(messages.getAllValues().size() - 1).getPayload()).path("sequence").asLong();
+        assertEquals(9, last,
+                "a reconnected transport must inherit the verdict-bump offset so its frames pass the client's stale filter");
+    }
+
+    @Test
     void d3Btl002RetainsRejectedMatchesUntilTheBoundedExecutorRecovers() {
         BattleWebSocketSessionRegistry sessions = mock(BattleWebSocketSessionRegistry.class);
         UUID secondMatchId = UUID.fromString("33333333-3333-4333-8333-333333333333");
