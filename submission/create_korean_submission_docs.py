@@ -229,7 +229,7 @@ def title_block(doc, title, subtitle, kind):
     p.paragraph_format.space_after = Pt(14)
     r = p.add_run(subtitle)
     set_font(r, 12, color=MUTED)
-    add_table(doc, ["프로젝트", "담당", "기준 리비전", "작성일"], [["D³ (Dopamin-Driven Development)", "최정민", "ab71e2b (main)", "2026. 08. 19."]], [3100, 1700, 2100, 2100])
+    add_table(doc, ["프로젝트", "담당", "기준 리비전", "작성일"], [["D³ (Dopamin-Driven Development)", "최정민", "c738cd8 (main)", "2026. 08. 19."]], [3100, 1700, 2100, 2100])
 
 
 def font(size):
