@@ -297,14 +297,28 @@ class CommunityControllerTest {
         mockMvc.perform(delete("/v1/community/posts/{postId}/comments/{commentId}", POST_ID, commentId)
                         .with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
                 .andExpect(status().isNoContent());
-        verify(service).deleteComment(USER_ID, commentId);
+        verify(service).deleteComment(USER_ID, POST_ID, commentId);
 
         org.mockito.Mockito.doThrow(new com.ddd.d3.community.application.CommentNotFoundException())
-                .when(service).deleteComment(USER_ID, commentId);
+                .when(service).deleteComment(USER_ID, POST_ID, commentId);
         mockMvc.perform(delete("/v1/community/posts/{postId}/comments/{commentId}", POST_ID, commentId)
                         .with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("COMMENT_NOT_FOUND"));
+    }
+
+    @Test
+    void d3Sec001RejectsOversizedCommentBodiesBeforeDeserialization() throws Exception {
+        String oversized = "{\"markdown\":\"" + "x".repeat(CommunityRequestSizeFilter.MAX_REQUEST_BYTES) + "\"}";
+
+        mockMvc.perform(post("/v1/community/posts/{postId}/comments", POST_ID)
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(oversized))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.code").value("PAYLOAD_TOO_LARGE"));
+
+        verify(service, never()).addComment(any(), any(), any());
     }
 
     @Test

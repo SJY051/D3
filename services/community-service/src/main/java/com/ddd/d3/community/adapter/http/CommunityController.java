@@ -108,7 +108,7 @@ public final class CommunityController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID postId,
             @PathVariable UUID commentId) {
-        service.deleteComment(UUID.fromString(jwt.getSubject()), commentId);
+        service.deleteComment(UUID.fromString(jwt.getSubject()), postId, commentId);
     }
 
     @GetMapping("/matches/{matchId}")

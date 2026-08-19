@@ -289,9 +289,13 @@ public final class JdbcCommunityRepository {
         return new CommentPage(rows, nextCursor);
     }
 
-    public boolean deleteComment(UUID commentId, UUID authorUserId) {
-        return jdbc.sql("delete from comment where id = :id and author_user_id = :authorUserId")
+    public boolean deleteComment(UUID commentId, UUID postId, UUID authorUserId) {
+        return jdbc.sql("""
+                        delete from comment
+                        where id = :id and post_id = :postId and author_user_id = :authorUserId
+                        """)
                 .param("id", commentId)
+                .param("postId", postId)
                 .param("authorUserId", authorUserId)
                 .update() == 1;
     }

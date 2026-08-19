@@ -145,9 +145,9 @@ public final class CommunityService {
         return repository.postComments(postId, decodedCursor, clamp(limit, 1, 50));
     }
 
-    /** Deletes a comment only when the requester is its author; otherwise it is not found for them. */
-    public void deleteComment(UUID requesterUserId, UUID commentId) {
-        if (!repository.deleteComment(commentId, requesterUserId)) {
+    /** Deletes a comment only when it belongs to the given post and the requester is its author. */
+    public void deleteComment(UUID requesterUserId, UUID postId, UUID commentId) {
+        if (!repository.deleteComment(commentId, postId, requesterUserId)) {
             throw new CommentNotFoundException();
         }
     }

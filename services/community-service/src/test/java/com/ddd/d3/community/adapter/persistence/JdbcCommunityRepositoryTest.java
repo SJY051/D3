@@ -267,9 +267,10 @@ class JdbcCommunityRepositoryTest {
         UUID commentId = UUID.fromString("66666666-6666-4666-8666-666666666663");
         repository.insertComment(new NewComment(commentId, POST_ONE, USER_ONE, "mine", "<p>mine</p>"));
 
-        assertFalse(repository.deleteComment(commentId, USER_TWO)); // not the author
-        assertTrue(repository.deleteComment(commentId, USER_ONE)); // author
-        assertFalse(repository.deleteComment(commentId, USER_ONE)); // already gone
+        assertFalse(repository.deleteComment(commentId, POST_ONE, USER_TWO)); // not the author
+        assertFalse(repository.deleteComment(commentId, POST_TWO, USER_ONE)); // wrong parent post
+        assertTrue(repository.deleteComment(commentId, POST_ONE, USER_ONE)); // author + correct post
+        assertFalse(repository.deleteComment(commentId, POST_ONE, USER_ONE)); // already gone
     }
 
     private void seedProfile(UUID userId, String handle, int rating, String tier, long identityVersion) {
