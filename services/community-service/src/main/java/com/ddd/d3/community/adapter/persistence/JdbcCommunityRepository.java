@@ -17,6 +17,7 @@ import com.ddd.d3.community.application.CommunityService.PostView;
 import com.ddd.d3.community.application.CommunityService.ProfileCursor;
 import com.ddd.d3.community.application.CommunityService.ProfilePage;
 import com.ddd.d3.community.application.CommunityService.ProfileView;
+import com.ddd.d3.community.application.MatchFinishedProjectionService.PlayerRecordEvidence;
 import com.ddd.d3.community.domain.PostVisibility;
 import java.time.Clock;
 import java.time.Instant;
@@ -24,15 +25,24 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 public final class JdbcCommunityRepository {
 
     private final JdbcClient jdbc;
     private final Clock clock;
+    private final ObjectMapper objectMapper;
 
     public JdbcCommunityRepository(JdbcClient jdbc, Clock clock) {
+        this(jdbc, clock, new ObjectMapper());
+    }
+
+    public JdbcCommunityRepository(JdbcClient jdbc, Clock clock, ObjectMapper objectMapper) {
         this.jdbc = jdbc;
         this.clock = clock;
+        this.objectMapper = objectMapper;
     }
 
     public PostView insertPost(NewPost post) {
@@ -353,13 +363,13 @@ public final class JdbcCommunityRepository {
     public Optional<MatchRecordView> matchRecord(UUID matchId) {
         return jdbc.sql("""
                         select match_id, player_one_user_id, player_two_user_id, result,
-                               ranked, source_version, projected_at
+                               ranked, source_version, projected_at, player_records::text
                         from match_projection
                         where match_id = :matchId
                           and projection_status = 'ACTIVE'
                         """)
                 .param("matchId", matchId)
-                .query(JdbcCommunityRepository::mapMatchRecord)
+                .query(this::mapMatchRecord)
                 .optional();
     }
 
@@ -369,7 +379,7 @@ public final class JdbcCommunityRepository {
                 : "";
         var query = jdbc.sql("""
                         select match_id, player_one_user_id, player_two_user_id, result,
-                               ranked, source_version, projected_at
+                               ranked, source_version, projected_at, player_records::text
                         from match_projection
                         where projection_status = 'ACTIVE'
                           and (player_one_user_id = :playerId or player_two_user_id = :playerId)
@@ -383,7 +393,7 @@ public final class JdbcCommunityRepository {
                 .param("cursorProjectedAt", java.sql.Timestamp.from(value.projectedAt()))
                 .param("cursorMatchId", value.matchId()));
 
-        List<MatchRecordView> rows = query.query(JdbcCommunityRepository::mapMatchRecord).list();
+        List<MatchRecordView> rows = query.query(this::mapMatchRecord).list();
         String nextCursor = null;
         if (rows.size() > limit) {
             rows.removeLast();
@@ -393,7 +403,7 @@ public final class JdbcCommunityRepository {
         return new MatchRecordPage(rows, nextCursor);
     }
 
-    private static MatchRecordView mapMatchRecord(java.sql.ResultSet resultSet, int rowNumber)
+    private MatchRecordView mapMatchRecord(java.sql.ResultSet resultSet, int rowNumber)
             throws java.sql.SQLException {
         return new MatchRecordView(
                 resultSet.getObject("match_id", UUID.class),
@@ -402,6 +412,16 @@ public final class JdbcCommunityRepository {
                 resultSet.getString("result"),
                 resultSet.getBoolean("ranked"),
                 resultSet.getLong("source_version"),
-                resultSet.getTimestamp("projected_at").toInstant());
+                resultSet.getTimestamp("projected_at").toInstant(),
+                deserializePlayerRecords(resultSet.getString("player_records")));
+    }
+
+    private List<PlayerRecordEvidence> deserializePlayerRecords(String value) {
+        if (value == null) return List.of();
+        try {
+            return objectMapper.readValue(value, new TypeReference<List<PlayerRecordEvidence>>() {});
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("stored match record evidence is malformed", exception);
+        }
     }
 }

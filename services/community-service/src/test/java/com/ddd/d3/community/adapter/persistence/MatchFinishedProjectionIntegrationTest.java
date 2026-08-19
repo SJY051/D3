@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.ddd.d3.community.adapter.messaging.CommunityMatchFinishedConsumer;
 import com.ddd.d3.community.application.CommunityService;
 import com.ddd.d3.community.application.MatchFinishedProjectionService;
 import com.ddd.d3.community.application.MatchFinishedProjectionService.MatchFinishedEvent;
@@ -13,6 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -21,6 +23,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -28,6 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import tools.jackson.databind.json.JsonMapper;
 
 @Testcontainers
 class MatchFinishedProjectionIntegrationTest {
@@ -325,6 +329,40 @@ class MatchFinishedProjectionIntegrationTest {
         assertEquals(11, readProjection().sourceVersion());
     }
 
+    @Test
+    void d3Stat001RoundTripsV2EvidenceWithoutDuplicatingTheResultPost() throws Exception {
+        MatchFinishedEvent event = enrichedEvent(EVENT_ID, 7, RECEIVED_AT);
+        var consumer = new CommunityMatchFinishedConsumer(
+                projections, JsonMapper.builder().build(), Clock.fixed(RECEIVED_AT, ZoneOffset.UTC));
+        String payload = v2Payload(event);
+
+        consumer.receive(payload);
+        consumer.receive(payload);
+
+        var record = communityRepository.matchRecord(MATCH_ID).orElseThrow();
+        assertEquals(event.players(), record.players());
+        assertEquals(1, count("match_projection"));
+        assertEquals(1, countGeneratedResultPosts());
+    }
+
+    @Test
+    void d3Stat001RejectsPlayerRecordEvidenceWithOtherThanTwoEntries() {
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.sql("""
+                        insert into match_projection (
+                            match_id, player_one_user_id, player_two_user_id, projection_status,
+                            result, ranked, player_records, source_version, projected_at
+                        ) values (
+                            :matchId, :playerOne, :playerTwo, 'ACTIVE',
+                            'DRAW', true, cast('[]' as jsonb), 1, :projectedAt
+                        )
+                        """)
+                .param("matchId", MATCH_ID)
+                .param("playerOne", PLAYER_ONE)
+                .param("playerTwo", PLAYER_TWO)
+                .param("projectedAt", java.sql.Timestamp.from(RECEIVED_AT))
+                .update());
+    }
+
     private MatchFinishedEvent event(UUID eventId, long version, String result, Instant receivedAt) {
         return event(eventId, version, result, true, receivedAt);
     }
@@ -340,6 +378,59 @@ class MatchFinishedProjectionIntegrationTest {
                 ranked,
                 List.of(PLAYER_ONE, PLAYER_TWO),
                 receivedAt);
+    }
+
+    private MatchFinishedEvent enrichedEvent(UUID eventId, long version, Instant receivedAt) {
+        return new MatchFinishedEvent(
+                eventId,
+                MATCH_ID,
+                version,
+                MATCH_ID,
+                "PLAYER_ONE_WIN",
+                true,
+                List.of(PLAYER_ONE, PLAYER_TWO),
+                List.of(
+                        playerEvidence(PLAYER_ONE, "PYTHON3", 2, "SILVER", 1),
+                        playerEvidence(PLAYER_TWO, "JAVA", 1, "GOLD", 2)),
+                receivedAt);
+    }
+
+    private MatchFinishedProjectionService.PlayerRecordEvidence playerEvidence(
+            UUID userId, String language, int attempts, String peakTier, int leaderboardPosition) {
+        return new MatchFinishedProjectionService.PlayerRecordEvidence(
+                userId,
+                language,
+                attempts,
+                peakTier,
+                leaderboardPosition,
+                new MatchFinishedProjectionService.ScoreEvidence(
+                        new java.math.BigDecimal("82"),
+                        new java.math.BigDecimal("35"),
+                        new java.math.BigDecimal("32"),
+                        new java.math.BigDecimal("15"),
+                        "v1", "demo-v1", "judge0", "v1"),
+                new MatchFinishedProjectionService.ExecutionEvidence(
+                        "ACCEPTED", 8, 8,
+                        List.of(new MatchFinishedProjectionService.RuntimeMeasurement("SMALL", 16, 3, 120)),
+                        "judge0", "1", "v1"),
+                new MatchFinishedProjectionService.AttackEvidence(1, 0, 0, 0));
+    }
+
+    private String v2Payload(MatchFinishedEvent event) throws Exception {
+        return JsonMapper.builder().build().writeValueAsString(Map.of(
+                "eventId", event.eventId(),
+                "eventType", "match.finished",
+                "version", 2,
+                "occurredAt", RECEIVED_AT.minusSeconds(1).toString(),
+                "correlationId", "projection-round-trip",
+                "aggregateId", event.aggregateId(),
+                "aggregateVersion", event.aggregateVersion(),
+                "data", Map.of(
+                        "matchId", event.matchId(),
+                        "result", event.result(),
+                        "ranked", event.ranked(),
+                        "playerIds", event.playerIds(),
+                        "players", event.players())));
     }
 
     private InboxRow readInbox(UUID eventId) {

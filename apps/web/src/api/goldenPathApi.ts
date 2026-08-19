@@ -25,6 +25,18 @@ export interface MatchRecord {
   ranked: boolean;
   result: "PLAYER_ONE_WIN" | "PLAYER_TWO_WIN" | "DRAW" | "VOIDED";
   sourceVersion: number;
+  players?: PlayerRecordEvidence[];
+}
+
+export interface PlayerRecordEvidence {
+  userId: string;
+  language: string;
+  attempts: number;
+  peakTier: string;
+  leaderboardPosition: number;
+  score: null | { total: number; speed: number; dynamicEfficiency: number; submissionDiscipline: number; calculationVersion: string; problemVersion: string; runtimeVersion: string; calibrationVersion: string };
+  execution: null | { verdict: string; passedCount: number; totalCount: number; runtimeMeasurements: { tier: string; inputSize: number; sampleCount: number; medianRuntimeMicros: number }[]; adapterVersion: string; runtimeVersion: string; evidenceVersion: string };
+  attacks: { launched: number; targeted: number; blocked: number; reflected: number };
 }
 
 export interface MatchRecordPage {

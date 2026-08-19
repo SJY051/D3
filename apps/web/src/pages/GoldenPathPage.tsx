@@ -7,6 +7,7 @@ import {
   type FeedPost,
   type MatchRecord,
   type MatchRecordPage,
+  type PlayerRecordEvidence,
   type RankedLanguage,
   createPublicPost,
   logout,
@@ -163,7 +164,12 @@ function Record() {
 
 function MatchDetails({ match, playerId }: { match: MatchRecord; playerId?: string }) {
   const opponent = playerId === match.playerOneUserId ? match.playerTwoUserId : match.playerOneUserId;
-  return <article className="golden-record"><p><strong>{outcomeLabel(match.result, playerId, match)}</strong> · {match.ranked ? "ranked" : "unranked"}</p>{playerId && <p>Opponent seat: {opponent}</p>}<p>Player one: {match.playerOneUserId} · Player two: {match.playerTwoUserId}</p><p>Source version {match.sourceVersion} · projected {match.projectedAt}</p><Link to={`/results/${match.matchId}`}>View match result</Link></article>;
+  const evidence = playerId === undefined ? null : match.players?.find((candidate) => candidate.userId === playerId) ?? null;
+  return <article className="golden-record"><p><strong>{outcomeLabel(match.result, playerId, match)}</strong> · {match.ranked ? "ranked" : "unranked"}</p>{playerId && <p>Opponent seat: {opponent}</p>}<p>Player one: {match.playerOneUserId} · Player two: {match.playerTwoUserId}</p>{evidence !== null && <RecordEvidence evidence={evidence} />}<p>Source version {match.sourceVersion} · projected {match.projectedAt}</p><Link to={`/results/${match.matchId}`}>View match result</Link></article>;
+}
+
+function RecordEvidence({ evidence }: { evidence: PlayerRecordEvidence }) {
+  return <section className="golden-record-evidence" aria-label="Public record evidence"><p>Language {evidence.language} · attempts {evidence.attempts} · peak {evidence.peakTier} · leaderboard #{evidence.leaderboardPosition}</p>{evidence.score !== null && <p>Score {evidence.score.total} — speed {evidence.score.speed}, efficiency {evidence.score.dynamicEfficiency}, discipline {evidence.score.submissionDiscipline}</p>}{evidence.execution !== null && <p>Execution {evidence.execution.verdict} · {evidence.execution.passedCount}/{evidence.execution.totalCount} tests · runtime evidence {evidence.execution.runtimeMeasurements.length}</p>}<p>Attacks launched {evidence.attacks.launched} · targeted {evidence.attacks.targeted} · blocked {evidence.attacks.blocked} · reflected {evidence.attacks.reflected}</p></section>;
 }
 
 function outcomeLabel(result: MatchRecord["result"], playerId?: string, match?: MatchRecord): string { if (result === "DRAW") return "Draw"; if (result === "VOIDED") return "Voided"; if (playerId !== undefined && match !== undefined) return playerId === (result === "PLAYER_ONE_WIN" ? match.playerOneUserId : match.playerTwoUserId) ? "Victory" : "Defeat"; return result === "PLAYER_ONE_WIN" ? "Player one victory" : "Player two victory"; }

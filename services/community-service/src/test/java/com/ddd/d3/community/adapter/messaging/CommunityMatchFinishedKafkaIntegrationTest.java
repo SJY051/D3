@@ -2,6 +2,7 @@ package com.ddd.d3.community.adapter.messaging;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.util.Map;
@@ -103,6 +104,11 @@ class CommunityMatchFinishedKafkaIntegrationTest {
                             select projection_status from match_projection
                             where match_id = '22222222-2222-4222-8222-222222222222'
                             """).query(String.class).single());
+            assertTrue(jdbc.sql("""
+                            select player_records is null
+                            from match_projection
+                            where match_id = '22222222-2222-4222-8222-222222222222'
+                            """).query(Boolean.class).single());
         });
     }
 }

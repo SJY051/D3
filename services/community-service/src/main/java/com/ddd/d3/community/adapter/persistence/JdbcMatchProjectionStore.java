@@ -4,15 +4,24 @@ import com.ddd.d3.community.application.MatchFinishedProjectionService.ApplyResu
 import com.ddd.d3.community.application.MatchFinishedProjectionService.MatchFinishedEvent;
 import com.ddd.d3.community.application.MatchFinishedProjectionService.Store;
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 public final class JdbcMatchProjectionStore implements Store {
 
     private final JdbcClient jdbc;
+    private final ObjectMapper objectMapper;
 
     public JdbcMatchProjectionStore(JdbcClient jdbc) {
+        this(jdbc, new ObjectMapper());
+    }
+
+    public JdbcMatchProjectionStore(JdbcClient jdbc, ObjectMapper objectMapper) {
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
+        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
     }
 
     @Override
@@ -25,10 +34,10 @@ public final class JdbcMatchProjectionStore implements Store {
         int projected = jdbc.sql("""
                         insert into match_projection (
                             match_id, player_one_user_id, player_two_user_id, projection_status,
-                            result, ranked, source_version, projected_at
+                            result, ranked, player_records, source_version, projected_at
                         ) values (
                             :matchId, :playerOneId, :playerTwoId, 'ACTIVE',
-                            :result, :ranked, :sourceVersion, :projectedAt
+                            :result, :ranked, cast(:playerRecords as jsonb), :sourceVersion, :projectedAt
                         )
                         on conflict (match_id) do update
                         set player_one_user_id = excluded.player_one_user_id,
@@ -36,6 +45,7 @@ public final class JdbcMatchProjectionStore implements Store {
                             projection_status = 'ACTIVE',
                             result = excluded.result,
                             ranked = excluded.ranked,
+                            player_records = excluded.player_records,
                             source_version = excluded.source_version,
                             projected_at = excluded.projected_at
                         where excluded.source_version > match_projection.source_version
@@ -47,6 +57,7 @@ public final class JdbcMatchProjectionStore implements Store {
                 .param("playerTwoId", event.playerIds().get(1))
                 .param("result", event.result())
                 .param("ranked", event.ranked())
+                .param("playerRecords", serialize(event.players()))
                 .param("sourceVersion", event.aggregateVersion())
                 .param("projectedAt", Timestamp.from(event.receivedAt()))
                 .update();
@@ -85,5 +96,16 @@ public final class JdbcMatchProjectionStore implements Store {
                 .param("aggregateVersion", event.aggregateVersion())
                 .param("receivedAt", Timestamp.from(event.receivedAt()))
                 .update() == 1;
+    }
+
+    private String serialize(List<?> value) {
+        if (value.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("match record evidence could not be serialized", exception);
+        }
     }
 }

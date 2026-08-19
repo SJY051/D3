@@ -100,6 +100,32 @@ class CommunityMatchFinishedConsumerTest {
         verifyNoInteractions(service);
     }
 
+    @Test
+    void d3Stat001RejectsEvidenceThatDoesNotMatchTheEventContractVersion() {
+        MatchFinishedProjectionService service = mock(MatchFinishedProjectionService.class);
+        CommunityMatchFinishedConsumer consumer = consumer(service);
+
+        assertThrows(IllegalArgumentException.class, () -> consumer.receive(validPayload().replace(
+                "\"playerIds\":[", "\"players\":[],\"playerIds\":[")));
+        assertThrows(IllegalArgumentException.class, () -> consumer.receive(validPayload().replace(
+                "\"playerIds\":[", "\"players\":null,\"playerIds\":[")));
+        assertThrows(IllegalArgumentException.class, () -> consumer.receive(validPayload().replace("\"version\":1", "\"version\":2")));
+        assertThrows(IllegalArgumentException.class, () -> consumer.receive(validV2PayloadWithNullPlayers()));
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void d3Stat001RejectsV2EvidenceOutOfSeatOrder() {
+        MatchFinishedProjectionService service = mock(MatchFinishedProjectionService.class);
+        CommunityMatchFinishedConsumer consumer = consumer(service);
+        String payload = validV2Payload().replace(
+                "\"userId\":\"33333333-3333-4333-8333-333333333331\"",
+                "\"userId\":\"33333333-3333-4333-8333-333333333332\"");
+
+        assertThrows(IllegalArgumentException.class, () -> consumer.receive(payload));
+        verifyNoInteractions(service);
+    }
+
     private CommunityMatchFinishedConsumer consumer(MatchFinishedProjectionService service) {
         return new CommunityMatchFinishedConsumer(
                 service,
@@ -125,6 +151,72 @@ class CommunityMatchFinishedConsumerTest {
                       "33333333-3333-4333-8333-333333333331",
                       "33333333-3333-4333-8333-333333333332"
                     ]
+                  }
+                }
+                """;
+    }
+
+    private String validV2Payload() {
+        return """
+                {
+                  "eventId":"11111111-1111-4111-8111-111111111111",
+                  "eventType":"match.finished",
+                  "version":2,
+                  "occurredAt":"2026-08-16T01:59:00Z",
+                  "correlationId":"44444444-4444-4444-8444-444444444444",
+                  "aggregateId":"22222222-2222-4222-8222-222222222222",
+                  "aggregateVersion":7,
+                  "data":{
+                    "matchId":"22222222-2222-4222-8222-222222222222",
+                    "result":"PLAYER_ONE_WIN",
+                    "ranked":true,
+                    "playerIds":[
+                      "33333333-3333-4333-8333-333333333331",
+                      "33333333-3333-4333-8333-333333333332"
+                    ],
+                    "players":[{
+                      "userId":"33333333-3333-4333-8333-333333333331",
+                      "language":"PYTHON3",
+                      "attempts":2,
+                      "peakTier":"SILVER",
+                      "leaderboardPosition":1,
+                      "score":null,
+                      "execution":null,
+                      "attacks":{"launched":0,"targeted":0,"blocked":0,"reflected":0}
+                    },{
+                      "userId":"33333333-3333-4333-8333-333333333332",
+                      "language":"JAVA",
+                      "attempts":1,
+                      "peakTier":"GOLD",
+                      "leaderboardPosition":2,
+                      "score":null,
+                      "execution":null,
+                      "attacks":{"launched":0,"targeted":0,"blocked":0,"reflected":0}
+                    }]
+                  }
+                }
+                """;
+    }
+
+    private String validV2PayloadWithNullPlayers() {
+        return """
+                {
+                  "eventId":"11111111-1111-4111-8111-111111111111",
+                  "eventType":"match.finished",
+                  "version":2,
+                  "occurredAt":"2026-08-16T01:59:00Z",
+                  "correlationId":"44444444-4444-4444-8444-444444444444",
+                  "aggregateId":"22222222-2222-4222-8222-222222222222",
+                  "aggregateVersion":7,
+                  "data":{
+                    "matchId":"22222222-2222-4222-8222-222222222222",
+                    "result":"PLAYER_ONE_WIN",
+                    "ranked":true,
+                    "playerIds":[
+                      "33333333-3333-4333-8333-333333333331",
+                      "33333333-3333-4333-8333-333333333332"
+                    ],
+                    "players":null
                   }
                 }
                 """;

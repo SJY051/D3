@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 public class CommunityServiceConfiguration {
@@ -31,13 +32,13 @@ public class CommunityServiceConfiguration {
     }
 
     @Bean
-    JdbcCommunityRepository communityRepository(DataSource dataSource, Clock communityClock) {
-        return new JdbcCommunityRepository(JdbcClient.create(dataSource), communityClock);
+    JdbcCommunityRepository communityRepository(DataSource dataSource, Clock communityClock, ObjectMapper objectMapper) {
+        return new JdbcCommunityRepository(JdbcClient.create(dataSource), communityClock, objectMapper);
     }
 
     @Bean
-    JdbcMatchProjectionStore matchProjectionStore(DataSource dataSource) {
-        return new JdbcMatchProjectionStore(JdbcClient.create(dataSource));
+    JdbcMatchProjectionStore matchProjectionStore(DataSource dataSource, ObjectMapper objectMapper) {
+        return new JdbcMatchProjectionStore(JdbcClient.create(dataSource), objectMapper);
     }
 
     @Bean

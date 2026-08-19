@@ -20,8 +20,8 @@ function isHttpContract(label) {
 }
 
 const files = collectJson(contractsRoot);
-if (files.length !== 14) {
-  throw new Error(`Expected 14 contract documents, found ${files.length}`);
+if (files.length !== 16) {
+  throw new Error(`Expected 16 contract documents, found ${files.length}`);
 }
 
 const parsedContracts = [];
@@ -107,6 +107,41 @@ if (!matchFinished(matchEvent)) {
 }
 if (matchFinished({ ...matchEvent, data: { ...matchEvent.data, sourceCode: "private" } })) {
   throw new Error("match.finished accepted private source outside its public contract");
+}
+
+const matchFinishedV2 = ajv.getSchema("https://d3.local/contracts/events/match-finished.v2.schema.json");
+const matchEventV2 = structuredClone(matchEvent);
+matchEventV2.version = 2;
+matchEventV2.data.players = matchEvent.data.playerIds.map((userId) => ({
+  userId,
+  language: "PYTHON3",
+  attempts: 2,
+  peakTier: "Silver II",
+  leaderboardPosition: 4,
+  score: { total: 82, speed: 35, dynamicEfficiency: 32, submissionDiscipline: 15, calculationVersion: "v1", problemVersion: "demo-v1", runtimeVersion: "judge0", calibrationVersion: "v1" },
+  execution: { verdict: "ACCEPTED", passedCount: 8, totalCount: 8, runtimeMeasurements: [], adapterVersion: "judge0", runtimeVersion: "1", evidenceVersion: "v1" },
+  attacks: { launched: 1, targeted: 0, blocked: 0, reflected: 0 },
+}));
+if (!matchFinishedV2?.(matchEventV2)) throw new Error(`match.finished v2 valid sample was rejected: ${ajv.errorsText(matchFinishedV2?.errors)}`);
+const unsafeMatchEventV2 = structuredClone(matchEventV2);
+unsafeMatchEventV2.data.players[0].sourceCode = "private";
+if (matchFinishedV2(unsafeMatchEventV2)) throw new Error("match.finished v2 accepted private source evidence");
+
+const communityContract = parsedContracts.find(({ label }) => label.replaceAll("\\", "/") === "contracts/http/community.openapi.json")?.contract;
+const communitySchemas = communityContract?.components?.schemas;
+if (!communitySchemas) throw new Error("community HTTP contract must define component schemas");
+const communityEvidenceSchema = JSON.parse(JSON.stringify({
+  $defs: communitySchemas,
+  $ref: "#/$defs/PlayerRecordEvidence",
+}).replaceAll("#/components/schemas/", "#/$defs/"));
+const communityEvidence = ajv.compile(communityEvidenceSchema);
+if (!communityEvidence(matchEventV2.data.players[0])) {
+  throw new Error(`community public record evidence rejected a valid sample: ${ajv.errorsText(communityEvidence.errors)}`);
+}
+for (const [field, privateField] of [["score", "sourceCode"], ["execution", "hiddenTests"], ["attacks", "rawDiagnostics"]]) {
+  const unsafe = structuredClone(matchEventV2.data.players[0]);
+  unsafe[field][privateField] = "private";
+  if (communityEvidence(unsafe)) throw new Error(`community public record evidence accepted ${privateField}`);
 }
 
 const judgeContract = parsedContracts.find(({ label }) => label.replaceAll("\\", "/") === "contracts/http/judge.openapi.json")?.contract;
@@ -354,4 +389,4 @@ for (const unsafe of [
   if (battleSnapshotV3(candidate)) throw new Error("battle event v3 accepted an invalid submission verdict");
 }
 
-console.log(`contracts: PASS (${files.length} JSON documents, 10 compiled JSON Schemas, privacy, Judge v1, and Battle v1/v2/v3 samples)`);
+console.log(`contracts: PASS (${files.length} JSON documents, 12 compiled JSON Schemas, privacy, Judge v1, and Battle v1/v2/v3 samples)`);

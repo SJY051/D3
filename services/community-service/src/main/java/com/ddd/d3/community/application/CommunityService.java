@@ -1,6 +1,7 @@
 package com.ddd.d3.community.application;
 
 import com.ddd.d3.community.adapter.persistence.JdbcCommunityRepository;
+import com.ddd.d3.community.application.MatchFinishedProjectionService.PlayerRecordEvidence;
 import com.ddd.d3.community.domain.MarkdownPolicy;
 import com.ddd.d3.community.domain.PostVisibility;
 import java.time.Instant;
@@ -205,7 +206,15 @@ public final class CommunityService {
             String result,
             boolean ranked,
             long sourceVersion,
-            Instant projectedAt) {}
+            Instant projectedAt,
+            List<PlayerRecordEvidence> players) {
+
+        public MatchRecordView(
+                UUID matchId, UUID playerOneUserId, UUID playerTwoUserId, String result, boolean ranked,
+                long sourceVersion, Instant projectedAt) {
+            this(matchId, playerOneUserId, playerTwoUserId, result, ranked, sourceVersion, projectedAt, List.of());
+        }
+    }
 
     public record MatchRecordPage(List<MatchRecordView> matches, String nextCursor) {}
 

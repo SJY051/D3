@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.ObjectMapper;
 
@@ -48,7 +49,27 @@ public final class CommunityMatchFinishedConsumer {
                 envelope.data().result(),
                 envelope.data().ranked(),
                 envelope.data().playerIds(),
+                envelope.data().players() == null ? List.of() : envelope.data().players(),
                 clock.instant()));
+    }
+
+    private static void validateVersionedPlayers(MatchFinishedEnvelope envelope, boolean playersPresent) {
+        List<MatchFinishedProjectionService.PlayerRecordEvidence> players = envelope.data().players();
+        if (envelope.version() == 1) {
+            if (playersPresent) {
+                throw new IllegalArgumentException("match.finished v1 must not carry player evidence");
+            }
+            return;
+        }
+        if (!playersPresent
+                || players == null
+                || players.size() != 2
+                || players.get(0) == null
+                || players.get(1) == null
+                || !players.get(0).userId().equals(envelope.data().playerIds().get(0))
+                || !players.get(1).userId().equals(envelope.data().playerIds().get(1))) {
+            throw new IllegalArgumentException("match.finished v2 requires seat-ordered evidence for both players");
+        }
     }
 
     private MatchFinishedEnvelope parse(String payload) {
@@ -56,13 +77,15 @@ public final class CommunityMatchFinishedConsumer {
             throw new IllegalArgumentException("match.finished payload must not be blank");
         }
         try {
-            MatchFinishedEnvelope envelope = objectMapper.readValue(payload, MatchFinishedEnvelope.class);
-            if (!"match.finished".equals(envelope.eventType()) || envelope.version() != 1) {
+            JsonNode document = objectMapper.readTree(payload);
+            MatchFinishedEnvelope envelope = objectMapper.treeToValue(document, MatchFinishedEnvelope.class);
+            if (!"match.finished".equals(envelope.eventType()) || (envelope.version() != 1 && envelope.version() != 2)) {
                 throw new IllegalArgumentException("unsupported match.finished contract");
             }
             if (envelope.aggregateVersion() < 0 || envelope.correlationId().isBlank()) {
                 throw new IllegalArgumentException("invalid match.finished envelope");
             }
+            validateVersionedPlayers(envelope, document.path("data").has("players"));
             return envelope;
         } catch (JacksonException exception) {
             throw new IllegalArgumentException("match.finished payload is malformed", exception);
@@ -91,7 +114,9 @@ public final class CommunityMatchFinishedConsumer {
         }
     }
 
-    record MatchFinishedData(UUID matchId, String result, Boolean ranked, List<UUID> playerIds) {
+    record MatchFinishedData(
+            UUID matchId, String result, Boolean ranked, List<UUID> playerIds,
+            List<MatchFinishedProjectionService.PlayerRecordEvidence> players) {
 
         MatchFinishedData {
             Objects.requireNonNull(matchId, "matchId");
