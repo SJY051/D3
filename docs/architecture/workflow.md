@@ -4,11 +4,11 @@ Owner: 최정민
 
 Status: Local P0 workflow rehearsed with the deterministic fake judge; final RC and live Judge0 application evidence pending
 
-Last verified: 2026-08-19 against `2915d0f`, the 2026-08-18 two-browser rehearsal and merged PRs #89/#96
+Last verified: 2026-08-19 against `c738cd8`, the 2026-08-18 two-browser rehearsal and merged PRs #89/#96
 
 Requirements: D3-BTL-001 through D3-BTL-005, D3-JDG-001, D3-STAT-001
 
-This diagram defines the Scenario A ownership and evidence hand-offs. The flow through sign-in, feed, ranked queue, Run/Submit, reconnect, result, rating/RP, result post and public record was rehearsed on frozen revision `25359ad` with two browser sessions and the deterministic fake judge; a fresh `2915d0f` acceptance and live Judge0 application E2E remain pending.
+This diagram defines the Scenario A ownership and evidence hand-offs. The flow through sign-in, feed, ranked queue, Run/Submit, reconnect, result, rating/RP, result post and public record was rehearsed on frozen revision `25359ad` with two browser sessions and the deterministic fake judge; a fresh `c738cd8` acceptance and live Judge0 application E2E remain pending.
 
 ```mermaid
 sequenceDiagram
