@@ -36,7 +36,7 @@ function snapshot(sequence: number): string {
   });
 }
 
-test("D3-BTL-002 keeps the local demo channel alive and recovers one closed transport", async ({ page }) => {
+test("D3-BTL-002 does not automatically reconnect after normal or protocol closes", async ({ page }) => {
   await page.clock.install();
   await page.addInitScript(({ initialSnapshot }) => {
     const runtime = window as typeof window & {
@@ -62,8 +62,10 @@ test("D3-BTL-002 keeps the local demo channel alive and recovers one closed tran
       onmessage: ((event: MessageEvent<string>) => void) | null = null;
       onerror: ((event: Event) => void) | null = null;
       onclose: ((event: CloseEvent) => void) | null = null;
+      url: string;
 
-      constructor() {
+      constructor(url: string) {
+        this.url = url;
         runtime.sockets.push(this);
         window.setTimeout(() => {
           this.readyState = BrowserBattleSocket.OPEN;
@@ -73,11 +75,6 @@ test("D3-BTL-002 keeps the local demo channel alive and recovers one closed tran
       }
 
       send(message: string) { runtime.commands.push(JSON.parse(message)); }
-      close() { this.readyState = 3; }
-      closeUnexpectedly() {
-        this.readyState = 3;
-        this.onclose?.(new CloseEvent("close"));
-      }
     }
 
     Object.defineProperty(window, "WebSocket", { configurable: true, value: BrowserBattleSocket });
@@ -88,12 +85,35 @@ test("D3-BTL-002 keeps the local demo channel alive and recovers one closed tran
   expect(await page.evaluate(() => (window as typeof window & { commands: unknown[] }).commands)).toContainEqual(
     expect.objectContaining({ type: "HEARTBEAT", version: 3, matchId: MATCH_ID }),
   );
-
-  await page.evaluate(() => {
-    const runtime = window as typeof window & { sockets: Array<{ closeUnexpectedly: () => void }> };
-    runtime.sockets[0]?.closeUnexpectedly();
-  });
+  await page.evaluate((matchId) => {
+    const runtime = window as typeof window & {
+      sockets: Array<{ url: string; onclose: ((event: CloseEvent) => void) | null }>;
+    };
+    runtime.sockets.find((socket) => socket.url.includes(`/ws/v1/battle/matches/${matchId}`))
+      ?.onclose?.({ code: 1000 } as CloseEvent);
+  }, MATCH_ID);
   await page.clock.runFor(1_000);
+  await expect(page.locator(".connection-pill")).toHaveText("DISCONNECTED");
+  expect(await page.evaluate((matchId) => {
+    const runtime = window as typeof window & { sockets: Array<{ url: string }> };
+    return runtime.sockets.filter((socket) => socket.url.includes(`/ws/v1/battle/matches/${matchId}`));
+  }, MATCH_ID)).toHaveLength(1);
+  expect(await page.evaluate(() => (window as typeof window & { refreshes: number }).refreshes)).toBe(1);
+
+  await page.getByRole("button", { name: "Reconnect" }).click();
   await expect(page.locator(".connection-pill")).toHaveText("LIVE");
+  await page.evaluate((matchId) => {
+    const runtime = window as typeof window & {
+      sockets: Array<{ url: string; onclose: ((event: CloseEvent) => void) | null }>;
+    };
+    runtime.sockets.filter((socket) => socket.url.includes(`/ws/v1/battle/matches/${matchId}`))[1]
+      ?.onclose?.({ code: 1002 } as CloseEvent);
+  }, MATCH_ID);
+  await page.clock.runFor(1_000);
+  await expect(page.locator(".connection-pill")).toHaveText("PROTOCOL_ERROR");
+  expect(await page.evaluate((matchId) => {
+    const runtime = window as typeof window & { sockets: Array<{ url: string }> };
+    return runtime.sockets.filter((socket) => socket.url.includes(`/ws/v1/battle/matches/${matchId}`));
+  }, MATCH_ID)).toHaveLength(2);
   expect(await page.evaluate(() => (window as typeof window & { refreshes: number }).refreshes)).toBe(2);
 });

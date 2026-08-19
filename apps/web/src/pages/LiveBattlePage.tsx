@@ -46,6 +46,7 @@ export function LiveBattlePage() {
     let socket: WebSocket | null = null;
     let heartbeat: number | undefined;
     let reconnect: number | undefined;
+    let fatalProtocolError = false;
     const stopHeartbeat = () => {
       if (heartbeat !== undefined) {
         window.clearInterval(heartbeat);
@@ -81,6 +82,7 @@ export function LiveBattlePage() {
         }
         const next = parseBattleSnapshot(event.data);
         if (next === null || next.matchId !== matchId) {
+          fatalProtocolError = true;
           setConnection("PROTOCOL_ERROR");
           socket?.close(1002, "invalid battle snapshot");
           return;
@@ -93,12 +95,17 @@ export function LiveBattlePage() {
           setConnection("DISCONNECTED");
         }
       };
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         if (active) {
           stopHeartbeat();
           socketRef.current = null;
-          setConnection((current) => current === "PROTOCOL_ERROR" ? current : "DISCONNECTED");
-          if (automaticReconnects.current === 0) {
+          if (event.code === 1002) {
+            fatalProtocolError = true;
+          }
+          setConnection((current) => fatalProtocolError || current === "PROTOCOL_ERROR"
+            ? "PROTOCOL_ERROR"
+            : "DISCONNECTED");
+          if (!fatalProtocolError && event.code !== 1000 && automaticReconnects.current === 0) {
             automaticReconnects.current += 1;
             reconnect = window.setTimeout(
               () => setReconnectAttempt((attempt) => attempt + 1),
