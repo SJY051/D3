@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
-import { waitForRankedMatch } from "../api/goldenPathApi";
+import { ApiRequestError, waitForRankedMatch } from "../api/goldenPathApi";
 import { currentSessionUserId } from "../api/session";
 import { setActiveMatch, useActiveMatch } from "../battle/useActiveMatch";
-import { updateRankedQueue, useRankedQueue } from "../battle/useRankedQueue";
+import { pauseRankedQueue, updateRankedQueue, useRankedQueue } from "../battle/useRankedQueue";
 
 const routes = [
   ["/sign-in", "Sign in"],
@@ -17,6 +17,9 @@ export function AppShell() {
   const rankedQueue = useRankedQueue();
   const { pathname } = useLocation();
   const matchedQueueId = rankedQueue?.status === "MATCHED" ? rankedQueue.matchId : null;
+  const queueElapsed = rankedQueue?.status === "QUEUED" && rankedQueue.enqueuedAt !== null
+    ? formatElapsed(rankedQueue.enqueuedAt)
+    : null;
   const showMatchedQueue = matchedQueueId !== null && pathname !== `/battles/${matchedQueueId}`;
   const showRejoin = !showMatchedQueue && activeMatchId !== null && pathname !== `/battles/${activeMatchId}`;
   const showSearchingQueue = !showMatchedQueue && !showRejoin && rankedQueue?.status === "QUEUED";
@@ -25,23 +28,41 @@ export function AppShell() {
     if (rankedQueue?.status !== "QUEUED") return undefined;
     let active = true;
     const controller = new AbortController();
-    void waitForRankedMatch(rankedQueue.language, {
-      idempotencyKey: rankedQueue.idempotencyKey,
-      signal: controller.signal,
-      onTicket: (ticket) => {
-        if (ticket.status === "QUEUED") updateRankedQueue(ticket);
-      },
-    }).then((ticket) => {
-      if (!active || ticket.matchId === null) return;
-      updateRankedQueue(ticket);
-      setActiveMatch(ticket.matchId, currentSessionUserId());
-      if (typeof document !== "undefined"
-          && document.hidden
-          && "Notification" in window
-          && Notification.permission === "granted") {
-        new Notification("Ranked match found", { body: "Return to your battle." });
+    const poll = async () => {
+      while (active && !controller.signal.aborted) {
+        try {
+          const ticket = await waitForRankedMatch(rankedQueue.language, {
+            idempotencyKey: rankedQueue.idempotencyKey,
+            signal: controller.signal,
+            onTicket: (next) => {
+              if (next.status === "QUEUED") updateRankedQueue(next);
+            },
+          });
+          if (!active || ticket.matchId === null) return;
+          updateRankedQueue(ticket);
+          setActiveMatch(ticket.matchId, currentSessionUserId());
+          if (typeof document !== "undefined"
+              && document.hidden
+              && "Notification" in window
+              && Notification.permission === "granted") {
+            new Notification("Ranked match found", { body: "Return to your battle." });
+          }
+          return;
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          if (error instanceof ApiRequestError && error.status === 401) {
+            pauseRankedQueue();
+            return;
+          }
+          try {
+            await sleep(750, controller.signal);
+          } catch {
+            return;
+          }
+        }
       }
-    }).catch(() => undefined);
+    };
+    void poll();
     return () => {
       active = false;
       controller.abort();
@@ -74,7 +95,7 @@ export function AppShell() {
       {showSearchingQueue && (
         <div className="rejoin-banner" role="status">
           <span className="rejoin-dot" aria-hidden="true" />
-          <span>Searching for ranked match</span>
+          <span>Searching for ranked match{queueElapsed === null ? "" : ` · ${queueElapsed}`}</span>
           <Link className="rejoin-action" to="/ranked">
             View queue
           </Link>
@@ -94,4 +115,19 @@ export function AppShell() {
       </main>
     </div>
   );
+}
+
+function sleep(milliseconds: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(resolve, milliseconds);
+    signal.addEventListener("abort", () => {
+      window.clearTimeout(timer);
+      reject(new DOMException("Queue polling aborted.", "AbortError"));
+    }, { once: true });
+  });
+}
+
+function formatElapsed(enqueuedAt: string): string {
+  const totalSeconds = Math.max(0, Math.floor((Date.now() - Date.parse(enqueuedAt)) / 1_000));
+  return `${Math.floor(totalSeconds / 60).toString().padStart(2, "0")}:${(totalSeconds % 60).toString().padStart(2, "0")}`;
 }

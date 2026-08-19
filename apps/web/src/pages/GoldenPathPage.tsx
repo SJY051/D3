@@ -124,6 +124,9 @@ function Ranked() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (queue?.status === "QUEUED" || queue?.status === "MATCHED") return;
+    if ("Notification" in window && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
     startRankedQueue(language, currentSessionUserId());
   }
   const queuedAt = queue?.status === "QUEUED" ? queue.enqueuedAt : null;

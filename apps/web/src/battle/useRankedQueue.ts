@@ -4,6 +4,7 @@ import type { RankedLanguage, RankedQueueTicket } from "../api/goldenPathApi";
 
 const KEY = "d3.rankedQueue";
 const TTL_MS = 15 * 60 * 1_000;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let cachedRaw: string | null = null;
 let cachedState: RankedQueueState | null = null;
 const LANGUAGES: Record<RankedLanguage, true> = {
@@ -57,7 +58,8 @@ function read(): RankedQueueState | null {
     if (typeof value.idempotencyKey !== "string"
         || typeof value.language !== "string"
         || LANGUAGES[value.language as RankedLanguage] !== true
-        || (value.status !== "QUEUED" && value.status !== "PAUSED" && value.status !== "MATCHED")) {
+        || (value.status !== "QUEUED" && value.status !== "PAUSED" && value.status !== "MATCHED")
+        || (value.status === "MATCHED" && (typeof value.matchId !== "string" || !UUID.test(value.matchId)))) {
       return null;
     }
     const recordedAt = typeof value.recordedAt === "number" ? value.recordedAt : 0;
@@ -72,7 +74,7 @@ function read(): RankedQueueState | null {
       enqueuedAt: typeof value.enqueuedAt === "string" ? value.enqueuedAt : null,
       idempotencyKey: value.idempotencyKey,
       language: value.language as RankedLanguage,
-      matchId: typeof value.matchId === "string" ? value.matchId : null,
+      matchId: typeof value.matchId === "string" && UUID.test(value.matchId) ? value.matchId : null,
       owner: typeof value.owner === "string" ? value.owner : null,
       recordedAt,
       status: value.status,

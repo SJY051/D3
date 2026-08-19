@@ -52,6 +52,18 @@ describe("ranked-queue store", () => {
     expect(getRankedQueue()).toBeNull();
   });
 
+  it("does not trust a mutated match id from storage", () => {
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-3" });
+    startRankedQueue("JAVA", "user-a");
+    localStorage.setItem("d3.rankedQueue", JSON.stringify({
+      ...getRankedQueue(),
+      matchId: "../admin",
+      status: "MATCHED",
+    }));
+
+    expect(getRankedQueue()).toBeNull();
+  });
+
   it("notifies subscribers and clears explicitly", () => {
     const handler = vi.fn();
     window.addEventListener("storage", handler);

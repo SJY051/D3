@@ -75,10 +75,13 @@ describe("P0 route behavior", () => {
 
   it("replays the same queued ticket key after a local cancel", async () => {
     vi.stubGlobal("crypto", { randomUUID: () => "ticket-1" });
+    const requestPermission = vi.fn();
+    vi.stubGlobal("Notification", { permission: "default", requestPermission });
     setSession({ userId: "user-1", accessToken: "token" });
     const { container, root } = await render("ranked", "/ranked");
 
     await act(async () => { container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); await Promise.resolve(); });
+    expect(requestPermission).toHaveBeenCalledTimes(1);
     const buttons = () => [...container.querySelectorAll("button")];
     await act(async () => { buttons().find((button) => button.textContent === "Cancel queue")!.click(); await Promise.resolve(); });
 

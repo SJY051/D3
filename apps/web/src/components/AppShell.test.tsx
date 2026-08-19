@@ -73,6 +73,7 @@ function banner(container: HTMLElement) {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   localStorage.clear();
   clearSession();
   vi.unstubAllGlobals();
@@ -146,6 +147,39 @@ describe("rejoin banner", () => {
     expect(container.textContent).toContain("Ranked match found");
     expect(banner(container)?.getAttribute("href")).toBe(`/battles/${MATCH}`);
     expect(getActiveMatch()).toBe(MATCH);
+    root.unmount();
+  });
+
+  it("keeps polling after the API helper reaches its bounded retry limit", async () => {
+    vi.useFakeTimers({ now: Date.parse("2026-08-18T00:00:10Z") });
+    setSession({ accessToken: "t", userId: "user-a" });
+    const fetchMock = vi.fn();
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      fetchMock.mockResolvedValueOnce(json({
+        enqueuedAt: "2026-08-18T00:00:00Z",
+        matchId: null,
+        status: "QUEUED",
+      }));
+    }
+    fetchMock.mockResolvedValueOnce(json({
+      enqueuedAt: "2026-08-18T00:00:00Z",
+      matchId: MATCH,
+      status: "MATCHED",
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-1" });
+    startRankedQueue("PYTHON3", "user-a");
+
+    const { container, root } = await renderShell("/feed");
+    await act(async () => { await Promise.resolve(); });
+    expect(container.textContent).toContain("Searching for ranked match · 00:10");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(13);
+    expect(container.textContent).toContain("Ranked match found");
     root.unmount();
   });
 });
