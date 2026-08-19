@@ -53,6 +53,34 @@ class JdbcCommunityRepositoryTest {
     }
 
     @Test
+    void d3Com001FollowingFeedShowsFollowedAuthorsAndKeepsFollowersPostsFromNonFollowers() {
+        UUID userThree = UUID.fromString("55555555-5555-4555-8555-555555555555");
+        UUID publicPost = UUID.fromString("33333333-3333-4333-8333-33333333A001");
+        UUID followersPost = UUID.fromString("33333333-3333-4333-8333-33333333A002");
+        UUID strangerPost = UUID.fromString("33333333-3333-4333-8333-33333333A003");
+
+        repository.insertPost(new NewPost(publicPost, USER_TWO, PostVisibility.PUBLIC, "pub", "<p>pub</p>", 3));
+        repository.insertPost(new NewPost(followersPost, USER_TWO, PostVisibility.FOLLOWERS, "foll", "<p>foll</p>", 4));
+        repository.insertPost(new NewPost(strangerPost, userThree, PostVisibility.PUBLIC, "str", "<p>str</p>", 3));
+        repository.insertFollow(USER_ONE, USER_TWO); // USER_ONE follows only USER_TWO
+
+        List<UUID> following = repository.followingFeed(USER_ONE, Optional.empty(), 20)
+                .posts().stream().map(post -> post.id()).toList();
+        assertTrue(following.contains(publicPost));
+        assertTrue(following.contains(followersPost)); // a follower sees the FOLLOWERS post
+        assertFalse(following.contains(strangerPost)); // a non-followed author is excluded
+
+        // The FOLLOWERS post never leaks into the public feed.
+        List<UUID> publicIds = repository.publicFeed(Optional.empty(), 20)
+                .posts().stream().map(post -> post.id()).toList();
+        assertFalse(publicIds.contains(followersPost));
+        assertTrue(publicIds.contains(publicPost));
+
+        // A viewer who follows nobody sees an empty following feed, so the FOLLOWERS post stays hidden.
+        assertTrue(repository.followingFeed(userThree, Optional.empty(), 20).posts().isEmpty());
+    }
+
+    @Test
     void d3Com001RecognizesAllAudiencesButFeedsOnlyPublicPostsWithKeysetPagination() {
         repository.insertPost(new NewPost(POST_ONE, USER_ONE, PostVisibility.PUBLIC, "one", "<p>one</p>", 3));
         repository.insertPost(new NewPost(POST_TWO, USER_TWO, PostVisibility.PUBLIC, "two", "<p>two</p>", 3));

@@ -113,8 +113,40 @@ public final class JdbcCommunityRepository {
         cursor.ifPresent(value -> query
                 .param("cursorCreatedAt", java.sql.Timestamp.from(value.createdAt()))
                 .param("cursorId", value.id()));
+        return feedPage(query.query(JdbcCommunityRepository::mapPost).list(), limit);
+    }
 
-        List<PostView> rows = query.query((rs, rowNum) -> new PostView(
+    /**
+     * Posts authored by users the viewer follows. The follow join is the authorization: a FOLLOWERS post
+     * only surfaces to a viewer who follows the author, and never leaks into the public feed.
+     */
+    public FeedPage followingFeed(UUID viewerUserId, Optional<FeedCursor> cursor, int limit) {
+        String cursorClause = cursor.isPresent()
+                ? "and (post.created_at, post.id) < (:cursorCreatedAt, :cursorId)"
+                : "";
+        var query = jdbc.sql("""
+                        select post.id, post.author_user_id, profile.handle, post.visibility::text,
+                               post.prose_markdown, post.rendered_html, post.prose_character_count,
+                               post.match_projection_id, post.created_at
+                        from post
+                        join follow on follow.followed_user_id = post.author_user_id
+                                   and follow.follower_user_id = :viewer
+                        left join profile_projection profile on profile.user_id = post.author_user_id
+                        where post.visibility in ('PUBLIC', 'FOLLOWERS')
+                        %s
+                        order by post.created_at desc, post.id desc
+                        limit :limit
+                        """.formatted(cursorClause))
+                .param("viewer", viewerUserId)
+                .param("limit", limit + 1);
+        cursor.ifPresent(value -> query
+                .param("cursorCreatedAt", java.sql.Timestamp.from(value.createdAt()))
+                .param("cursorId", value.id()));
+        return feedPage(query.query(JdbcCommunityRepository::mapPost).list(), limit);
+    }
+
+    private static PostView mapPost(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+        return new PostView(
                 rs.getObject("id", UUID.class),
                 rs.getObject("author_user_id", UUID.class),
                 rs.getString("handle"),
@@ -123,8 +155,10 @@ public final class JdbcCommunityRepository {
                 rs.getString("rendered_html"),
                 rs.getInt("prose_character_count"),
                 rs.getObject("match_projection_id", UUID.class),
-                rs.getTimestamp("created_at").toInstant()))
-                .list();
+                rs.getTimestamp("created_at").toInstant());
+    }
+
+    private static FeedPage feedPage(List<PostView> rows, int limit) {
         String nextCursor = null;
         if (rows.size() > limit) {
             rows.removeLast();

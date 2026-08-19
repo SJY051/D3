@@ -69,6 +69,18 @@ class CommunityControllerTest {
     }
 
     @Test
+    void d3Com001FollowingFeedDerivesTheViewerFromTheAuthenticatedSubject() throws Exception {
+        when(service.followingFeed(USER_ID, Optional.empty(), 20))
+                .thenReturn(new CommunityService.FeedPage(List.of(), null));
+
+        mockMvc.perform(get("/v1/community/following-feed")
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
+                .andExpect(status().isOk());
+
+        verify(service).followingFeed(USER_ID, Optional.empty(), 20);
+    }
+
+    @Test
     void d3Stat001ExposesAnActiveMatchRecordWithoutAuthentication() throws Exception {
         when(service.matchRecord(MATCH_ID)).thenReturn(Optional.of(new CommunityService.MatchRecordView(
                 MATCH_ID,
@@ -122,7 +134,7 @@ class CommunityControllerTest {
 
     @Test
     void d3Com001CreatesOnlyPublicPostsForTheAuthenticatedSubject() throws Exception {
-        when(service.createPublicPost(any(), any(), any())).thenReturn(new CommunityService.PostView(
+        when(service.createPost(any(), any(), any())).thenReturn(new CommunityService.PostView(
                 POST_ID,
                 USER_ID,
                 "alice",
@@ -386,7 +398,7 @@ class CommunityControllerTest {
                 .andExpect(jsonPath("$.code").value("PAYLOAD_TOO_LARGE"))
                 .andExpect(jsonPath("$.correlationId").value("corr-big"));
 
-        verify(service, never()).createPublicPost(any(), any(), any());
+        verify(service, never()).createPost(any(), any(), any());
     }
 
     @Test
