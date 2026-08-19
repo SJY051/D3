@@ -247,6 +247,21 @@ for (const unsafe of [
 }
 
 const battleCommandV3 = ajv.getSchema("https://d3.local/contracts/websocket/battle-command.v3.schema.json");
+const heartbeatCommand = {
+  type: "HEARTBEAT",
+  version: 3,
+  matchId: readyCommand.matchId,
+  commandId: "77777777-7777-4777-8777-777777777777",
+};
+if (!battleCommandV3?.(heartbeatCommand)) {
+  throw new Error(`battle command v3 rejected HEARTBEAT: ${ajv.errorsText(battleCommandV3?.errors)}`);
+}
+for (const unsafe of [
+  { ...heartbeatCommand, attackId: "attack-one" },
+  { ...heartbeatCommand, sourceCode: "private" },
+]) {
+  if (battleCommandV3(unsafe)) throw new Error("battle command v3 accepted an invalid HEARTBEAT payload");
+}
 const attackCommand = {
   type: "ATTACK_LAUNCH",
   version: 3,
