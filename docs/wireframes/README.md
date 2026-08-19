@@ -83,7 +83,7 @@ Status: Approved by SJY051 for Issue #48; visual polish and self-submission verd
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-The timer, connection state, self-only verdict with attempt number, accepted submit lock, warning window, and attack effect require text or shape in addition to color. The implementation keeps the deterministic garbage effect in a pointer-free display layer above the editor so the controlled source buffer remains unchanged.
+The timer, connection state, self-only verdict with attempt number, accepted submit lock, warning window, and attack effect require text or shape in addition to color. An accepted submit locks only that player's accepted submission; when both players hold accepted submits, the server advances to `JUDGING` early, otherwise the server deadline remains authoritative. The implementation keeps the deterministic garbage effect in a pointer-free display layer above the editor so the controlled source buffer remains unchanged.
 
 ## WF-05 — Match result (`/results/:matchId`)
 

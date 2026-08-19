@@ -4,11 +4,11 @@ Owner: 최정민
 
 Status: Local P0 workflow rehearsed with the deterministic fake judge; final RC and live Judge0 application evidence pending
 
-Last verified: 2026-08-19 against `2915d0f`, the 2026-08-18 two-browser rehearsal and merged PRs #89/#96
+Last verified: 2026-08-19 against `ab71e2b`, the 2026-08-18 two-browser rehearsal and merged PRs #89/#96/#98
 
 Requirements: D3-BTL-001 through D3-BTL-005, D3-JDG-001, D3-STAT-001
 
-This diagram defines the Scenario A ownership and evidence hand-offs. The flow through sign-in, feed, ranked queue, Run/Submit, reconnect, result, rating/RP, result post and public record was rehearsed on frozen revision `25359ad` with two browser sessions and the deterministic fake judge; a fresh `2915d0f` acceptance and live Judge0 application E2E remain pending.
+This diagram defines the Scenario A ownership and evidence hand-offs. The flow through sign-in, feed, ranked queue, Run/Submit, reconnect, result, rating/RP, result post and public record was rehearsed on frozen revision `25359ad` with two browser sessions and the deterministic fake judge; a fresh `ab71e2b` acceptance and live Judge0 application E2E remain pending.
 
 ```mermaid
 sequenceDiagram
@@ -59,19 +59,21 @@ sequenceDiagram
   alt RUN result or non-accepted SUBMIT
     BT-->>G: Return bounded judge status; keep match RUNNING
     G-->>WA: Forward caller-visible result
-  else First accepted SUBMIT
+  else ACCEPTED SUBMIT
     BT->>BT: Lock solver and close new submissions at server acceptance time
-    BT->>BT: Await SUBMIT jobs already accepted before the cutoff
-    Note over BT,J: Finish when cutoff jobs resolve or a bounded judging timeout expires
-    BT->>BT: Include a second accepted cutoff job in both-solve scoring
-    Note over BT,J: Outcome calculation waits for an approved safe scoring-evidence boundary
-    BT->>BT: Commit outcome, named score components and calculation version
-    BT-->>G: Per-player final outcome, score, rating and RP
-    G-->>WA: Forward Player A result
-    G-->>WB: Forward Player B result
-    BT-->>K: match.finished.v1 and rating.changed.v1
-    K-->>C: Idempotent projection events
-    C->>C: Build result post and searchable record
+    alt Both participants hold an accepted SUBMIT
+      BT->>BT: Begin JUDGING early and publish the latest snapshot
+      Note over BT,J: Existing result poller calculates outcome from committed safe evidence
+      BT->>BT: Commit outcome, named score components and calculation version
+      BT-->>G: Per-player final outcome, score, rating and RP
+      G-->>WA: Forward Player A result
+      G-->>WB: Forward Player B result
+      BT-->>K: match.finished.v1 and rating.changed.v1
+      K-->>C: Idempotent projection events
+      C->>C: Build result post and searchable record
+    else Only one participant holds an accepted SUBMIT
+      BT-->>G: Return self-only accepted lock; keep match RUNNING
+    end
   else Authoritative match deadline
     BT->>BT: Await accepted in-flight SUBMIT jobs within the bounded judging timeout
     Note over BT,J: Outcome calculation waits for an approved safe scoring-evidence boundary
@@ -102,6 +104,10 @@ stateDiagram-v2
 
 `FINISHED` is the single terminal aggregate state. Normal completion, surrender, reconnect expiry and confirmed platform incidents differ through the committed outcome and reason. The domain void outcome is serialized as `match.finished.v1.result = VOIDED`; it is not a separate lifecycle state. The service persists that result before publishing projections. A deadline poll commits its bounded PostgreSQL batch before asynchronous match-ID fan-out, so Redis latency cannot hold later claims open. Redis may hold expiring queue, presence, reconnect, or fan-out state, but loss of Redis must not erase a committed outcome. A Battle instance periodically re-reads PostgreSQL for its active local WebSocket matches, so a pub/sub notification missed during subscriber recovery converges to the latest aggregate version; transient read failures defer that cycle without creating a disconnect result.
 
+### Current submission boundary
+
+An accepted `SUBMIT` locks that player's accepted submission but does not by itself finish the match. When **both** participants have an accepted `SUBMIT`, Battle transitions `RUNNING → JUDGING` early and the existing result poller calculates the outcome. If only one participant has accepted, the server-owned deadline remains the normal transition to `JUDGING`. Surrender, reconnect expiry, and classified platform incidents remain separate terminal paths.
+
 ## Exception and recovery branches
 
 | Trigger | Authoritative owner | Required result | Acceptance evidence |
@@ -128,7 +134,7 @@ Judge HTTP v1 defines synchronous acceptance, stable submission IDs, idempotency
 
 The versioned Judge contract, service-authenticated HTTP handlers, deterministic local fake, durable PostgreSQL storage, fenced asynchronous processing, transactional outbox, Kafka producer, and selectable real Judge0 adapter are implemented. Issue #59 additionally passed the production adapter and six-runtime smoke over an exact source-security-group-only route to the designated Judge0 host. The temporary runner and route were removed after evidence capture; a deployed judge-service application using that path remains **NOT RUN**.
 
-The local Battle flow includes ranked queueing, participant-scoped WebSocket snapshots/commands, judged-event correlation, accepted locking, outcome/rating calculation, and result publication. PR #89 adds heartbeat and reconnect stability; PR #96 adds self-submission verdict/attempt state and accepted locking. The two-browser deterministic-fake rehearsal is **PASS** on `25359ad`; final fresh-RC acceptance, live Judge0 application execution, and a live attack exchange remain **PENDING/NOT RUN** as separately stated in the test plan.
+The local Battle flow includes ranked queueing, participant-scoped WebSocket snapshots/commands, judged-event correlation, accepted locking, outcome/rating calculation, and result publication. PR #89 adds heartbeat and reconnect stability; PR #96 adds self-submission verdict/attempt state and accepted locking; PR #98 begins judging early once both participants hold an accepted submit. The two-browser deterministic-fake rehearsal is **PASS** on `25359ad`; final fresh-RC acceptance, live Judge0 application execution, and a live attack exchange remain **PENDING/NOT RUN** as separately stated in the test plan.
 
 Community's P0 projections are implemented: `match.finished.v1` creates the traceable public record and ranked non-void result post, `rating.changed.v1` updates rating/RP/tier, and `user-profile.changed.v1` updates handle data. PRs #60/#64/#70/#75/#76 provide producer, consumer, replay/order/concurrency safety, and authenticated keyset handle search; issue #17 is closed. Score composition, attempts, attack history, execution summaries, display name, leaderboard, language statistics, and peak tier remain P1 enrichment requiring a privacy-reviewed versioned boundary.
 

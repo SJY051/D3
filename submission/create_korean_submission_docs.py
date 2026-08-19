@@ -229,7 +229,7 @@ def title_block(doc, title, subtitle, kind):
     p.paragraph_format.space_after = Pt(14)
     r = p.add_run(subtitle)
     set_font(r, 12, color=MUTED)
-    add_table(doc, ["프로젝트", "담당", "기준 리비전", "작성일"], [["D³ (Dopamin-Driven Development)", "최정민", "1afdd16 (main)", "2026. 08. 19."]], [3100, 1700, 2100, 2100])
+    add_table(doc, ["프로젝트", "담당", "기준 리비전", "작성일"], [["D³ (Dopamin-Driven Development)", "최정민", "ab71e2b (main)", "2026. 08. 19."]], [3100, 1700, 2100, 2100])
 
 
 def font(size):
@@ -264,7 +264,7 @@ def diagram(path):
         draw.polygon([(ex, ey), (ex-16, ey-8), (ex-16, ey+8)], fill="#2E74B5")
     draw.rounded_rectangle((235, 550, 970, 700), radius=12, fill="#FFF8E8", outline="#C99A24", width=2)
     draw.text((265, 575), "현재 종료 규칙", font=font(25), fill="#7A5A00")
-    draw.text((265, 620), "양쪽 Submit만으로 종료되지 않음 → 서버 타이머 만료 후 JUDGING·점수 계산", font=font(21), fill="#5C4900")
+    draw.text((265, 620), "양쪽 ACCEPTED면 조기 JUDGING · 그 외에는 서버 타이머 만료 후 점수 계산", font=font(21), fill="#5C4900")
     img.save(path)
 
 
@@ -308,7 +308,7 @@ def workflow_doc():
         ("6. 프로젝션", "Feed·전적 조회", "Kafka 이벤트를 Community가 소비하여 결과 게시물·전적 생성", "원본 코드·숨김 테스트 미노출"),
     ], [800, 2380, 3550, 2630])
     add_heading(doc, "4. 현재 매치 종료 규칙", 1)
-    add_body(doc, "현재 구현에서는 한쪽 또는 양쪽 플레이어가 Submit을 눌러도 매치가 즉시 끝나지 않는다. Submit은 Judge 증거를 기록하며, 서버가 가진 매치 타이머가 만료되면 Battle이 RUNNING에서 JUDGING으로 전환한 뒤 저장된 증거를 비교하여 FINISHED를 확정한다.")
+    add_body(doc, "Submit은 Judge 증거를 기록하며, ACCEPTED된 제출은 해당 플레이어만 잠근다. 양쪽 플레이어가 모두 ACCEPTED되면 Battle은 즉시 RUNNING에서 JUDGING으로 전환해 결과 계산을 시작한다. 한쪽만 ACCEPTED이거나 미정답이면 서버 매치 타이머 만료 후 저장된 증거를 비교하여 FINISHED를 확정한다.")
     add_bullets(doc, [
         "한 명만 정답이면 정답 플레이어가 승리한다.",
         "둘 다 정답이면 풀이 속도(50%), 동적 실행 효율(35%), 제출 절제(15%)를 비교한다.",
@@ -356,8 +356,8 @@ def wireframe_doc():
         "문제 영역: 문제 설명, 제약, 공개 예제와 진단 결과를 표시한다.",
         "에디터 영역: 사용자의 소스만 수정 가능하며 공격 오버레이는 저장된 소스를 바꾸지 않는다.",
         "상대 정보: 연결 상태·제한된 진행 상태만 마스킹하여 표시하고, 상대 코드·리터럴·식별자는 노출하지 않는다.",
-        "행동 영역: Ready, Run, Submit, 공격·방어·반사 상태를 제공한다. Submit은 현재 매치를 종료하지 않으며 Judge 증거를 기록한다.",
-        "종료: 서버 타이머가 만료된 후 결과 계산 단계로 이동한다. 재접속, 항복, 플랫폼 장애는 별도 상태로 안내한다.",
+        "행동 영역: Ready, Run, Submit, 공격·방어·반사 상태를 제공한다. ACCEPTED Submit은 해당 플레이어의 제출을 잠근다.",
+        "종료: 양쪽 ACCEPTED면 즉시 JUDGING으로 전환하고, 그렇지 않으면 서버 타이머가 만료된 후 결과 계산 단계로 이동한다. 재접속, 항복, 플랫폼 장애는 별도 상태로 안내한다.",
     ])
     add_heading(doc, "4. 공통 셸과 접근성", 1)
     add_body(doc, "로그인한 사용자가 진행 중인 매치를 보유하면, 배틀 화면 이외의 P0 화면 상단에 ‘진행 중인 매치로 돌아가기’ 배너를 표시한다. 매치가 종료되거나 소유자가 변경되면 배너는 사라진다.")
@@ -409,7 +409,7 @@ def testplan_doc():
         "로컬 deterministic fake Judge는 정해진 입력으로 결과를 재현한다. 실제 임의 코드를 실행한 Judge0 결과로 설명하지 않는다.",
         "한 명만 정답이면 즉시 승패 우선 규칙을 적용한다. 둘 다 정답이면 속도 50%, 동적 실행 효율 35%, 제출 절제 15%를 비교한다.",
         "둘 다 미정답이면 hidden test 통과율을 주 점수로 사용한다. 정확히 같으면 무승부다.",
-        "현재 Submit은 증거 기록이며 종료 명령이 아니다. 서버 타이머 종료 후 JUDGING·결과 계산이 수행되는지 확인한다.",
+        "ACCEPTED Submit은 해당 플레이어를 잠그며, 양쪽이 ACCEPTED면 조기 JUDGING·결과 계산이 수행되는지 확인한다. 한쪽만 ACCEPTED이면 서버 타이머 종료를 확인한다.",
     ])
     add_heading(doc, "5. 시연 전 Preflight", 1)
     add_table(doc, ["순서", "점검", "통과 기준"], [
@@ -584,7 +584,7 @@ def raster_workflow_page2():
         ("6. 프로젝션", "Feed·전적 조회", "Kafka 이벤트를 Community가 소비", "결과 게시물 생성"),
     ], [220, 390, 500, 330], size=19)
     y = page_heading(d, y, "4. 현재 매치 종료 규칙")
-    y = page_paragraph(d, y, "현재 Submit은 Judge 증거를 기록하는 동작이다. 한쪽 또는 양쪽이 Submit을 눌러도 매치는 즉시 종료되지 않으며, 서버 타이머가 만료된 뒤 RUNNING → JUDGING → FINISHED 순서로 결과를 확정한다.", size=24)
+    y = page_paragraph(d, y, "Submit은 Judge 증거를 기록한다. 양쪽 플레이어가 모두 ACCEPTED되면 조기 RUNNING → JUDGING으로 전환하고, 한쪽만 ACCEPTED이거나 미정답이면 서버 타이머 만료 후 결과를 확정한다.", size=24)
     y = page_bullets(d, y, ["한 명만 정답이면 정답 플레이어가 승리한다.", "둘 다 정답이면 풀이 속도 50%, 동적 실행 효율 35%, 제출 절제 15%를 비교한다.", "플랫폼 장애는 VOIDED로 처리하며 rating·RP를 변경하지 않는다."], size=23)
     y = page_heading(d, y, "5. 신뢰·개인정보 경계")
     y = page_bullets(d, y, ["PostgreSQL은 결과·점수의 권위 저장소이며 Redis는 만료 가능한 상태에만 사용한다.", "Community는 다른 서비스 DB를 조회하지 않고 버전이 있는 Kafka 이벤트로 자체 프로젝션을 만든다.", "사용자 코드·숨김 테스트·자격 증명은 공개 이벤트와 전적에 포함하지 않는다."], size=22)
@@ -612,7 +612,7 @@ def raster_wireframe_page2():
     y = page_heading(d, y, "2. P0 화면별 기능 정의 (계속)")
     y = page_table(d, y, ["ID", "화면·경로", "핵심 기능"], [("WF-04", "배틀 /battles/:matchId", "문제·에디터·Run/Submit·공격·상대 마스킹"), ("WF-05", "결과 /results/:matchId", "승패·무승부·무효, 결과 전적, Feed 이동"), ("WF-06", "전적 /players/:playerId", "최근 ACTIVE 경기, keyset 더보기")], [210, 430, 800], size=20)
     y = page_heading(d, y, "3. WF-04 배틀 화면의 상태 설계")
-    y = page_bullets(d, y, ["문제·에디터·테스트 진단과 Run/Submit 행동 영역을 분리한다.", "상대 정보는 연결·제한된 진행 상태만 표시하며 코드·리터럴·식별자는 노출하지 않는다.", "Submit은 현재 매치를 종료하지 않고 Judge 증거를 기록한다. 서버 타이머 만료 후 결과 계산 단계로 전환한다.", "공격 오버레이는 저장된 소스를 변경하지 않으며 warning·block·reflect 상태를 텍스트와 함께 표시한다."], size=23)
+    y = page_bullets(d, y, ["문제·에디터·테스트 진단과 Run/Submit 행동 영역을 분리한다.", "상대 정보는 연결·제한된 진행 상태만 표시하며 코드·리터럴·식별자는 노출하지 않는다.", "ACCEPTED Submit은 본인 제출만 잠근다. 양쪽 ACCEPTED면 조기 JUDGING, 그 외에는 서버 타이머 만료 후 결과 계산 단계로 전환한다.", "공격 오버레이는 저장된 소스를 변경하지 않으며 warning·block·reflect 상태를 텍스트와 함께 표시한다."], size=23)
     y = page_heading(d, y, "4. 공통 셸과 접근성")
     y = page_paragraph(d, y, "진행 중인 매치를 가진 사용자는 배틀 화면 외 P0 화면에서 ‘진행 중인 매치로 돌아가기’ 배너를 확인할 수 있다. 주요 조작은 키보드 접근, focus 표시, 색상 외 상태 텍스트, reduced-motion 대체 표시를 제공한다.", size=23)
     y = page_heading(d, y, "5. P1 기능 경계")
@@ -643,7 +643,7 @@ def raster_test_pages():
 def raster_test_page2():
     img, d, y = page_canvas("D³ 테스트 계획서", "Judge·점수 검증과 시연 전 품질 게이트", 2)
     y = page_heading(d, y, "4. Judge 및 점수 검증 기준")
-    y = page_bullets(d, y, ["Judge 상태는 ACCEPTED, WRONG_ANSWER, COMPILATION_ERROR, RUNTIME_ERROR, TIME_LIMIT, MEMORY_LIMIT, PLATFORM_FAILURE로 구분한다.", "로컬 deterministic fake Judge는 정해진 입력으로 결과를 재현한다. 실제 임의 코드 실행 결과로 설명하지 않는다.", "한 명만 정답이면 승리한다. 둘 다 정답이면 속도 50%, 동적 실행 효율 35%, 제출 절제 15%를 비교한다.", "현재 Submit은 증거 기록이다. 서버 타이머가 만료된 후 JUDGING·결과 계산이 진행되는지 확인한다."], size=22)
+    y = page_bullets(d, y, ["Judge 상태는 ACCEPTED, WRONG_ANSWER, COMPILATION_ERROR, RUNTIME_ERROR, TIME_LIMIT, MEMORY_LIMIT, PLATFORM_FAILURE로 구분한다.", "로컬 deterministic fake Judge는 정해진 입력으로 결과를 재현한다. 실제 임의 코드 실행 결과로 설명하지 않는다.", "한 명만 정답이면 승리한다. 둘 다 정답이면 속도 50%, 동적 실행 효율 35%, 제출 절제 15%를 비교한다.", "양쪽 ACCEPTED는 조기 JUDGING·결과 계산으로 전환하며, 한쪽만 ACCEPTED이면 서버 타이머가 종료를 결정하는지 확인한다."], size=22)
     y = page_heading(d, y, "5. 시연 전 Preflight")
     y = page_table(d, y, ["순서", "점검", "통과 기준"], [("1", "의존성·구조", "pnpm install --frozen-lockfile, pnpm verify:scaffold 성공"), ("2", "로컬 기동", "pnpm local:start 후 demo-preflight: READY"), ("3", "서비스 상태", "Web·Gateway·Identity·Battle·Judge·Community·DB·Redis·Kafka"), ("4", "데모 문제", "V12 demo-sum-v1 자동 seed, 수동 INSERT 금지"), ("5", "시연 세션", "독립 브라우저 2개와 로그인 상태 준비")], [120, 360, 960], size=18)
     y = page_heading(d, y, "6. 부하·카오스 계획")
