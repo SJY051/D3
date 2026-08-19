@@ -99,6 +99,9 @@ public final class JdbcMatchProjectionStore implements Store {
     }
 
     private String serialize(List<?> value) {
+        if (value.isEmpty()) {
+            return null;
+        }
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JacksonException exception) {
