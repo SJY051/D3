@@ -96,6 +96,13 @@ public final class CommunityService {
         if (followerUserId.equals(followedUserId)) {
             throw new IllegalArgumentException("a user cannot follow themselves");
         }
+        // Validate the target against the Community-owned identity projection so an arbitrary UUID
+        // cannot create a permanent follow row and corrupt counts. The projection is eventually
+        // consistent, so a just-registered user may be briefly unfollowable until it catches up.
+        // ponytail: projection existence check; a versioned Identity existence contract if that lag bites.
+        if (!repository.profileExists(followedUserId)) {
+            throw new ProfileNotFoundException();
+        }
         repository.insertFollow(followerUserId, followedUserId);
     }
 

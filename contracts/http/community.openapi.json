@@ -138,6 +138,7 @@
           "204": { "description": "Follow recorded; repeating an existing follow is an idempotent no-op" },
           "400": { "$ref": "#/components/responses/InvalidRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/ProfileNotFound" },
           "413": { "$ref": "#/components/responses/PayloadTooLarge" }
         }
       }
@@ -324,6 +325,10 @@
       },
       "CommentNotFound": {
         "description": "Comment does not exist under this post or is not owned by the requester (code COMMENT_NOT_FOUND)",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "ProfileNotFound": {
+        "description": "Follow target has no known Community identity projection (code PROFILE_NOT_FOUND)",
         "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
       }
     },

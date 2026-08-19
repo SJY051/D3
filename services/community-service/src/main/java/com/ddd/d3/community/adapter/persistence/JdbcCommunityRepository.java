@@ -165,25 +165,32 @@ public final class JdbcCommunityRepository {
                 .update();
     }
 
-    public FollowState followState(UUID targetUserId, Optional<UUID> viewerUserId) {
-        long followers = count("select count(*) from follow where followed_user_id = :id", targetUserId);
-        long following = count("select count(*) from follow where follower_user_id = :id", targetUserId);
-        boolean viewerFollowing = viewerUserId.map(viewer -> jdbc.sql("""
-                        select exists (
-                            select 1 from follow
-                            where follower_user_id = :viewer and followed_user_id = :target
-                        )
-                        """)
-                .param("viewer", viewer)
-                .param("target", targetUserId)
+    public boolean profileExists(UUID userId) {
+        return jdbc.sql("select exists (select 1 from profile_projection where user_id = :id)")
+                .param("id", userId)
                 .query(Boolean.class)
-                .single())
-                .orElse(false);
-        return new FollowState(followers, following, viewerFollowing);
+                .single();
     }
 
-    private long count(String sql, UUID id) {
-        return jdbc.sql(sql).param("id", id).query(Long.class).single();
+    public FollowState followState(UUID targetUserId, Optional<UUID> viewerUserId) {
+        // One statement so the counts and the viewer flag come from a single snapshot; a null viewer
+        // makes the exists() false without a separate branch.
+        return jdbc.sql("""
+                        select
+                            (select count(*) from follow where followed_user_id = :target) as followers,
+                            (select count(*) from follow where follower_user_id = :target) as following,
+                            exists (
+                                select 1 from follow
+                                where follower_user_id = :viewer and followed_user_id = :target
+                            ) as viewer_following
+                        """)
+                .param("target", targetUserId)
+                .param("viewer", viewerUserId.orElse(null))
+                .query((rs, rowNum) -> new FollowState(
+                        rs.getLong("followers"),
+                        rs.getLong("following"),
+                        rs.getBoolean("viewer_following")))
+                .single();
     }
 
     public boolean publicPostExists(UUID postId) {
@@ -213,18 +220,18 @@ public final class JdbcCommunityRepository {
     }
 
     public LikeState likeState(UUID postId, Optional<UUID> viewerUserId) {
-        long likes = count("select count(*) from post_like where post_id = :id", postId);
-        boolean viewerLiked = viewerUserId.map(viewer -> jdbc.sql("""
-                        select exists (
-                            select 1 from post_like where post_id = :post and user_id = :viewer
-                        )
+        // Single statement so the count and the viewer flag share one snapshot.
+        return jdbc.sql("""
+                        select
+                            (select count(*) from post_like where post_id = :post) as likes,
+                            exists (
+                                select 1 from post_like where post_id = :post and user_id = :viewer
+                            ) as viewer_liked
                         """)
                 .param("post", postId)
-                .param("viewer", viewer)
-                .query(Boolean.class)
-                .single())
-                .orElse(false);
-        return new LikeState(likes, viewerLiked);
+                .param("viewer", viewerUserId.orElse(null))
+                .query((rs, rowNum) -> new LikeState(rs.getLong("likes"), rs.getBoolean("viewer_liked")))
+                .single();
     }
 
     public CommentView insertComment(NewComment comment) {

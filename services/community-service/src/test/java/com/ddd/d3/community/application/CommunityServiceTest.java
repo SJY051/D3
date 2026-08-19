@@ -45,6 +45,16 @@ class CommunityServiceTest {
     }
 
     @Test
+    void d3Com001FollowRejectsUnknownTargetSoArbitraryUuidsCannotPoisonFollowCounts() {
+        UUID follower = UUID.fromString("11111111-1111-4111-8111-111111111111");
+        UUID target = UUID.fromString("22222222-2222-4222-8222-222222222222");
+        when(repository.profileExists(target)).thenReturn(false);
+
+        assertThrows(ProfileNotFoundException.class, () -> service.follow(follower, target));
+        verify(repository, never()).insertFollow(any(), any());
+    }
+
+    @Test
     void d3Com001RejectsInvalidFeedCursorsInsteadOfFallingBackToTheFirstPage() {
         assertThrows(IllegalArgumentException.class, () -> service.publicFeed(Optional.of("not-a-cursor"), 20));
         verify(repository, never()).publicFeed(any(), anyInt());
