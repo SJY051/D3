@@ -8,7 +8,7 @@ Last verified: 2026-08-19 against `c738cd8`, the 2026-08-18 two-browser rehearsa
 
 Requirements: D3-BTL-001 through D3-BTL-005, D3-JDG-001, D3-STAT-001
 
-This diagram defines the Scenario A ownership and evidence hand-offs. The flow through sign-in, feed, ranked queue, Run/Submit, reconnect, result, rating/RP, result post and public record was rehearsed on frozen revision `25359ad` with two browser sessions and the deterministic fake judge; a fresh `c738cd8` acceptance and live Judge0 application E2E remain pending.
+This diagram defines the Scenario A ownership and evidence hand-offs. The flow through sign-in, feed, ranked queue, Run/Submit, reconnect, result, rating/RP, result post and public record was rehearsed on frozen revision `25359ad` and passed the fresh RC `c738cd8` two-session acceptance on 2026-08-19 (zero manual database edits, match `30e8b599`); the live Judge0 application E2E remains pending.
 
 ```mermaid
 sequenceDiagram
@@ -128,7 +128,7 @@ Judge HTTP v1 defines synchronous acceptance, stable submission IDs, idempotency
 
 The versioned Judge contract, service-authenticated HTTP handlers, deterministic local fake, durable PostgreSQL storage, fenced asynchronous processing, transactional outbox, Kafka producer, and selectable real Judge0 adapter are implemented. Issue #59 additionally passed the production adapter and six-runtime smoke over an exact source-security-group-only route to the designated Judge0 host. The temporary runner and route were removed after evidence capture; a deployed judge-service application using that path remains **NOT RUN**.
 
-The local Battle flow includes ranked queueing, participant-scoped WebSocket snapshots/commands, judged-event correlation, accepted locking, outcome/rating calculation, and result publication. PR #89 adds heartbeat and reconnect stability; PR #96 adds self-submission verdict/attempt state and accepted locking. The two-browser deterministic-fake rehearsal is **PASS** on `25359ad`; final fresh-RC acceptance, live Judge0 application execution, and a live attack exchange remain **PENDING/NOT RUN** as separately stated in the test plan.
+The local Battle flow includes ranked queueing, participant-scoped WebSocket snapshots/commands, judged-event correlation, accepted locking, outcome/rating calculation, and result publication. PR #89 adds heartbeat and reconnect stability; PR #96 adds self-submission verdict/attempt state and accepted locking. The two-browser deterministic-fake rehearsal is **PASS** on `25359ad`, and the fresh RC `c738cd8` acceptance (including a live attack exchange with the warning overlay) is **PASS** on 2026-08-19; live Judge0 application execution remains **NOT RUN** as separately stated in the test plan. PR #98 additionally finishes the match immediately once both submissions are accepted, and PR #103 keeps the snapshot sequence stream monotonic across verdict updates and reconnects.
 
 Community's P0 projections are implemented: `match.finished.v1` creates the traceable public record and ranked non-void result post, `rating.changed.v1` updates rating/RP/tier, and `user-profile.changed.v1` updates handle data. PRs #60/#64/#70/#75/#76 provide producer, consumer, replay/order/concurrency safety, and authenticated keyset handle search; issue #17 is closed. Score composition, attempts, attack history, execution summaries, display name, leaderboard, language statistics, and peak tier remain P1 enrichment requiring a privacy-reviewed versioned boundary.
 

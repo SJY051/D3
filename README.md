@@ -35,7 +35,7 @@ Last verified: 2026-08-19 against `c738cd8`, the `25359ad` rehearsal and merged 
 
 ## 현재 증거 상태
 
-현재 권위 있는 판정은 [산출물 현황](docs/artifact-status.md)을 따릅니다. 2026-08-18 기준 P0 골든 패스는 격리된 환경의 두 브라우저 세션과 로컬 결정론적 fake judge로 리허설했습니다. 회원가입·로그인, fenced code를 포함한 Markdown 피드, 동일 언어 매칭, Run·Submit·재접속, 결과·전적, rating·RP 반영과 자동 결과 게시까지 확인했습니다. 이후 PR #89의 heartbeat/reconnect 안정화와 PR #96의 self-submission verdict·accepted lock이 병합됐으며, 이 delta를 포함한 fresh `c738cd8` 인수는 **PENDING**입니다. 공격 교환과 Surrender의 라이브 실증은 **NOT RUN**입니다.
+현재 권위 있는 판정은 [산출물 현황](docs/artifact-status.md)을 따릅니다. 2026-08-18 기준 P0 골든 패스는 격리된 환경의 두 브라우저 세션과 로컬 결정론적 fake judge로 리허설했습니다. 회원가입·로그인, fenced code를 포함한 Markdown 피드, 동일 언어 매칭, Run·Submit·재접속, 결과·전적, rating·RP 반영과 자동 결과 게시까지 확인했습니다. 이후 PR #89의 heartbeat/reconnect 안정화와 PR #96의 self-submission verdict·accepted lock이 병합됐으며, 이 delta를 포함한 fresh RC `c738cd8` 두-세션 인수는 2026-08-19 **PASS**했고(수동 DB 개입 0회, 공격 교환 라이브 포함, match `30e8b599`), Surrender의 라이브 실증은 **NOT RUN**입니다.
 
 fake judge 결과는 실제 코드 실행 증거가 아닙니다. Judge0 실행 호스트와 production adapter의 6개 런타임, source-security-group 전용 경로 smoke는 issue #59에서 **PASS**했습니다. 임시 runner와 route는 제거됐고, 배포된 judge-service가 그 경로로 실행하는 애플리케이션 통합은 **NOT RUN**입니다.
 
