@@ -53,6 +53,7 @@ public final class JdbcCommunityRepository {
         return new PostView(
                 post.id(),
                 post.authorUserId(),
+                authorHandle(post.authorUserId()),
                 post.visibility(),
                 post.markdown(),
                 post.renderedHtml(),
@@ -90,14 +91,16 @@ public final class JdbcCommunityRepository {
 
     public FeedPage publicFeed(Optional<FeedCursor> cursor, int limit) {
         String where = cursor.isPresent()
-                ? "where visibility = 'PUBLIC' and (created_at, id) < (:cursorCreatedAt, :cursorId)"
-                : "where visibility = 'PUBLIC'";
+                ? "where post.visibility = 'PUBLIC' and (post.created_at, post.id) < (:cursorCreatedAt, :cursorId)"
+                : "where post.visibility = 'PUBLIC'";
         var query = jdbc.sql("""
-                        select id, author_user_id, visibility::text, prose_markdown, rendered_html,
-                               prose_character_count, match_projection_id, created_at
+                        select post.id, post.author_user_id, profile.handle, post.visibility::text,
+                               post.prose_markdown, post.rendered_html, post.prose_character_count,
+                               post.match_projection_id, post.created_at
                         from post
+                        left join profile_projection profile on profile.user_id = post.author_user_id
                         %s
-                        order by created_at desc, id desc
+                        order by post.created_at desc, post.id desc
                         limit :limit
                         """.formatted(where))
                 .param("limit", limit + 1);
@@ -108,6 +111,7 @@ public final class JdbcCommunityRepository {
         List<PostView> rows = query.query((rs, rowNum) -> new PostView(
                 rs.getObject("id", UUID.class),
                 rs.getObject("author_user_id", UUID.class),
+                rs.getString("handle"),
                 PostVisibility.valueOf(rs.getString("visibility")),
                 rs.getString("prose_markdown"),
                 rs.getString("rendered_html"),
@@ -122,6 +126,18 @@ public final class JdbcCommunityRepository {
             nextCursor = new FeedCursor(last.createdAt(), last.id()).encode();
         }
         return new FeedPage(rows, nextCursor);
+    }
+
+    private String authorHandle(UUID authorUserId) {
+        return jdbc.sql("""
+                        select handle
+                        from profile_projection
+                        where user_id = :authorUserId
+                        """)
+                .param("authorUserId", authorUserId)
+                .query(String.class)
+                .optional()
+                .orElse(null);
     }
 
     public ProfilePage searchProfilesByHandle(String handlePrefix, Optional<ProfileCursor> cursor, int limit) {

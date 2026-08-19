@@ -120,6 +120,7 @@ public final class CommunityService {
     public record PostView(
             UUID id,
             UUID authorUserId,
+            String authorHandle,
             PostVisibility visibility,
             String markdown,
             String renderedHtml,
