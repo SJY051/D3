@@ -2,9 +2,9 @@
 
 Owner: 최정민 and service owners
 
-Status: Executable local platform with partial Judge adapter evidence; product integration, load and chaos pending
+Status: Local deterministic-fake golden path rehearsed; live Judge0 application, final RC, load and chaos evidence pending
 
-Last verified: 2026-08-14 against D3-QLT-001, issue #13 and #15 test sources, CI scaffold and Judge0 host boundary
+Last verified: 2026-08-19 against `2915d0f`, the `25359ad` two-browser rehearsal and issue #59 route smoke
 
 Requirement: D3-QLT-001
 
@@ -14,13 +14,13 @@ Requirement: D3-QLT-001
 |---|---|---|---|---|
 | Domain unit | Match state, outcome, rating, energy | Active Battle lifecycle, versioned score/rating calculators, fixed one-solver, both-solver, neither-solver, exact-tie, placement, established, unranked and void boundaries, plus deterministic fake and real-Judge normalization slices | Deterministic examples, boundaries and clock control | PARTIAL PASS: Battle outcome, rating and attack domain requirements are active; live calibration evidence remains pending |
 | Adapter integration | PostgreSQL, Redis, Kafka, outbox/inbox | Forward-only service migrations run on PostgreSQL Testcontainers; Battle proves Redis TTL/lease coordination, two-user matching, per-player concurrent active-match fencing, idempotent match creation, legacy clock/result restoration, single-snapshot aggregate reads, optimistic lifecycle persistence, transactional READY/SURRENDER replay, PostgreSQL transport-generation allocation, autonomous deadline advancement, generation-fenced Redis retry, cross-instance notification repair, durable Judge evidence, concurrent exactly-once result/rating commit, per-match audit persistence, failed-publication retention and replay-safe Battle outbox dispatch; Judge adds transactional outbox and producer behavior | Real-container transaction, uniqueness and retry evidence | PARTIAL PASS: ranked entry, lifecycle, Judge correlation, result/rating commit and both outbox producers are active; live multi-service and broker-restart evidence remains pending |
-| Contract | HTTP, events, WebSocket | Fourteen parseable versioned documents; Battle HTTP/WebSocket v1/v2/v3, Judge HTTP v1, and event-envelope schemas have positive and adversarial samples. Negative samples reject client-owned identity/source, undeclared command types, wrong versions and privacy-unsafe fields | Producer/consumer compatibility and negative samples | PARTIAL PASS: Gateway/Battle WebSocket auth, membership, projection, Judge commands, result events and server-owned connection lifecycle tests are active; Community projection consumers remain incomplete |
-| Browser | Ranked golden path and privacy | Playwright drives the approved WF-04 Battle v3 credential boundary through warning, reflect, deterministic overlay and expiry while asserting the controlled editor source never changes; the full Scenario A remains skipped | Two independent sessions with fake judge | PARTIAL PASS: attack source-integrity slice active; full vertical slice and live two-session trace pending |
+| Contract | HTTP, events, WebSocket | Versioned HTTP, event and WebSocket documents have positive and adversarial samples. Negative samples reject client-owned identity/source, undeclared command types, wrong versions and privacy-unsafe fields; `battle-event.v3` carries self-only submission verdict/attempt/accepted-lock state | Producer/consumer compatibility and negative samples | PARTIAL PASS: Gateway/Battle auth, heartbeat/reconnect, viewer privacy, Judge commands, result events, Community projection consumers and server-owned connection lifecycle tests are active; final RC contract acceptance remains pending |
+| Browser | Ranked golden path and privacy | Playwright covers the approved P0 routes and Battle attack source integrity. The isolated `25359ad` rehearsal drove two browser sessions through sign-in, feed, ranked queue, Run/Submit, reconnect, result, rating/RP, result post and public record with the deterministic fake judge | Two independent sessions with fake judge | PASS for the recorded `25359ad` rehearsal; fresh `2915d0f` acceptance, submission-verdict capture and live attack/Surrender traces remain PENDING/NOT RUN |
 | Judge host smoke | Runtime mapping and host isolation | Bound zero-ingress host, pinned images, hardened startup and executable sanitized smoke | Real Judge0 cases for six pinned runtimes | PASS: six hello-world plus six deterministic cases; live outage injection NOT RUN |
-| Judge application smoke | Real adapter routing, credential and private connectivity | Local HTTP-fixture tests exercise the selectable real adapter path | judge-service calls the designated host over the bound private route for all six runtimes | NOT RUN: private service route PENDING |
+| Judge application smoke | Real adapter routing, credential and private connectivity | Local HTTP-fixture tests plus issue #59 production-adapter execution from a temporary application-side runner over an exact source-SG route | deployed judge-service calls the designated host for all six runtimes | PARTIAL PASS: adapter and source-SG route smoke PASS; deployed judge-service application integration remains NOT RUN |
 | Load | Match fan-out, judge queue, feed reads | Scenario definitions below | Versioned report on designated host | NOT RUN |
 | Chaos | Reconnect, broker lag, cache loss, Judge failure | Scenario definitions below | Recovery and no-duplicate assertions | NOT RUN |
-| Demo preflight | Full-stack dependency readiness | `pnpm local:start` plus HTTP/TCP checker | All required live dependencies pass on frozen build | PASS on 2026-08-14 working tree; loopback and CORS regressions active; rerun on reviewed revision |
+| Demo preflight | Full-stack dependency readiness | `pnpm local:start` plus HTTP/TCP checker | All required live dependencies pass on frozen build | PASS for the isolated `25359ad` rehearsal; rerun on `2915d0f` remains PENDING |
 
 ## Reporting contract
 
@@ -48,9 +48,9 @@ These rows summarize narrow test evidence. The issue #13 PR report remains autho
 |---|---|---|
 | Gateway canonical Identity ingress | PARTIAL PASS | `/api` is stripped once; register, login, refresh and refresh-cookie logout are anonymous while profile and undeclared auth paths still require authentication |
 | Judge machine-token validation | PASS | Issuer, Judge audience, Battle client, `token_use=service` and endpoint scope are all required; user-like, wrong-audience and wrong-client tokens fail closed |
-| Battle browser WebSocket credential and command | PARTIAL PASS | A mock-decoded user token reaches the unavailable downstream route instead of failing Gateway auth; tests cover credential stripping, ambiguity rejection, exact origin, participant lookup, private two-view projection, ordering, reconnect replay, failed-session isolation, bounded async fan-out, a Redis notification reaching two listener instances, and strict session-bound READY/SURRENDER frames. Live Identity issuance, disconnect generation and two-browser handshake are NOT RUN |
-| Browser session cookie and key lifecycle | NOT RUN | Depends on the rebased issue #26 Identity implementation and must prove cookie flags, rotation/revocation and stable demo/deploy signing keys |
-| Identity issuance and Battle acquisition | NOT RUN | The short-lived service-token endpoint/client and positive Battle-to-Judge call remain to be integrated after issue #26 |
+| Battle browser WebSocket credential and command | PASS at local integration boundary | Identity-issued user tokens reach participant-authorized Battle sessions through Gateway; tests cover credential stripping, exact origin, private projections, heartbeat, reconnect replay, transport-generation fencing and strict session-bound commands. The `25359ad` two-browser handshake/reconnect rehearsal passed; fresh RC evidence remains pending |
+| Browser session cookie and key lifecycle | PASS at local integration boundary | Identity register/login/refresh/logout, cookie rotation/revocation and stable demo/deploy signing-key enforcement have active tests and were exercised in the local rehearsal |
+| Identity issuance and Battle acquisition | PASS | PR #51 integrates scoped short-lived service-token issuance, Battle acquisition and positive Battle-to-Judge calls without forwarding browser credentials |
 
 ## Issue #60 match projection evidence
 
@@ -60,7 +60,7 @@ These rows summarize narrow test evidence. The issue #13 PR report remains autho
 | PostgreSQL inbox and projection | PASS | Concurrent duplicates and replay are no-ops, seat order and authoritative IDs/version remain traceable, stale events do not regress state, and an authoritative replay rebuilds a quarantined row |
 | Transaction rollback | PASS | A forced failure while marking the inbox applied rolls back both the inbox claim and projection write |
 | Contract privacy | PASS | Strict parsing rejects missing required scalar fields, unknown private fields, duplicate JSON fields, trailing JSON documents and aggregate/match correlation mismatches before persistence |
-| Public record and result post | PASS at service boundary | Issue #64 creates one immutable public post for each ranked non-void projection and exposes ACTIVE records by match or player through public HTTP; handle/rating projections and the UI trace remain pending |
+| Public record, result post and profile search | PASS at service boundary | Issues #64/#17 and PRs #70/#75/#76 create one immutable ranked non-void public post, expose ACTIVE records, project rating/RP/tier and handle, and provide authenticated keyset handle search; the `25359ad` UI trace passed and fresh RC evidence remains pending |
 
 ## Issue #64 result post and public record evidence
 
