@@ -162,10 +162,11 @@
       },
       "Post": {
         "type": "object",
-        "required": ["id", "authorUserId", "visibility", "markdown", "renderedHtml", "proseCharacterCount", "matchId", "createdAt"],
+        "required": ["id", "authorUserId", "authorHandle", "visibility", "markdown", "renderedHtml", "proseCharacterCount", "matchId", "createdAt"],
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "authorUserId": { "type": "string", "format": "uuid" },
+          "authorHandle": { "type": ["string", "null"], "minLength": 1 },
           "visibility": { "$ref": "#/components/schemas/PostVisibility" },
           "markdown": { "type": "string" },
           "renderedHtml": { "type": "string" },
