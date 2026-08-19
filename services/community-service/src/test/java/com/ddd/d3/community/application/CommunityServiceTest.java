@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.ddd.d3.community.adapter.persistence.JdbcCommunityRepository;
 import com.ddd.d3.community.domain.MarkdownPolicy;
@@ -31,6 +32,16 @@ class CommunityServiceTest {
                         markdown,
                         PostVisibility.PUBLIC));
         verify(repository, never()).insertPost(any());
+    }
+
+    @Test
+    void d3Com001UnlikeRejectsNonPublicPostSoTheLikeContractStaysPublicOnly() {
+        UUID userId = UUID.fromString("11111111-1111-4111-8111-111111111111");
+        UUID postId = UUID.fromString("22222222-2222-4222-8222-222222222222");
+        when(repository.publicPostExists(postId)).thenReturn(false);
+
+        assertThrows(PostNotFoundException.class, () -> service.unlike(userId, postId));
+        verify(repository, never()).deleteLike(any(), any());
     }
 
     @Test

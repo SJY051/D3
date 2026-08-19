@@ -113,6 +113,7 @@ public final class CommunityService {
     }
 
     public void unlike(UUID userId, UUID postId) {
+        requirePublicPost(postId);
         repository.deleteLike(userId, postId);
     }
 
