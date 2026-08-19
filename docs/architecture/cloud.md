@@ -4,7 +4,7 @@ Owner: 윤서진
 
 Status: Account, region and isolated Judge0 host bound; production-adapter source-SG route proven; application service bindings pending
 
-Last verified: 2026-08-15 against the assigned account, Seoul region and issue #59 temporary application-runner evidence
+Last verified: 2026-08-19 against `2915d0f`, the assigned Seoul account and issue #59 source-SG route smoke
 
 ```mermaid
 flowchart TB

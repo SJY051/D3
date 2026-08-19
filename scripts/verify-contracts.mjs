@@ -247,6 +247,21 @@ for (const unsafe of [
 }
 
 const battleCommandV3 = ajv.getSchema("https://d3.local/contracts/websocket/battle-command.v3.schema.json");
+const heartbeatCommand = {
+  type: "HEARTBEAT",
+  version: 3,
+  matchId: readyCommand.matchId,
+  commandId: "77777777-7777-4777-8777-777777777777",
+};
+if (!battleCommandV3?.(heartbeatCommand)) {
+  throw new Error(`battle command v3 rejected HEARTBEAT: ${ajv.errorsText(battleCommandV3?.errors)}`);
+}
+for (const unsafe of [
+  { ...heartbeatCommand, attackId: "attack-one" },
+  { ...heartbeatCommand, sourceCode: "private" },
+]) {
+  if (battleCommandV3(unsafe)) throw new Error("battle command v3 accepted an invalid HEARTBEAT payload");
+}
 const attackCommand = {
   type: "ATTACK_LAUNCH",
   version: 3,
@@ -318,6 +333,25 @@ for (const privateField of ["playerId", "opponentId", "sourceCode", "literal", "
   const unsafe = structuredClone(attackSnapshot);
   unsafe.payload.attack.current[privateField] = "private";
   if (battleSnapshotV3(unsafe)) throw new Error(`battle event v3 accepted private field: ${privateField}`);
+}
+
+const verdictSnapshot = structuredClone(attackSnapshot);
+verdictSnapshot.payload.submission = { verdict: "WRONG_ANSWER", attemptNumber: 1, acceptedLocked: false };
+if (!battleSnapshotV3(verdictSnapshot)) {
+  throw new Error(`battle event v3 rejected a self-submission verdict: ${ajv.errorsText(battleSnapshotV3.errors)}`);
+}
+verdictSnapshot.payload.submission = { verdict: "ACCEPTED", attemptNumber: 2, acceptedLocked: true };
+if (!battleSnapshotV3(verdictSnapshot)) {
+  throw new Error(`battle event v3 rejected an accepted-lock verdict: ${ajv.errorsText(battleSnapshotV3.errors)}`);
+}
+for (const unsafe of [
+  { verdict: "ACCEPTED", attemptNumber: 2, acceptedLocked: true, sourceCode: "private" },
+  { verdict: "ACCEPTED", attemptNumber: 2, acceptedLocked: true, opponentVerdict: "WRONG_ANSWER" },
+  { verdict: "NOT_A_STATUS", attemptNumber: 1, acceptedLocked: false },
+]) {
+  const candidate = structuredClone(attackSnapshot);
+  candidate.payload.submission = unsafe;
+  if (battleSnapshotV3(candidate)) throw new Error("battle event v3 accepted an invalid submission verdict");
 }
 
 console.log(`contracts: PASS (${files.length} JSON documents, 10 compiled JSON Schemas, privacy, Judge v1, and Battle v1/v2/v3 samples)`);

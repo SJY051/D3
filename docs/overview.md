@@ -4,7 +4,7 @@ Owner: 윤서진
 
 Status: 첫 방문자용 개요; 로컬 P0 골든 패스 리허설 실증, 최종 인수·배포 증거는 PENDING
 
-Last verified: 2026-08-18 against frozen revision `25359ad` rehearsal and [artifact status](artifact-status.md)
+Last verified: 2026-08-19 against `2915d0f`, frozen `25359ad` rehearsal and [artifact status](artifact-status.md)
 
 ## 왜 이 제품을 만드는가
 
@@ -57,10 +57,10 @@ flowchart LR
 
 | 구분 | 현재 확인된 사실 | 남은 증거 |
 |---|---|---|
-| 로컬 골든 패스 | frozen revision `25359ad`에서 두 브라우저 세션으로 로그인 → 피드 발행 → 동일 언어 매칭 → Run/Submit·재접속 → 결과 → rating/RP → 자동 결과 게시물·공개 전적까지 리허설했습니다. 로컬 판정은 deterministic fake judge를 사용했습니다. | 최종 인수용 재실행과 라벨이 포함된 시연 녹화는 **PENDING**입니다. |
-| 서비스 경계와 데이터 | Gateway와 네 도메인 서비스가 동작하며, 서비스별 PostgreSQL과 Kafka outbox→inbox 흐름을 사용합니다. Community의 결과·rating·프로필 projection과 handle 검색까지 구현됐습니다. | 배포 환경에서의 전체 서비스 통합·운영 증거는 **PENDING**입니다. |
-| 실시간 배틀 | 서버 권위 시간·상태, Run/Submit, 재접속 경로를 두 세션 리허설에서 확인했습니다. | 공격 교환·Surrender의 라이브 실증은 **NOT RUN**이며, 부하·장애·장시간 연결을 포함한 운영 수준 검증은 **PENDING**입니다. |
-| Judge0 경계 | 격리된 AWS Judge0 호스트에서 언어 런타임 실행 경계를 확인했습니다. | 애플리케이션에서 Judge0로 이어지는 사설 네트워크 경로의 통합 실행은 **NOT RUN**입니다. |
+| 로컬 골든 패스 | frozen revision `25359ad`에서 두 브라우저 세션으로 로그인 → 피드 발행 → 동일 언어 매칭 → Run/Submit·재접속 → 결과 → rating/RP → 자동 결과 게시물·공개 전적까지 리허설했습니다. 로컬 판정은 deterministic fake judge를 사용했습니다. 이후 #89 heartbeat/reconnect와 #96 self-verdict/accepted lock이 병합됐습니다. | delta를 포함한 final `2915d0f` 인수와 라벨이 포함된 시연 녹화는 **PENDING**입니다. |
+| 서비스 경계와 데이터 | Gateway와 네 도메인 서비스가 동작하며, 서비스별 PostgreSQL과 Kafka outbox→inbox 흐름을 사용합니다. Community의 결과·rating·프로필 projection과 handle 검색까지 구현됐고 issue #17은 closed입니다. | 배포 환경에서의 전체 서비스 통합·운영 증거는 **PENDING**입니다. |
+| 실시간 배틀 | 서버 권위 시간·상태, Run/Submit, 재접속 경로를 두 세션 리허설에서 확인했고, #89 heartbeat/reconnect 및 #96 self-only verdict/accepted lock이 병합됐습니다. | final RC delta 인수와 공격 교환·Surrender의 라이브 실증은 **PENDING/NOT RUN**이며, 부하·장애·장시간 연결 검증도 남아 있습니다. |
+| Judge0 경계 | 격리된 AWS Judge0 호스트, production adapter의 6개 런타임과 exact source-SG route smoke가 issue #59에서 **PASS**했습니다. | 애플리케이션 클라우드 배포와 deployed judge-service→Judge0 통합 실행은 **NOT RUN**입니다. |
 | 선택 기능(P1) | 핵심 P0와 분리해 문서에 범위를 명시했습니다. | OAuth 연결, 비랭크 방, 솔로 연습 완성, 팔로우·댓글·좋아요, 확장 통계 등은 **PENDING**입니다. |
 
 `PASS`는 위에 적은 환경과 경로에서 관찰했다는 뜻이며, 프로덕션 배포 완료를 뜻하지 않습니다. 전체 산출물의 권위 있는 상태는 [artifact status](artifact-status.md)에서 확인할 수 있습니다.

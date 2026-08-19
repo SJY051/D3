@@ -2,6 +2,7 @@ package com.ddd.d3.battle.application;
 
 import com.ddd.d3.battle.domain.BattleMatch;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -95,6 +96,11 @@ public final class BattleJudgedSubmissionService {
                 evidence.completedAt()));
 
         if (!"PLATFORM_FAILURE".equals(evidence.status())) {
+            if (reference.mode() == BattleJudgeGateway.Mode.SUBMIT
+                    && "ACCEPTED".equals(evidence.status())
+                    && references.bothParticipantsAccepted(reference.matchId())) {
+                return beginJudgingEarly(reference.matchId(), evidence.completedAt());
+            }
             return Optional.empty();
         }
         BattleMatch.Snapshot snapshot = matches.findById(reference.matchId())
@@ -105,6 +111,22 @@ public final class BattleJudgedSubmissionService {
         if (match.aggregateVersion() != expectedVersion) {
             matches.save(match.snapshot(), expectedVersion);
             return Optional.of(reference.matchId());
+        }
+        return Optional.empty();
+    }
+
+    private Optional<UUID> beginJudgingEarly(UUID matchId, Instant completedAt) {
+        BattleMatch.Snapshot snapshot = matches.findById(matchId)
+                .orElseThrow(BattleMatchNotFoundException::new);
+        if (snapshot.state() != BattleMatch.State.RUNNING) {
+            return Optional.empty(); // deadline or incident already advanced the match
+        }
+        BattleMatch match = BattleMatch.restore(snapshot, Clock.fixed(completedAt, clock.getZone()));
+        long expectedVersion = match.aggregateVersion();
+        match.handle(new BattleMatch.BeginJudging());
+        if (match.aggregateVersion() != expectedVersion) {
+            matches.save(match.snapshot(), expectedVersion);
+            return Optional.of(matchId);
         }
         return Optional.empty();
     }

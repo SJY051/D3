@@ -47,6 +47,27 @@ class CommunityControllerTest {
     }
 
     @Test
+    void d3Com001ExposesTheProjectedAuthorHandleOnFeedPosts() throws Exception {
+        when(service.publicFeed(Optional.empty(), 20)).thenReturn(new CommunityService.FeedPage(List.of(
+                new CommunityService.PostView(
+                        POST_ID,
+                        USER_ID,
+                        "alice",
+                        PostVisibility.PUBLIC,
+                        "hello",
+                        "<p>hello</p>",
+                        5,
+                        null,
+                        Instant.parse("2026-08-14T00:00:00Z"))), null));
+
+        mockMvc.perform(get("/v1/community/feed")
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.posts[0].authorUserId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.posts[0].authorHandle").value("alice"));
+    }
+
+    @Test
     void d3Stat001ExposesAnActiveMatchRecordWithoutAuthentication() throws Exception {
         when(service.matchRecord(MATCH_ID)).thenReturn(Optional.of(new CommunityService.MatchRecordView(
                 MATCH_ID,
@@ -103,6 +124,7 @@ class CommunityControllerTest {
         when(service.createPublicPost(any(), any(), any())).thenReturn(new CommunityService.PostView(
                 POST_ID,
                 USER_ID,
+                "alice",
                 PostVisibility.PUBLIC,
                 "hello",
                 "<p>hello</p>",
@@ -116,6 +138,7 @@ class CommunityControllerTest {
                         .content("{\"markdown\":\"hello\",\"visibility\":\"PUBLIC\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authorUserId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.authorHandle").value("alice"))
                 .andExpect(jsonPath("$.visibility").value("PUBLIC"))
                 .andExpect(jsonPath("$.renderedHtml").value("<p>hello</p>"));
     }

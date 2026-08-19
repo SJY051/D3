@@ -119,6 +119,30 @@ public class JdbcBattleJudgeReferenceStore implements BattleJudgeReferenceStore 
     }
 
     @Override
+    public Optional<SubmissionVerdict> findLatestSubmissionVerdict(UUID matchId, UUID playerId) {
+        Objects.requireNonNull(matchId, "matchId");
+        Objects.requireNonNull(playerId, "playerId");
+        return jdbc.sql("""
+                        select submission_id, last_judge_status, attempt_number, last_result_at
+                        from judge_job_reference
+                        where match_id = :matchId
+                          and player_user_id = :playerId
+                          and mode = 'SUBMIT'
+                          and last_result_at is not null
+                        order by last_result_at desc, attempt_number desc, submission_id desc
+                        limit 1
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .query((resultSet, rowNumber) -> new SubmissionVerdict(
+                        resultSet.getObject("submission_id", UUID.class),
+                        resultSet.getString("last_judge_status"),
+                        resultSet.getInt("attempt_number"),
+                        resultSet.getTimestamp("last_result_at").toInstant()))
+                .optional();
+    }
+
+    @Override
     public void record(Reference reference) {
         Objects.requireNonNull(reference, "reference");
         int inserted = jdbc.sql("""
@@ -251,6 +275,27 @@ public class JdbcBattleJudgeReferenceStore implements BattleJudgeReferenceStore 
                 .param("eventId", eventId)
                 .update();
         if (applied != 1) throw new IllegalStateException("Judged event was not applied exactly once");
+    }
+
+    @Override
+    public boolean bothParticipantsAccepted(UUID matchId) {
+        Objects.requireNonNull(matchId, "matchId");
+        return Boolean.TRUE.equals(jdbc.sql("""
+                        select count(*) = 2
+                        from match_player mp
+                        where mp.match_id = :matchId
+                          and exists (
+                              select 1
+                              from judge_job_reference ref
+                              where ref.match_id = mp.match_id
+                                and ref.player_user_id = mp.user_id
+                                and ref.mode = 'SUBMIT'
+                                and ref.last_judge_status = 'ACCEPTED'
+                          )
+                        """)
+                .param("matchId", matchId)
+                .query(Boolean.class)
+                .single());
     }
 
     private Reference reference(ResultSet resultSet, int rowNumber) throws SQLException {

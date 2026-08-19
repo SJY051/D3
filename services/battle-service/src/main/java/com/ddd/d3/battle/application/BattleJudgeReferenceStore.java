@@ -11,6 +11,8 @@ public interface BattleJudgeReferenceStore {
 
     Optional<Reference> findByCommandId(UUID commandId);
 
+    Optional<SubmissionVerdict> findLatestSubmissionVerdict(UUID matchId, UUID playerId);
+
     void record(Reference reference);
 
     boolean receiveJudgedEvent(JudgedEvent event);
@@ -20,6 +22,9 @@ public interface BattleJudgeReferenceStore {
     Optional<Reference> lockPendingReference(UUID eventId);
 
     void recordEvidence(UUID eventId, Evidence evidence);
+
+    /** True when both match participants hold an accepted (locked) SUBMIT, so judging can begin early. */
+    boolean bothParticipantsAccepted(UUID matchId);
 
     record SubmissionContext(
             UUID problemId,
@@ -47,6 +52,8 @@ public interface BattleJudgeReferenceStore {
             Instant receivedAt) {}
 
     record PendingJudgedEvent(UUID eventId, UUID submissionId) {}
+
+    record SubmissionVerdict(UUID submissionId, String status, int attemptNumber, Instant completedAt) {}
 
     record Evidence(
             UUID submissionId,

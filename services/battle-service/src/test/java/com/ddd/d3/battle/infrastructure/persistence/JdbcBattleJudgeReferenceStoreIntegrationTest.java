@@ -152,6 +152,54 @@ class JdbcBattleJudgeReferenceStoreIntegrationTest {
     }
 
     @Test
+    void d3Jdg001ReadsTheLatestViewerScopedSubmissionVerdict() {
+        MatchFixture match = createRunningMatch();
+        assertTrue(store.findLatestSubmissionVerdict(match.matchId(), match.playerOneId()).isEmpty());
+
+        transactions.executeWithoutResult(status -> store.record(new BattleJudgeReferenceStore.Reference(
+                UUID.randomUUID(), match.matchId(), match.playerOneId(), BattleJudgeGateway.Mode.RUN,
+                UUID.randomUUID(), null, "ACCEPTED", "judge-evidence-v1", NOW, NOW.plusSeconds(1))));
+        assertTrue(store.findLatestSubmissionVerdict(match.matchId(), match.playerOneId()).isEmpty(),
+                "RUN attempts must never surface as submission verdicts");
+
+        UUID pendingId = UUID.randomUUID();
+        transactions.executeWithoutResult(status -> store.record(new BattleJudgeReferenceStore.Reference(
+                pendingId, match.matchId(), match.playerOneId(), BattleJudgeGateway.Mode.SUBMIT,
+                UUID.randomUUID(), 1, "QUEUED", null, NOW, null)));
+        assertTrue(store.findLatestSubmissionVerdict(match.matchId(), match.playerOneId()).isEmpty(),
+                "unsettled submissions must not surface a verdict yet");
+
+        transactions.executeWithoutResult(status -> jdbc.sql("""
+                        update judge_job_reference
+                        set last_judge_status = 'WRONG_ANSWER',
+                            evidence_version = 'judge-evidence-v1',
+                            last_result_at = :resultAt
+                        where submission_id = :submissionId
+                        """)
+                .param("resultAt", Timestamp.from(NOW.plusSeconds(2)))
+                .param("submissionId", pendingId)
+                .update());
+        BattleJudgeReferenceStore.SubmissionVerdict wrong =
+                store.findLatestSubmissionVerdict(match.matchId(), match.playerOneId()).orElseThrow();
+        assertEquals("WRONG_ANSWER", wrong.status());
+        assertEquals(1, wrong.attemptNumber());
+        assertEquals(pendingId, wrong.submissionId());
+
+        UUID acceptedId = UUID.randomUUID();
+        transactions.executeWithoutResult(status -> store.record(new BattleJudgeReferenceStore.Reference(
+                acceptedId, match.matchId(), match.playerOneId(), BattleJudgeGateway.Mode.SUBMIT,
+                UUID.randomUUID(), 2, "ACCEPTED", "judge-evidence-v1", NOW.plusSeconds(3), NOW.plusSeconds(4))));
+        BattleJudgeReferenceStore.SubmissionVerdict accepted =
+                store.findLatestSubmissionVerdict(match.matchId(), match.playerOneId()).orElseThrow();
+        assertEquals("ACCEPTED", accepted.status());
+        assertEquals(2, accepted.attemptNumber());
+        assertEquals(acceptedId, accepted.submissionId());
+
+        assertTrue(store.findLatestSubmissionVerdict(match.matchId(), match.playerTwoId()).isEmpty(),
+                "the opponent must never observe the submitter's verdict");
+    }
+
+    @Test
     void v9UpgradePreservesExistingJudgeReferencesAndAddsNullableEvidence() {
         Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
         Flyway.configure().dataSource(dataSource).target("8").load().migrate();
@@ -209,6 +257,43 @@ class JdbcBattleJudgeReferenceStoreIntegrationTest {
                         """)
                 .param("submissionId", submissionId)
                 .update());
+    }
+
+    @Test
+    void d3Btl002ReportsBothParticipantsAcceptedOnlyWhenEachHoldsAnAcceptedSubmit() {
+        MatchFixture match = createRunningMatch();
+
+        assertEquals(false, store.bothParticipantsAccepted(match.matchId()));
+
+        insertSubmitReference(match.matchId(), match.playerOneId(), 1, "ACCEPTED");
+        assertEquals(false, store.bothParticipantsAccepted(match.matchId()));
+
+        insertSubmitReference(match.matchId(), match.playerTwoId(), 1, "WRONG_ANSWER");
+        assertEquals(false, store.bothParticipantsAccepted(match.matchId()));
+
+        insertSubmitReference(match.matchId(), match.playerTwoId(), 2, "ACCEPTED");
+        assertEquals(true, store.bothParticipantsAccepted(match.matchId()));
+    }
+
+    private void insertSubmitReference(UUID matchId, UUID playerId, int attempt, String status) {
+        jdbc.sql("""
+                        insert into judge_job_reference (
+                            submission_id, match_id, player_user_id, mode, command_id,
+                            attempt_number, last_judge_status, evidence_version, accepted_at, last_result_at
+                        ) values (
+                            :submissionId, :matchId, :playerId, 'SUBMIT', :commandId,
+                            :attempt, :status, 'judge-evidence-v1', :acceptedAt, :resultAt
+                        )
+                        """)
+                .param("submissionId", UUID.randomUUID())
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .param("commandId", UUID.randomUUID())
+                .param("attempt", attempt)
+                .param("status", status)
+                .param("acceptedAt", Timestamp.from(NOW))
+                .param("resultAt", Timestamp.from(NOW.plusSeconds(1)))
+                .update();
     }
 
     private MatchFixture createRunningMatch() {
