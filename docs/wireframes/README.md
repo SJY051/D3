@@ -51,6 +51,41 @@ Operation:   Problem list → Inspect → Activate / bounded edit
 └──────────────┴───────────────────────────────┴───────────────┘
 ```
 
+## WF-02 P1 — Community feed social interactions (`/feed`)
+
+Status: DRAFT — review required. Not approved; styled work stays blocked until a reviewer approves this revision. Depends on contract #106 / PR #112; consumed by Issue #111.
+
+Activates the P1 elements the P0 WF-02 intentionally hides — post like, post comment thread, and author follow — over the already-recognized persistence and the #106 endpoints. Scope is S-04 (follow / like / comment) only; reposts, quotes, reply threads, and dislikes are out of scope here (Issue #110, spec extension pending).
+
+```text
+┌──────────────┬───────────────────────────────┬───────────────┐
+│ D³ navigation│ Public feed                   │ Queue shortcut│
+│ Feed         │ ┌───────────────────────────┐ │ Recent record │
+│ Practice     │ │ Composer: Markdown / code │ │               │
+│ Ranked       │ └───────────────────────────┘ │               │
+│ Record       │ ┌───────────────────────────┐ │               │
+│              │ │ Author        [Follow ▷]  │ │               │
+│              │ │ code block / match card   │ │               │
+│              │ │ → /results/:matchId       │ │               │
+│              │ │ [♥ Like · 3] [Comments ▸] │ │               │
+│              │ │ ┌ thread (expanded) ──────┐│ │               │
+│              │ │ │ commenter · body        ││ │               │
+│              │ │ │             [Delete·own]││ │               │
+│              │ │ │ [Load more] (keyset)    ││ │               │
+│              │ │ │ [ Add a comment       ] ││ │               │
+│              │ │ └─────────────────────────┘│ │               │
+│              │ └───────────────────────────┘ │               │
+└──────────────┴───────────────────────────────┴───────────────┘
+```
+
+Interaction and state:
+- Like reflects `viewerLiked`/`likeCount` (GET like-state); toggle is POST/DELETE likes. Non-color cue: filled vs outline glyph plus a `Liked`/`Like` text label, never color alone. Optimistic toggle reconciles against the contract response.
+- Comments show an open/collapse affordance, not a total count: the #106 `CommentPage` returns `comments` plus `nextCursor` and no aggregate count, so the control reads `Comments ▸` and expands to load the thread (GET comments, `Load more` keyset cursor) rather than promising a number that would require scanning every page. The composer posts (POST comment) and prepends. `Delete` appears only on the viewer's own comments (author-only DELETE) and asks for confirmation first. A real total would need a `commentCount` field added to the #106 like-state-style contract; out of scope here.
+- Follow sits on the post author, reflecting `viewerFollowing` (GET follow-state) with a `Follow`/`Following ✓` text label; toggle is POST/DELETE follows. Hidden on the viewer's own posts (no self-follow).
+- Like and comment controls appear only on PUBLIC posts (the P0 feed is public-only); a non-public or missing post resolves to `POST_NOT_FOUND` and renders no control. `COMMENT_NOT_FOUND` surfaces as an inline, non-destructive error.
+- 360 px: controls wrap beneath the post, the thread is full-width, keyboard order is like → comments → composer → follow, focus stays visible, and expand/collapse is a real button (Enter/Space).
+- No mocks: every control here is backed by a live #106 endpoint before it renders; nothing appears as a placeholder.
+
 ## WF-03 — Ranked matchmaking (`/ranked`)
 
 ```text
