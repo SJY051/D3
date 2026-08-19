@@ -4,7 +4,7 @@ Owner: 윤서진
 
 Status: Local P0 service boundaries active; deployed Judge0 application integration and enriched P1 records pending
 
-Last verified: 2026-08-19 against `2915d0f`, merged PRs #70/#75/#76/#89/#96 and issue #59 evidence
+Last verified: 2026-08-19 against `c738cd8`, merged PRs #70/#75/#76/#89/#96 and issue #59 evidence
 
 | Boundary | Owns | Does not own | Initial caller or consumer |
 |---|---|---|---|
@@ -46,7 +46,7 @@ Judge HTTP v1 has service-authenticated `RUN`/`SUBMIT` handlers, idempotent acce
 
 The deterministic fake is the local default and provides repeatable normalized-result evidence without representing host execution as live. An explicitly selected real adapter maps the six supported language keys to pinned Judge0 runtime IDs, applies fixed resource and network options, and normalizes provider results behind the same application seam. Issue #59 ran the production `HttpJudge0Client` and `Judge0ExecutionAdapter` for all six runtimes over an exact source-security-group-only route to the designated Judge0 host, then removed the temporary runner and route. This adapter/route smoke is **PASS**; execution by a deployed judge-service application remains **NOT RUN**.
 
-The local P0 vertical slice includes Battle `RUN`/`SUBMIT` correlation, judged-event consumption, accepted locking, committed score/rating, Battle outbox, and viewer-scoped submission verdicts in `battle-event.v3`. PR #89 adds heartbeat and reconnect stability, and PR #96 adds self-only submission verdict/attempt state with accepted locking. The 2026-08-18 two-browser rehearsal passed with the deterministic fake; a fresh `2915d0f` acceptance and live Judge0 application E2E remain **PENDING**.
+The local P0 vertical slice includes Battle `RUN`/`SUBMIT` correlation, judged-event consumption, accepted locking, committed score/rating, Battle outbox, and viewer-scoped submission verdicts in `battle-event.v3`. PR #89 adds heartbeat and reconnect stability, and PR #96 adds self-only submission verdict/attempt state with accepted locking. The 2026-08-18 two-browser rehearsal passed with the deterministic fake; a fresh `c738cd8` acceptance and live Judge0 application E2E remain **PENDING**.
 
 The current v1 events support the implemented P0 Community projections: `match.finished.v1` creates the seat-ordered public match record and ranked non-void result post, `rating.changed.v1` updates rating/RP/tier, and `user-profile.changed.v1` updates the public handle. PRs #60/#64/#70/#75/#76 provide replay-safe projection, Identity production, Community consumption, and authenticated keyset handle search; issue #17 is closed. Score composition, attempts, attack history, execution summary, display name, leaderboard, language statistics, and peak tier remain P1 enrichment rather than missing P0 projection work.
 
