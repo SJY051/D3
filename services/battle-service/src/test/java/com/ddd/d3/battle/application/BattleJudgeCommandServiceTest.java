@@ -135,6 +135,7 @@ class BattleJudgeCommandServiceTest {
         @Override public List<PendingJudgedEvent> findProcessablePending(int limit) { throw new UnsupportedOperationException(); }
         @Override public Optional<Reference> lockPendingReference(UUID eventId) { throw new UnsupportedOperationException(); }
         @Override public void recordEvidence(UUID eventId, Evidence evidence) { throw new UnsupportedOperationException(); }
+        @Override public boolean bothParticipantsAccepted(UUID matchId) { throw new UnsupportedOperationException(); }
     }
 
     private static final class FakeReceipts implements BattleCommandReceiptStore {

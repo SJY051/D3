@@ -259,6 +259,43 @@ class JdbcBattleJudgeReferenceStoreIntegrationTest {
                 .update());
     }
 
+    @Test
+    void d3Btl002ReportsBothParticipantsAcceptedOnlyWhenEachHoldsAnAcceptedSubmit() {
+        MatchFixture match = createRunningMatch();
+
+        assertEquals(false, store.bothParticipantsAccepted(match.matchId()));
+
+        insertSubmitReference(match.matchId(), match.playerOneId(), 1, "ACCEPTED");
+        assertEquals(false, store.bothParticipantsAccepted(match.matchId()));
+
+        insertSubmitReference(match.matchId(), match.playerTwoId(), 1, "WRONG_ANSWER");
+        assertEquals(false, store.bothParticipantsAccepted(match.matchId()));
+
+        insertSubmitReference(match.matchId(), match.playerTwoId(), 2, "ACCEPTED");
+        assertEquals(true, store.bothParticipantsAccepted(match.matchId()));
+    }
+
+    private void insertSubmitReference(UUID matchId, UUID playerId, int attempt, String status) {
+        jdbc.sql("""
+                        insert into judge_job_reference (
+                            submission_id, match_id, player_user_id, mode, command_id,
+                            attempt_number, last_judge_status, evidence_version, accepted_at, last_result_at
+                        ) values (
+                            :submissionId, :matchId, :playerId, 'SUBMIT', :commandId,
+                            :attempt, :status, 'judge-evidence-v1', :acceptedAt, :resultAt
+                        )
+                        """)
+                .param("submissionId", UUID.randomUUID())
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .param("commandId", UUID.randomUUID())
+                .param("attempt", attempt)
+                .param("status", status)
+                .param("acceptedAt", Timestamp.from(NOW))
+                .param("resultAt", Timestamp.from(NOW.plusSeconds(1)))
+                .update();
+    }
+
     private MatchFixture createRunningMatch() {
         UUID problemId = UUID.randomUUID();
         UUID matchId = UUID.randomUUID();

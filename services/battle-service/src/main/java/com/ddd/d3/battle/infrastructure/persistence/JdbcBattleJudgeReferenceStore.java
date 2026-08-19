@@ -277,6 +277,27 @@ public class JdbcBattleJudgeReferenceStore implements BattleJudgeReferenceStore 
         if (applied != 1) throw new IllegalStateException("Judged event was not applied exactly once");
     }
 
+    @Override
+    public boolean bothParticipantsAccepted(UUID matchId) {
+        Objects.requireNonNull(matchId, "matchId");
+        return Boolean.TRUE.equals(jdbc.sql("""
+                        select count(*) = 2
+                        from match_player mp
+                        where mp.match_id = :matchId
+                          and exists (
+                              select 1
+                              from judge_job_reference ref
+                              where ref.match_id = mp.match_id
+                                and ref.player_user_id = mp.user_id
+                                and ref.mode = 'SUBMIT'
+                                and ref.last_judge_status = 'ACCEPTED'
+                          )
+                        """)
+                .param("matchId", matchId)
+                .query(Boolean.class)
+                .single());
+    }
+
     private Reference reference(ResultSet resultSet, int rowNumber) throws SQLException {
         Timestamp lastResultAt = resultSet.getTimestamp("last_result_at");
         return new Reference(
