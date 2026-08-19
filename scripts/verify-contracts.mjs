@@ -127,6 +127,23 @@ const unsafeMatchEventV2 = structuredClone(matchEventV2);
 unsafeMatchEventV2.data.players[0].sourceCode = "private";
 if (matchFinishedV2(unsafeMatchEventV2)) throw new Error("match.finished v2 accepted private source evidence");
 
+const communityContract = parsedContracts.find(({ label }) => label.replaceAll("\\", "/") === "contracts/http/community.openapi.json")?.contract;
+const communitySchemas = communityContract?.components?.schemas;
+if (!communitySchemas) throw new Error("community HTTP contract must define component schemas");
+const communityEvidenceSchema = JSON.parse(JSON.stringify({
+  $defs: communitySchemas,
+  $ref: "#/$defs/PlayerRecordEvidence",
+}).replaceAll("#/components/schemas/", "#/$defs/"));
+const communityEvidence = ajv.compile(communityEvidenceSchema);
+if (!communityEvidence(matchEventV2.data.players[0])) {
+  throw new Error(`community public record evidence rejected a valid sample: ${ajv.errorsText(communityEvidence.errors)}`);
+}
+for (const [field, privateField] of [["score", "sourceCode"], ["execution", "hiddenTests"], ["attacks", "rawDiagnostics"]]) {
+  const unsafe = structuredClone(matchEventV2.data.players[0]);
+  unsafe[field][privateField] = "private";
+  if (communityEvidence(unsafe)) throw new Error(`community public record evidence accepted ${privateField}`);
+}
+
 const judgeContract = parsedContracts.find(({ label }) => label.replaceAll("\\", "/") === "contracts/http/judge.openapi.json")?.contract;
 const acceptJudgeSubmission = judgeContract?.paths?.["/internal/v1/judge/submissions"]?.post;
 const readJudgeEvidence = judgeContract?.paths?.["/internal/v1/judge/submissions/{submissionId}/evidence"]?.get;
