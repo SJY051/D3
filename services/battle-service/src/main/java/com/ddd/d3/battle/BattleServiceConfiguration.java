@@ -11,6 +11,7 @@ import com.ddd.d3.battle.application.BattleConnectionService;
 import com.ddd.d3.battle.application.BattleMatchCommandService;
 import com.ddd.d3.battle.application.BattleMatchRepository;
 import com.ddd.d3.battle.application.BattleMatchViewService;
+import com.ddd.d3.battle.application.BattleSubmissionViewService;
 import com.ddd.d3.battle.application.GarbageAttackEventStore;
 import com.ddd.d3.battle.application.BattleDeadlineClaimStore;
 import com.ddd.d3.battle.application.BattleDeadlineScheduler;
@@ -114,6 +115,11 @@ class BattleServiceConfiguration {
     @Bean
     BattleMatchViewService battleMatchViewService(BattleMatchRepository matches, Clock clock) {
         return new BattleMatchViewService(matches, clock);
+    }
+
+    @Bean
+    BattleSubmissionViewService battleSubmissionViewService(BattleJudgeReferenceStore references) {
+        return new BattleSubmissionViewService(references);
     }
 
     @Bean

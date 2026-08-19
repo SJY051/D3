@@ -6,7 +6,7 @@ Owner: D³ team
 
 Status: Local runtime active; P0 golden path rehearsed with the local fake judge
 
-Last verified: 2026-08-18 against the isolated two-browser rehearsal evidence
+Last verified: 2026-08-19 against `2915d0f`, the `25359ad` rehearsal and merged PRs #89/#96
 
 문제 풀이가 일회성 점수로 끝나면 실력의 변화와 개발자의 활동이 서로 단절됩니다. D³는 풀이와 대전 결과를 공개 피드, 전적, rating·RP로 이어 개발 과정 자체가 정체성과 기록이 되도록 만들었습니다.
 
@@ -14,7 +14,6 @@ Last verified: 2026-08-18 against the isolated two-browser rehearsal evidence
 
 **가입·로그인 → 공개 피드 게시·탐색 → 동일 언어 랭크 매칭 → 서버 권위 실시간 배틀(Run·Submit, 공격, 재접속) → 판정·승패 확정 → rating·RP 반영 → 자동 결과 게시·공개 전적**
 
-<!-- 스크린샷 자리: docs/assets/ 아래 자산으로 내일 갱신 예정. -->
 
 ## Quick start
 
@@ -36,9 +35,17 @@ Last verified: 2026-08-18 against the isolated two-browser rehearsal evidence
 
 ## 현재 증거 상태
 
-현재 권위 있는 판정은 [산출물 현황](docs/artifact-status.md)을 따릅니다. 2026-08-18 기준 P0 골든 패스는 격리된 환경의 두 브라우저 세션과 로컬 결정론적 fake judge로 리허설했습니다. 회원가입·로그인, fenced code를 포함한 Markdown 피드, 동일 언어 매칭, Run·Submit·재접속, 결과·전적, rating·RP 반영과 자동 결과 게시까지 확인했습니다. 공격 교환과 Surrender는 라이브로 실증하지 않았으며 **NOT RUN**입니다.
+현재 권위 있는 판정은 [산출물 현황](docs/artifact-status.md)을 따릅니다. 2026-08-18 기준 P0 골든 패스는 격리된 환경의 두 브라우저 세션과 로컬 결정론적 fake judge로 리허설했습니다. 회원가입·로그인, fenced code를 포함한 Markdown 피드, 동일 언어 매칭, Run·Submit·재접속, 결과·전적, rating·RP 반영과 자동 결과 게시까지 확인했습니다. 이후 PR #89의 heartbeat/reconnect 안정화와 PR #96의 self-submission verdict·accepted lock이 병합됐으며, 이 delta를 포함한 fresh `2915d0f` 인수는 **PENDING**입니다. 공격 교환과 Surrender의 라이브 실증은 **NOT RUN**입니다.
 
-fake judge 결과는 실제 코드 실행 증거가 아닙니다. Judge0 실행 호스트와 source-security-group 전용 사설 경로 자체는 격리된 AWS 환경에서 smoke로 검증했지만(issue #59), 배포된 judge-service가 그 경로로 실행하는 것은 **NOT RUN**입니다.
+fake judge 결과는 실제 코드 실행 증거가 아닙니다. Judge0 실행 호스트와 production adapter의 6개 런타임, source-security-group 전용 경로 smoke는 issue #59에서 **PASS**했습니다. 임시 runner와 route는 제거됐고, 배포된 judge-service가 그 경로로 실행하는 애플리케이션 통합은 **NOT RUN**입니다.
+
+## 골든 패스 시각 정체성
+
+Issue #84는 승인된 화면 정보 구조와 API 경계를 바꾸지 않고, D³의 dark-first 제품
+정체성으로 골든 패스와 battle 표면을 정리합니다. 아래 비교에서 왼쪽은 기존 scaffold
+화면(Before), 오른쪽은 D³ 헤더·제품 히어로·상태 체계를 적용한 화면(After)입니다.
+
+![Golden path visual identity — Before on the left, After on the right](docs/assets/golden-path-visual-identity-before-after.png)
 
 | 영역 | 현재 증거 | 판정 |
 |---|---|---|
@@ -48,7 +55,7 @@ fake judge 결과는 실제 코드 실행 증거가 아닙니다. Judge0 실행 
 | Contracts | HTTP 4개, event 5개, WebSocket 1개 문서 | 골든 패스 계약 경로 실증; 전체 계약 인수 PENDING |
 | Data | 서비스별 PostgreSQL 소유권, 논리 ERD와 forward-only Flyway 체인 | 네 서비스 migration PASS; 서비스 간 DB 공유 없음 |
 | Local infra | PostgreSQL, Redis, Kafka, Config, Discovery, Gateway, 네 도메인 서비스와 Web | 전체 로컬 기동 및 dependency preflight PASS |
-| Cloud/Judge0 | zero-ingress Judge0 호스트와 고정 6개 런타임, real adapter 코드 경로 | 호스트 PASS; 애플리케이션 사설 연결 PENDING/NOT RUN |
+| Cloud/Judge0 | zero-ingress Judge0 호스트, 고정 6개 런타임, production adapter와 source-SG route smoke | 호스트·adapter·route smoke PASS; 애플리케이션 배포 및 deployed judge-service 통합 PENDING/NOT RUN |
 
 ### 아키텍처와 저장소
 

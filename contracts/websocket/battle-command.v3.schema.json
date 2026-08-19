@@ -12,6 +12,7 @@
       "enum": [
         "READY",
         "SURRENDER",
+        "HEARTBEAT",
         "RUN",
         "SUBMIT",
         "ATTACK_LAUNCH",
@@ -45,7 +46,7 @@
   "oneOf": [
     {
       "properties": {
-        "type": { "enum": ["READY", "SURRENDER"] },
+        "type": { "enum": ["HEARTBEAT", "READY", "SURRENDER"] },
         "attackId": false,
         "sourceCode": false
       }

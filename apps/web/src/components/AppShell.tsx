@@ -16,9 +16,9 @@ export function AppShell() {
   return (
     <div className="scaffold-shell">
       <header className="scaffold-header">
-        <strong className="scaffold-brand">D3</strong>
-        <span>Dopamin-Driven Development</span>
-        <b>STRUCTURAL PROTOTYPE · VERSIONED API SURFACE</b>
+        <strong className="scaffold-brand" aria-label="D cubed">D<sup>3</sup></strong>
+        <span className="scaffold-product-name">Dopamin-Driven Development</span>
+        <b className="scaffold-status">Developer network · live coding arena</b>
       </header>
       <nav className="scaffold-nav" aria-label="Golden path routes">
         {routes.map(([to, label]) => (

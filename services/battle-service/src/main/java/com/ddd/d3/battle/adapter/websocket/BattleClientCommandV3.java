@@ -31,7 +31,7 @@ record BattleClientCommandV3(
     }
 
     enum Type {
-        READY, SURRENDER, RUN, SUBMIT, ATTACK_LAUNCH, ATTACK_BLOCK, ATTACK_REFLECT;
+        HEARTBEAT, READY, SURRENDER, RUN, SUBMIT, ATTACK_LAUNCH, ATTACK_BLOCK, ATTACK_REFLECT;
         boolean isAttack() { return this == ATTACK_LAUNCH || this == ATTACK_BLOCK || this == ATTACK_REFLECT; }
         boolean isJudge() { return this == RUN || this == SUBMIT; }
     }

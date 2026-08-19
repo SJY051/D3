@@ -116,6 +116,10 @@ final class BattleWebSocketHandler extends TextWebSocketHandler implements SubPr
 
     private void handleV3(UUID matchId, UUID viewerId, long generation, BattleClientCommandV3 command) {
         switch (command.type()) {
+            case HEARTBEAT -> {
+                // Browser WebSocket clients cannot emit protocol ping frames. This no-op keeps
+                // the authenticated transport active without changing match state or snapshots.
+            }
             case READY -> commands.handle(matchId, command.commandId(), viewerId, generation,
                     new BattleMatch.Ready(viewerId.toString()));
             case SURRENDER -> commands.handle(matchId, command.commandId(), viewerId, generation,
