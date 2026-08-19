@@ -123,7 +123,7 @@ public class JdbcBattleResultStore implements BattleResultStore {
                         resultSet.getString("slug") + "-v" + resultSet.getInt("version")))
                 .single();
         List<PlayerRow> players = jdbc.sql("""
-                        select user_id, seat, attempts
+                        select user_id, seat, language_key, attempts
                         from match_player
                         where match_id = :matchId
                         order by seat
@@ -132,6 +132,7 @@ public class JdbcBattleResultStore implements BattleResultStore {
                 .query((resultSet, rowNumber) -> new PlayerRow(
                         resultSet.getObject("user_id", UUID.class),
                         resultSet.getInt("seat"),
+                        resultSet.getString("language_key"),
                         resultSet.getInt("attempts")))
                 .list();
         if (players.size() != 2 || players.get(0).seat() != 1 || players.get(1).seat() != 2) {
@@ -144,6 +145,7 @@ public class JdbcBattleResultStore implements BattleResultStore {
                     StandingRow standing = Objects.requireNonNull(standings.get(player.playerId()), "standing");
                     return new PlayerContext(
                             player.playerId(),
+                            player.language(),
                             player.attempts(),
                             bestPerformance(matchId, player.playerId()),
                             new RatingProgressionCalculator.PlayerStanding(
@@ -275,8 +277,10 @@ public class JdbcBattleResultStore implements BattleResultStore {
                 .param("playerId", playerId)
                 .query((resultSet, rowNumber) -> {
                     Timestamp acceptedAt = resultSet.getTimestamp("accepted_at");
+                    String verdict = resultSet.getString("last_judge_status");
                     return new JudgedPerformance(
-                            "ACCEPTED".equals(resultSet.getString("last_judge_status")),
+                            "ACCEPTED".equals(verdict),
+                            verdict,
                             acceptedAt == null ? null : acceptedAt.toInstant(),
                             resultSet.getInt("passed_count"),
                             resultSet.getInt("total_count"),
@@ -420,6 +424,9 @@ public class JdbcBattleResultStore implements BattleResultStore {
         data.put("result", outcome.name());
         data.put("ranked", completion.pending().ranked());
         data.put("playerIds", List.of(match.playerOneId(), match.playerTwoId()));
+        data.put("players", List.of(
+                publicRecord(completion, completion.pending().playerOne(), completion.playerOnePeakTier()),
+                publicRecord(completion, completion.pending().playerTwo(), completion.playerTwoPeakTier())));
         insertOutbox(
                 UUID.randomUUID(),
                 completion.pending().matchId(),
@@ -427,7 +434,8 @@ public class JdbcBattleResultStore implements BattleResultStore {
                 "match.finished",
                 match.result().resolvedAt(),
                 completion.pending().matchId().toString(),
-                data);
+                data,
+                2);
     }
 
     private void insertRatingChanged(
@@ -447,7 +455,89 @@ public class JdbcBattleResultStore implements BattleResultStore {
                 "rating.changed",
                 completion.occurredAt(),
                 completion.pending().matchId().toString(),
-                data);
+                data,
+                1);
+    }
+
+    private Map<String, Object> publicRecord(Completion completion, PlayerContext player, String peakTier) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("userId", player.playerId());
+        record.put("language", player.language());
+        record.put("attempts", player.submissionAttempts());
+        record.put("peakTier", peakTier);
+        record.put("leaderboardPosition", leaderboardPosition(player.playerId()));
+        record.put("score", scoreRecord(completion, player));
+        record.put("execution", player.performance().map(this::executionRecord).orElse(null));
+        record.put("attacks", attackRecord(completion.pending().matchId(), player.playerId()));
+        return record;
+    }
+
+    private Map<String, Object> scoreRecord(Completion completion, PlayerContext player) {
+        if (completion.scoreResult() == null) {
+            return null;
+        }
+        MatchScoreCalculator.PlayerScore score = completion.scoreResult().scoreFor(player.playerId().toString());
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("total", score.total());
+        record.put("speed", score.speed());
+        record.put("dynamicEfficiency", score.dynamicEfficiency());
+        record.put("submissionDiscipline", score.submissionDiscipline());
+        record.put("calculationVersion", score.calculationVersion());
+        record.put("problemVersion", score.evidenceVersion().problemVersion());
+        record.put("runtimeVersion", score.evidenceVersion().runtimeVersion());
+        record.put("calibrationVersion", score.evidenceVersion().calibrationVersion());
+        return record;
+    }
+
+    private static Map<String, Object> executionRecord(JudgedPerformance performance) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("verdict", performance.verdict());
+        record.put("passedCount", performance.passedCount());
+        record.put("totalCount", performance.totalCount());
+        record.put("runtimeMeasurements", performance.runtimeMeasurements());
+        record.put("adapterVersion", performance.adapterVersion());
+        record.put("runtimeVersion", performance.runtimeVersion());
+        record.put("evidenceVersion", performance.evidenceVersion());
+        return record;
+    }
+
+    private int leaderboardPosition(UUID playerId) {
+        Long position = jdbc.sql("""
+                        select 1 + count(*)
+                        from season_rank contender
+                        join season_rank player on player.season_id = contender.season_id
+                        where player.season_id = :seasonId
+                          and player.user_id = :playerId
+                          and (contender.rp > player.rp
+                               or (contender.rp = player.rp and contender.user_id::text < player.user_id::text))
+                        """)
+                .param("seasonId", seasonId)
+                .param("playerId", playerId)
+                .query(Long.class)
+                .single();
+        return Math.toIntExact(position);
+    }
+
+    private Map<String, Object> attackRecord(UUID matchId, UUID playerId) {
+        return jdbc.sql("""
+                        select count(*) filter (where actor_user_id = :playerId and attack_type = 'ATTACK_WARNED') as launched,
+                               count(*) filter (where target_user_id = :playerId and attack_type = 'ATTACK_WARNED') as targeted,
+                               count(*) filter (where actor_user_id = :playerId and resolution = 'BLOCKED') as blocked,
+                               count(*) filter (where actor_user_id = :playerId and resolution = 'REFLECTED') as reflected
+                        from attack_event
+                        where match_id = :matchId
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .query((resultSet, rowNumber) -> {
+                    Map<String, Object> record = new LinkedHashMap<>();
+                    record.put("launched", resultSet.getLong("launched"));
+                    record.put("targeted", resultSet.getLong("targeted"));
+                    record.put("blocked", resultSet.getLong("blocked"));
+                    record.put("reflected", resultSet.getLong("reflected"));
+                    return record;
+                })
+                .single();
     }
 
     private void insertOutbox(
@@ -457,11 +547,12 @@ public class JdbcBattleResultStore implements BattleResultStore {
             String eventType,
             Instant occurredAt,
             String correlationId,
-            Map<String, Object> data) {
+            Map<String, Object> data,
+            int version) {
         Map<String, Object> envelope = new LinkedHashMap<>();
         envelope.put("eventId", eventId.toString());
         envelope.put("eventType", eventType);
-        envelope.put("version", 1);
+        envelope.put("version", version);
         envelope.put("occurredAt", occurredAt.toString());
         envelope.put("correlationId", correlationId);
         envelope.put("aggregateId", aggregateId.toString());
@@ -518,7 +609,7 @@ public class JdbcBattleResultStore implements BattleResultStore {
 
     private record MatchMetadata(boolean ranked, String problemVersion) {}
 
-    private record PlayerRow(UUID playerId, int seat, int attempts) {}
+    private record PlayerRow(UUID playerId, int seat, String language, int attempts) {}
 
     private record StandingRow(
             UUID playerId,

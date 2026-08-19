@@ -48,6 +48,7 @@ public final class CommunityMatchFinishedConsumer {
                 envelope.data().result(),
                 envelope.data().ranked(),
                 envelope.data().playerIds(),
+                envelope.data().players() == null ? List.of() : envelope.data().players(),
                 clock.instant()));
     }
 
@@ -57,7 +58,7 @@ public final class CommunityMatchFinishedConsumer {
         }
         try {
             MatchFinishedEnvelope envelope = objectMapper.readValue(payload, MatchFinishedEnvelope.class);
-            if (!"match.finished".equals(envelope.eventType()) || envelope.version() != 1) {
+            if (!"match.finished".equals(envelope.eventType()) || (envelope.version() != 1 && envelope.version() != 2)) {
                 throw new IllegalArgumentException("unsupported match.finished contract");
             }
             if (envelope.aggregateVersion() < 0 || envelope.correlationId().isBlank()) {
@@ -91,7 +92,9 @@ public final class CommunityMatchFinishedConsumer {
         }
     }
 
-    record MatchFinishedData(UUID matchId, String result, Boolean ranked, List<UUID> playerIds) {
+    record MatchFinishedData(
+            UUID matchId, String result, Boolean ranked, List<UUID> playerIds,
+            List<MatchFinishedProjectionService.PlayerRecordEvidence> players) {
 
         MatchFinishedData {
             Objects.requireNonNull(matchId, "matchId");

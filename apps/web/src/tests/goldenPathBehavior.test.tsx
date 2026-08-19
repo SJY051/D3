@@ -106,7 +106,7 @@ describe("P0 route behavior", () => {
   });
 
   it("appends a player record page through its next cursor", async () => {
-    const first = { matches: [{ matchId: "00000000-0000-4000-8000-000000000001", playerOneUserId: "00000000-0000-4000-8000-000000000002", playerTwoUserId: "00000000-0000-4000-8000-000000000003", result: "DRAW", ranked: true, sourceVersion: 1, projectedAt: "2026-08-17T00:00:00Z" }], nextCursor: "cursor-2" };
+    const first = { matches: [{ matchId: "00000000-0000-4000-8000-000000000001", playerOneUserId: "00000000-0000-4000-8000-000000000002", playerTwoUserId: "00000000-0000-4000-8000-000000000003", result: "DRAW", ranked: true, sourceVersion: 1, projectedAt: "2026-08-17T00:00:00Z", players: [{ userId: "00000000-0000-4000-8000-000000000002", language: "PYTHON3", attempts: 2, peakTier: "Silver II", leaderboardPosition: 4, score: { total: 82, speed: 35, dynamicEfficiency: 32, submissionDiscipline: 15, calculationVersion: "v1", problemVersion: "demo-v1", runtimeVersion: "judge0", calibrationVersion: "v1" }, execution: { verdict: "ACCEPTED", passedCount: 8, totalCount: 8, runtimeMeasurements: [], adapterVersion: "judge0", runtimeVersion: "1", evidenceVersion: "v1" }, attacks: { launched: 1, targeted: 0, blocked: 0, reflected: 0 } }] }], nextCursor: "cursor-2" };
     const second = { matches: [{ ...first.matches[0], matchId: "00000000-0000-4000-8000-000000000004" }], nextCursor: null };
     const fetchMock = vi.fn().mockResolvedValueOnce(json(first)).mockResolvedValueOnce(json(second));
     vi.stubGlobal("fetch", fetchMock);
@@ -114,6 +114,8 @@ describe("P0 route behavior", () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     await act(async () => { container.querySelector("button")!.click(); await Promise.resolve(); });
     expect(container.querySelectorAll(".golden-record")).toHaveLength(2);
+    expect(container.textContent).toContain("leaderboard #4");
+    expect(container.textContent).toContain("Score 82");
     expect(fetchMock.mock.calls[1][0]).toContain("cursor=cursor-2");
     root.unmount();
   });

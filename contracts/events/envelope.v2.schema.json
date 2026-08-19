@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d3.local/contracts/events/envelope.v2.schema.json",
+  "title": "D3 Event Envelope v2",
+  "x-requirements": ["D3-QLT-001", "D3-STAT-001"],
+  "type": "object",
+  "required": ["eventId", "eventType", "version", "occurredAt", "correlationId", "aggregateId", "aggregateVersion", "data"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "type": "string", "minLength": 1 },
+    "version": { "type": "integer", "const": 2 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 1 },
+    "aggregateId": { "type": "string", "minLength": 1 },
+    "aggregateVersion": { "type": "integer", "minimum": 0 },
+    "data": { "type": "object" }
+  },
+  "additionalProperties": false
+}

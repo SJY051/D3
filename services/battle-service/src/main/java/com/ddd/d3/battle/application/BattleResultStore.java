@@ -16,6 +16,7 @@ public interface BattleResultStore {
 
     record JudgedPerformance(
             boolean accepted,
+            String verdict,
             Instant acceptedAt,
             int passedCount,
             int totalCount,
@@ -31,6 +32,7 @@ public interface BattleResultStore {
 
     record PlayerContext(
             UUID playerId,
+            String language,
             int submissionAttempts,
             Optional<JudgedPerformance> performance,
             RatingProgressionCalculator.PlayerStanding standing,

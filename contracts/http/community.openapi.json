@@ -187,7 +187,7 @@
       },
       "MatchRecord": {
         "type": "object",
-        "required": ["matchId", "playerOneUserId", "playerTwoUserId", "result", "ranked", "sourceVersion", "projectedAt"],
+        "required": ["matchId", "playerOneUserId", "playerTwoUserId", "result", "ranked", "sourceVersion", "projectedAt", "players"],
         "properties": {
           "matchId": { "type": "string", "format": "uuid" },
           "playerOneUserId": { "type": "string", "format": "uuid" },
@@ -195,7 +195,8 @@
           "result": { "type": "string", "enum": ["PLAYER_ONE_WIN", "PLAYER_TWO_WIN", "DRAW", "VOIDED"] },
           "ranked": { "type": "boolean" },
           "sourceVersion": { "type": "integer", "minimum": 0 },
-          "projectedAt": { "type": "string", "format": "date-time" }
+          "projectedAt": { "type": "string", "format": "date-time" },
+          "players": { "type": "array", "maxItems": 2, "items": { "$ref": "#/components/schemas/PlayerRecordEvidence" } }
         },
         "additionalProperties": false
       },
@@ -205,6 +206,21 @@
         "properties": {
           "matches": { "type": "array", "items": { "$ref": "#/components/schemas/MatchRecord" } },
           "nextCursor": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "PlayerRecordEvidence": {
+        "type": "object",
+        "required": ["userId", "language", "attempts", "peakTier", "leaderboardPosition", "score", "execution", "attacks"],
+        "properties": {
+          "userId": { "type": "string", "format": "uuid" },
+          "language": { "type": "string" },
+          "attempts": { "type": "integer", "minimum": 0 },
+          "peakTier": { "type": "string" },
+          "leaderboardPosition": { "type": "integer", "minimum": 1 },
+          "score": { "type": ["object", "null"] },
+          "execution": { "type": ["object", "null"] },
+          "attacks": { "type": "object" }
         },
         "additionalProperties": false
       },
