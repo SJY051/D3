@@ -22,6 +22,7 @@ export interface RankedQueueState {
   language: RankedLanguage;
   matchId: string | null;
   owner: string | null;
+  pausedBecause: "SESSION_REQUIRED" | "CONFLICT" | null;
   recordedAt: number;
   status: "QUEUED" | "PAUSED" | "MATCHED";
 }
@@ -45,9 +46,19 @@ function write(next: RankedQueueState) {
   emit();
 }
 
+function isExpired(state: Pick<RankedQueueState, "recordedAt">): boolean {
+  return Date.now() - state.recordedAt > TTL_MS;
+}
+
 function read(): RankedQueueState | null {
   const raw = storage()?.getItem(KEY) ?? null;
-  if (raw === cachedRaw) return cachedState;
+  if (raw === cachedRaw) {
+    if (cachedState !== null && isExpired(cachedState)) {
+      clearRankedQueue();
+      return null;
+    }
+    return cachedState;
+  }
   if (raw === null) {
     cachedRaw = null;
     cachedState = null;
@@ -63,7 +74,7 @@ function read(): RankedQueueState | null {
       return null;
     }
     const recordedAt = typeof value.recordedAt === "number" ? value.recordedAt : 0;
-    if (Date.now() - recordedAt > TTL_MS) {
+    if (isExpired({ recordedAt })) {
       storage()?.removeItem(KEY);
       cachedRaw = null;
       cachedState = null;
@@ -76,6 +87,7 @@ function read(): RankedQueueState | null {
       language: value.language as RankedLanguage,
       matchId: typeof value.matchId === "string" && UUID.test(value.matchId) ? value.matchId : null,
       owner: typeof value.owner === "string" ? value.owner : null,
+      pausedBecause: value.pausedBecause === "SESSION_REQUIRED" || value.pausedBecause === "CONFLICT" ? value.pausedBecause : null,
       recordedAt,
       status: value.status,
     };
@@ -93,9 +105,10 @@ export function startRankedQueue(language: RankedLanguage, owner: string | null 
     language,
     matchId: null,
     owner,
+    pausedBecause: null,
     recordedAt: Date.now(),
     status: "QUEUED",
-  } : { ...current, status: "QUEUED" };
+  } : { ...current, pausedBecause: null, status: "QUEUED" };
   write(next);
   return next;
 }
@@ -112,14 +125,15 @@ export function updateRankedQueue(ticket: RankedQueueTicket) {
     ...current,
     enqueuedAt: ticket.enqueuedAt,
     matchId: ticket.matchId,
+    pausedBecause: null,
     status: ticket.status,
   });
 }
 
-export function pauseRankedQueue() {
+export function pauseRankedQueue(pausedBecause: RankedQueueState["pausedBecause"] = null) {
   const current = read();
   if (current !== null && current.status === "QUEUED") {
-    write({ ...current, status: "PAUSED" });
+    write({ ...current, pausedBecause, status: "PAUSED" });
   }
 }
 
@@ -137,7 +151,17 @@ export function clearRankedQueueIfMatch(matchId: string) {
 
 export function clearRankedQueueIfNotOwner(userId: string) {
   const current = read();
-  if (current !== null && current.owner !== null && current.owner !== userId) {
+  if (current !== null && current.owner !== userId) {
+    clearRankedQueue();
+  }
+}
+
+export function claimRankedQueueOwner(userId: string) {
+  const current = read();
+  if (current === null) return;
+  if (current.owner === null) {
+    write({ ...current, owner: userId });
+  } else if (current.owner !== userId) {
     clearRankedQueue();
   }
 }

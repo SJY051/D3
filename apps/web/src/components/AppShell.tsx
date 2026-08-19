@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { ApiRequestError, waitForRankedMatch } from "../api/goldenPathApi";
 import { currentSessionUserId } from "../api/session";
@@ -14,6 +14,7 @@ const routes = [
 
 export function AppShell() {
   const activeMatchId = useActiveMatch();
+  const navigate = useNavigate();
   const rankedQueue = useRankedQueue();
   const { pathname } = useLocation();
   const [now, setNow] = useState(() => Date.now());
@@ -52,7 +53,12 @@ export function AppShell() {
         } catch (error) {
           if (controller.signal.aborted) return;
           if (error instanceof ApiRequestError && error.status >= 400 && error.status < 500) {
-            pauseRankedQueue();
+            if (error.status === 401) {
+              pauseRankedQueue("SESSION_REQUIRED");
+              navigate("/sign-in", { replace: true });
+            } else {
+              pauseRankedQueue(error.status === 409 ? "CONFLICT" : null);
+            }
             return;
           }
           try {
@@ -68,7 +74,7 @@ export function AppShell() {
       active = false;
       controller.abort();
     };
-  }, [rankedQueue?.idempotencyKey, rankedQueue?.language, rankedQueue?.status]);
+  }, [navigate, rankedQueue?.idempotencyKey, rankedQueue?.language, rankedQueue?.status]);
 
   useEffect(() => {
     if (!showSearchingQueue) return undefined;

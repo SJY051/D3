@@ -1,5 +1,5 @@
 import { clearActiveMatch, clearActiveMatchIfNotOwner } from "../battle/useActiveMatch";
-import { clearRankedQueue, clearRankedQueueIfNotOwner } from "../battle/useRankedQueue";
+import { claimRankedQueueOwner, clearRankedQueue, clearRankedQueueIfNotOwner } from "../battle/useRankedQueue";
 
 export interface SessionToken {
   accessToken: string;
@@ -47,7 +47,7 @@ export async function requestSessionAccessToken(forceRefresh = false): Promise<s
       accessToken = value.accessToken;
       if (typeof value.userId === "string" && value.userId.length > 0) {
         clearActiveMatchIfNotOwner(value.userId);
-        clearRankedQueueIfNotOwner(value.userId);
+        claimRankedQueueOwner(value.userId);
         userId = value.userId;
       }
       return value.accessToken;

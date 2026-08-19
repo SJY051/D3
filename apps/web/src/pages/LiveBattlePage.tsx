@@ -102,11 +102,11 @@ export function LiveBattlePage() {
     if (snapshot === null || snapshot.matchId !== matchId) {
       return;
     }
+    clearRankedQueueIfMatch(matchId);
     if (snapshot.match.state === "FINISHED") {
       clearActiveMatchIfMatch(matchId);
     } else {
       setActiveMatch(matchId, currentSessionUserId());
-      clearRankedQueueIfMatch(matchId);
     }
   }, [matchId, snapshot]);
 

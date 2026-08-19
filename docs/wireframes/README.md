@@ -62,6 +62,10 @@ Operation:   Problem list → Inspect → Activate / bounded edit
 │  Status    QUEUED → MATCHED                   elapsed 00:18   │
 │                                                              │
 │  [ searching pulse with reduced-motion alternative ]         │
+│  [Pause polling] stops local polling only; server ticket may │
+│  still match or expire.                                      │
+│  On PAUSED, show Retry existing queue with reason copy when  │
+│  session or active-ticket conflict caused the pause.         │
 │  On MATCHED, move to /battles/:matchId.                      │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -152,6 +156,15 @@ Handle lookup remains gated until Identity publishes `user-profile.changed.v1`; 
 ```
 
 Reviewed by SJY051 on 2026-08-18 for Issue #85. The banner is a shared shell element rendered above every P0 route while the signed-in user owns a live match. It uses text plus an icon (non-color cue), one action, and disappears when the match finishes, the owner changes, or the marker expires.
+
+## Global shell — ranked queue banner
+
+```text
+[ ● Searching for ranked match · 00:18 — View queue ]   (hidden behind active-match rejoin)
+[ ● Ranked match found — Enter battle ]                 (hidden on /battles/:matchId)
+```
+
+Reviewed by SJY051 in PR #95 review on 2026-08-19 for Issue #86. The queue banner is a shared shell element rendered above every P0 route while a signed-in user has a persisted ranked queue marker. It preserves the original idempotency key across navigation, displays elapsed time while `QUEUED`, switches to an explicit battle action when `MATCHED`, and disappears when the battle snapshot is received, the owner changes, or the marker expires.
 
 ## Visual review gate
 

@@ -18,7 +18,7 @@ import {
   signIn,
 } from "../api/goldenPathApi";
 import { currentSessionUserId } from "../api/session";
-import { pauseRankedQueue, startRankedQueue, useRankedQueue } from "../battle/useRankedQueue";
+import { pauseRankedQueue, startRankedQueue, type RankedQueueState, useRankedQueue } from "../battle/useRankedQueue";
 
 export type GoldenPathKind = "sign-in" | "feed" | "ranked" | "result" | "record";
 
@@ -129,9 +129,8 @@ function Ranked() {
     }
     startRankedQueue(language, currentSessionUserId());
   }
-  const queuedAt = queue?.status === "QUEUED" ? queue.enqueuedAt : null;
   const selectedLanguage = queue?.language ?? language;
-  return <form className="golden-panel golden-form" onSubmit={submit}><label>Language<select disabled={queue !== null} onChange={(event) => setLanguage(event.target.value as RankedLanguage)} value={selectedLanguage}><option value="C">C</option><option value="CPP">CPP</option><option value="JAVA">JAVA</option><option value="PYTHON3">PYTHON3</option><option value="JAVASCRIPT">JAVASCRIPT</option><option value="TYPESCRIPT">TYPESCRIPT</option></select></label><p>Queue replays one idempotency key until MATCHED, then opens the authenticated Battle v3 route.</p><p className="golden-queue-state" role="status">{queue?.status === "QUEUED" ? "Searching — queued attempt remains active across routes." : queue?.status === "PAUSED" ? "Polling paused — the queued ticket stays active on the server until it matches or expires." : queue?.status === "MATCHED" ? "Match found. Opening Battle v3." : "Idle — choose a language to join."}{queuedAt !== null && ` Elapsed ${formatElapsed(queuedAt, now)}.`}</p><button disabled={queue?.status === "QUEUED" || queue?.status === "MATCHED"} type="submit">{queue?.status === "QUEUED" ? "Finding a match..." : queue?.status === "PAUSED" ? "Retry existing queue" : queue?.status === "MATCHED" ? "Match found" : "Join ranked queue"}</button>{queue?.status === "QUEUED" && <button type="button" onClick={pauseRankedQueue}>Cancel queue</button>}{queue?.status === "MATCHED" && queue.matchId !== null && <Link className="golden-link" to={`/battles/${queue.matchId}`}>Enter battle</Link>}</form>;
+  return <form className="golden-panel golden-form" onSubmit={submit}><label>Language<select disabled={queue !== null} onChange={(event) => setLanguage(event.target.value as RankedLanguage)} value={selectedLanguage}><option value="C">C</option><option value="CPP">CPP</option><option value="JAVA">JAVA</option><option value="PYTHON3">PYTHON3</option><option value="JAVASCRIPT">JAVASCRIPT</option><option value="TYPESCRIPT">TYPESCRIPT</option></select></label><p>Queue replays one idempotency key until MATCHED, then opens the authenticated Battle v3 route.</p><p className="golden-queue-state" role="status">{rankedQueueStatus(queue, now)}</p><button disabled={queue?.status === "QUEUED" || queue?.status === "MATCHED"} type="submit">{queue?.status === "QUEUED" ? "Finding a match..." : queue?.status === "PAUSED" ? "Retry existing queue" : queue?.status === "MATCHED" ? "Match found" : "Join ranked queue"}</button>{queue?.status === "QUEUED" && <button type="button" onClick={() => pauseRankedQueue()}>Pause polling</button>}{queue?.status === "MATCHED" && queue.matchId !== null && <Link className="golden-link" to={`/battles/${queue.matchId}`}>Enter battle</Link>}</form>;
 }
 
 function Result() {
@@ -171,6 +170,26 @@ function outcomeLabel(result: MatchRecord["result"], playerId?: string, match?: 
 export function formatElapsed(enqueuedAt: string, now: number): string {
   const totalSeconds = Math.max(0, Math.floor((now - Date.parse(enqueuedAt)) / 1_000));
   return `${Math.floor(totalSeconds / 60).toString().padStart(2, "0")}:${(totalSeconds % 60).toString().padStart(2, "0")}`;
+}
+
+function rankedQueueStatus(queue: RankedQueueState | null, now: number): string {
+  if (queue?.status === "QUEUED") {
+    const elapsed = queue.enqueuedAt === null ? "" : ` Elapsed ${formatElapsed(queue.enqueuedAt, now)}.`;
+    return `Searching — queued attempt remains active across routes.${elapsed}`;
+  }
+  if (queue?.status === "PAUSED" && queue.pausedBecause === "SESSION_REQUIRED") {
+    return "Polling paused — sign in again to resume this ranked queue.";
+  }
+  if (queue?.status === "PAUSED" && queue.pausedBecause === "CONFLICT") {
+    return "Polling paused — this account already has an active queue or match.";
+  }
+  if (queue?.status === "PAUSED") {
+    return "Polling paused — retry to reuse the queued ticket if the server still has it.";
+  }
+  if (queue?.status === "MATCHED") {
+    return "Match found. Opening Battle v3.";
+  }
+  return "Idle — choose a language to join.";
 }
 
 function useResource<T>(loader: () => Promise<T>, dependencies: readonly unknown[]): Resource<T> {

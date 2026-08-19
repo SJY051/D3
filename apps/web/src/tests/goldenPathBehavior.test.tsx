@@ -3,8 +3,8 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clearSession, setSession } from "../api/session";
-import { getRankedQueue } from "../battle/useRankedQueue";
+import { clearSession, requestSessionAccessToken, setSession } from "../api/session";
+import { getRankedQueue, startRankedQueue } from "../battle/useRankedQueue";
 import { formatElapsed, GoldenPathPage, type GoldenPathKind } from "../pages/GoldenPathPage";
 
 function json(body: unknown, status = 200): Response {
@@ -83,7 +83,7 @@ describe("P0 route behavior", () => {
     await act(async () => { container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); await Promise.resolve(); });
     expect(requestPermission).toHaveBeenCalledTimes(1);
     const buttons = () => [...container.querySelectorAll("button")];
-    await act(async () => { buttons().find((button) => button.textContent === "Cancel queue")!.click(); await Promise.resolve(); });
+    await act(async () => { buttons().find((button) => button.textContent === "Pause polling")!.click(); await Promise.resolve(); });
 
     expect(container.querySelector("select")!.disabled).toBe(true);
     expect(container.querySelector("button[type=submit]")!.textContent).toBe("Retry existing queue");
@@ -92,6 +92,17 @@ describe("P0 route behavior", () => {
     await act(async () => { container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); await Promise.resolve(); });
     expect(getRankedQueue()).toMatchObject({ idempotencyKey: "ticket-1", status: "QUEUED" });
     root.unmount();
+  });
+
+  it("backs a refreshed session into an anonymous ranked queue marker", async () => {
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-2" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({ userId: "user-1", accessToken: "token" })));
+
+    startRankedQueue("PYTHON3");
+
+    await requestSessionAccessToken(true);
+
+    expect(getRankedQueue()).toMatchObject({ idempotencyKey: "ticket-2", owner: "user-1" });
   });
 
   it("appends a player record page through its next cursor", async () => {

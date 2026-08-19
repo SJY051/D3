@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  claimRankedQueueOwner,
   clearRankedQueue,
   clearRankedQueueIfMatch,
   clearRankedQueueIfNotOwner,
@@ -11,6 +12,7 @@ import {
 } from "./useRankedQueue";
 
 afterEach(() => {
+  vi.useRealTimers();
   localStorage.clear();
   vi.unstubAllGlobals();
 });
@@ -20,14 +22,16 @@ describe("ranked-queue store", () => {
     vi.stubGlobal("crypto", { randomUUID: () => "ticket-1" });
 
     startRankedQueue("PYTHON3", "user-a");
-    pauseRankedQueue();
+    pauseRankedQueue("CONFLICT");
     const paused = getRankedQueue();
     startRankedQueue("JAVA", "user-a");
 
     expect(paused?.status).toBe("PAUSED");
+    expect(paused?.pausedBecause).toBe("CONFLICT");
     expect(getRankedQueue()).toMatchObject({
       idempotencyKey: "ticket-1",
       language: "PYTHON3",
+      pausedBecause: null,
       status: "QUEUED",
     });
   });
@@ -75,9 +79,37 @@ describe("ranked-queue store", () => {
     expect(handler).toHaveBeenCalledTimes(2);
   });
 
+  it("expires the cached queue state after the storage ttl", () => {
+    vi.useFakeTimers({ now: Date.parse("2026-08-18T00:00:00Z") });
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-4" });
+
+    startRankedQueue("C");
+    expect(getRankedQueue()).not.toBeNull();
+
+    vi.setSystemTime(Date.parse("2026-08-18T00:16:00Z"));
+
+    expect(getRankedQueue()).toBeNull();
+    expect(localStorage.getItem("d3.rankedQueue")).toBeNull();
+  });
+
+  it("claims anonymous queues on refresh and clears them on explicit owner mismatch", () => {
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-5" });
+
+    startRankedQueue("C");
+    claimRankedQueueOwner("user-a");
+
+    expect(getRankedQueue()?.owner).toBe("user-a");
+
+    clearRankedQueue();
+    startRankedQueue("C");
+    clearRankedQueueIfNotOwner("user-b");
+
+    expect(getRankedQueue()).toBeNull();
+  });
+
   it("skips duplicate queued ticket writes", () => {
     const handler = vi.fn();
-    vi.stubGlobal("crypto", { randomUUID: () => "ticket-4" });
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-6" });
     window.addEventListener("storage", handler);
 
     startRankedQueue("C");

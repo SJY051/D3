@@ -1,13 +1,13 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "./AppShell";
 import { LiveBattlePage } from "../pages/LiveBattlePage";
 import { clearSession, setSession } from "../api/session";
 import { getActiveMatch, setActiveMatch } from "../battle/useActiveMatch";
-import { getRankedQueue, startRankedQueue } from "../battle/useRankedQueue";
+import { getRankedQueue, startRankedQueue, updateRankedQueue } from "../battle/useRankedQueue";
 
 const MATCH = "00000000-0000-4000-8000-000000000001";
 
@@ -50,6 +50,10 @@ class FakeWebSocket {
   close() { this.onclose?.(); }
 }
 
+function LocationProbe() {
+  return <output data-testid="location">{useLocation().pathname}</output>;
+}
+
 async function renderShell(path: string) {
   const container = document.createElement("div");
   const root = createRoot(container);
@@ -59,9 +63,11 @@ async function renderShell(path: string) {
         <Routes>
           <Route path="/" element={<AppShell />}>
             <Route path="feed" element={<p>feed</p>} />
+            <Route path="sign-in" element={<p>sign-in</p>} />
             <Route path="battles/:matchId" element={<LiveBattlePage />} />
           </Route>
         </Routes>
+        <LocationProbe />
       </MemoryRouter>,
     );
   });
@@ -131,6 +137,32 @@ describe("rejoin banner", () => {
     root.unmount();
   });
 
+  it("clears a matched queue marker when the first battle snapshot is already finished", async () => {
+    vi.stubGlobal("WebSocket", FakeWebSocket as unknown as typeof WebSocket);
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-1" });
+    setSession({ accessToken: "t", userId: "user-a" });
+    startRankedQueue("PYTHON3", "user-a");
+    updateRankedQueue({
+      enqueuedAt: "2026-08-18T00:00:00Z",
+      matchId: MATCH,
+      status: "MATCHED",
+    });
+    setActiveMatch(MATCH, "user-a");
+
+    const { root } = await renderShell(`/battles/${MATCH}`);
+    await act(async () => { await Promise.resolve(); });
+    const socket = FakeWebSocket.instances.at(-1)!;
+
+    await act(async () => {
+      socket.onopen?.();
+      socket.onmessage?.({ data: snapshotMessage("FINISHED") });
+    });
+
+    expect(getRankedQueue()).toBeNull();
+    expect(getActiveMatch()).toBeNull();
+    root.unmount();
+  });
+
   it("keeps polling a ranked queue from the shell and exposes the matched battle", async () => {
     setSession({ accessToken: "t", userId: "user-a" });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({
@@ -196,6 +228,40 @@ describe("rejoin banner", () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
     expect(getRankedQueue()?.status).toBe("PAUSED");
+    expect(getRankedQueue()?.pausedBecause).toBeNull();
+    root.unmount();
+  });
+
+  it("redirects to sign-in when shell polling loses the session", async () => {
+    setSession({ accessToken: "t", userId: "user-a" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({
+      code: "SESSION_REQUIRED",
+      message: "session required",
+    }, 401)));
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-1" });
+    startRankedQueue("PYTHON3", "user-a");
+
+    const { container, root } = await renderShell("/feed");
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(getRankedQueue()).toMatchObject({ pausedBecause: "SESSION_REQUIRED", status: "PAUSED" });
+    expect(container.querySelector("[data-testid=location]")?.textContent).toBe("/sign-in");
+    root.unmount();
+  });
+
+  it("pauses shell polling with conflict copy on active-ticket conflicts", async () => {
+    setSession({ accessToken: "t", userId: "user-a" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({
+      code: "ACTIVE_TICKET_CONFLICT",
+      message: "active ticket exists",
+    }, 409)));
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-1" });
+    startRankedQueue("PYTHON3", "user-a");
+
+    const { root } = await renderShell("/feed");
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(getRankedQueue()).toMatchObject({ pausedBecause: "CONFLICT", status: "PAUSED" });
     root.unmount();
   });
 });
