@@ -28,6 +28,24 @@ public final class CommunityHttpExceptionHandler {
         return error(HttpStatus.NOT_FOUND, "MATCH_RECORD_NOT_FOUND", "match record was not found", request);
     }
 
+    @ExceptionHandler(com.ddd.d3.community.application.PostNotFoundException.class)
+    ResponseEntity<CommunityErrorResponse> postNotFound(
+            com.ddd.d3.community.application.PostNotFoundException exception, HttpServletRequest request) {
+        return error(HttpStatus.NOT_FOUND, "POST_NOT_FOUND", "post was not found", request);
+    }
+
+    @ExceptionHandler(com.ddd.d3.community.application.CommentNotFoundException.class)
+    ResponseEntity<CommunityErrorResponse> commentNotFound(
+            com.ddd.d3.community.application.CommentNotFoundException exception, HttpServletRequest request) {
+        return error(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND", "comment was not found", request);
+    }
+
+    @ExceptionHandler(com.ddd.d3.community.application.ProfileNotFoundException.class)
+    ResponseEntity<CommunityErrorResponse> profileNotFound(
+            com.ddd.d3.community.application.ProfileNotFoundException exception, HttpServletRequest request) {
+        return error(HttpStatus.NOT_FOUND, "PROFILE_NOT_FOUND", "target user was not found", request);
+    }
+
     private static ResponseEntity<CommunityErrorResponse> error(
             HttpStatus status, String code, String message, HttpServletRequest request) {
         String correlationId = request.getHeader("X-Correlation-Id");

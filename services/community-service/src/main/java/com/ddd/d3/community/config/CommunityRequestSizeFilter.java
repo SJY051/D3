@@ -21,7 +21,8 @@ import tools.jackson.databind.ObjectMapper;
 public final class CommunityRequestSizeFilter extends OncePerRequestFilter {
 
     public static final int MAX_REQUEST_BYTES = 65_536;
-    private static final String POST_PATH = "/v1/community/posts";
+    // Cap every community write, not just post creation: comments and follows also carry request bodies.
+    private static final String COMMUNITY_PREFIX = "/v1/community/";
 
     private final ObjectMapper objectMapper;
 
@@ -34,7 +35,7 @@ public final class CommunityRequestSizeFilter extends OncePerRequestFilter {
         String requestUri = request.getRequestURI();
         String contextPath = request.getContextPath();
         String path = stripMatrixParameters(UriUtils.decode(requestUri.substring(contextPath.length()), StandardCharsets.UTF_8));
-        return !("POST".equals(request.getMethod()) && POST_PATH.equals(path));
+        return !("POST".equals(request.getMethod()) && path.startsWith(COMMUNITY_PREFIX));
     }
 
     @Override

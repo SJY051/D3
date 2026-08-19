@@ -1,6 +1,12 @@
 package com.ddd.d3.community.adapter.persistence;
 
+import com.ddd.d3.community.application.CommunityService.CommentCursor;
+import com.ddd.d3.community.application.CommunityService.CommentPage;
+import com.ddd.d3.community.application.CommunityService.CommentView;
 import com.ddd.d3.community.application.CommunityService.FeedCursor;
+import com.ddd.d3.community.application.CommunityService.FollowState;
+import com.ddd.d3.community.application.CommunityService.LikeState;
+import com.ddd.d3.community.application.CommunityService.NewComment;
 import com.ddd.d3.community.application.CommunityService.FeedPage;
 import com.ddd.d3.community.application.CommunityService.MatchRecordCursor;
 import com.ddd.d3.community.application.CommunityService.MatchRecordPage;
@@ -138,6 +144,167 @@ public final class JdbcCommunityRepository {
                 .query(String.class)
                 .optional()
                 .orElse(null);
+    }
+
+    public void insertFollow(UUID followerUserId, UUID followedUserId) {
+        jdbc.sql("""
+                        insert into follow (follower_user_id, followed_user_id, created_at)
+                        values (:follower, :followed, :createdAt)
+                        on conflict (follower_user_id, followed_user_id) do nothing
+                        """)
+                .param("follower", followerUserId)
+                .param("followed", followedUserId)
+                .param("createdAt", java.sql.Timestamp.from(clock.instant()))
+                .update();
+    }
+
+    public void deleteFollow(UUID followerUserId, UUID followedUserId) {
+        jdbc.sql("delete from follow where follower_user_id = :follower and followed_user_id = :followed")
+                .param("follower", followerUserId)
+                .param("followed", followedUserId)
+                .update();
+    }
+
+    public boolean profileExists(UUID userId) {
+        return jdbc.sql("select exists (select 1 from profile_projection where user_id = :id)")
+                .param("id", userId)
+                .query(Boolean.class)
+                .single();
+    }
+
+    public FollowState followState(UUID targetUserId, Optional<UUID> viewerUserId) {
+        // One statement so the counts and the viewer flag come from a single snapshot; a null viewer
+        // makes the exists() false without a separate branch.
+        return jdbc.sql("""
+                        select
+                            (select count(*) from follow where followed_user_id = :target) as followers,
+                            (select count(*) from follow where follower_user_id = :target) as following,
+                            exists (
+                                select 1 from follow
+                                where follower_user_id = :viewer and followed_user_id = :target
+                            ) as viewer_following
+                        """)
+                .param("target", targetUserId)
+                .param("viewer", viewerUserId.orElse(null))
+                .query((rs, rowNum) -> new FollowState(
+                        rs.getLong("followers"),
+                        rs.getLong("following"),
+                        rs.getBoolean("viewer_following")))
+                .single();
+    }
+
+    public boolean publicPostExists(UUID postId) {
+        return jdbc.sql("select exists (select 1 from post where id = :id and visibility = 'PUBLIC')")
+                .param("id", postId)
+                .query(Boolean.class)
+                .single();
+    }
+
+    public void insertLike(UUID userId, UUID postId) {
+        jdbc.sql("""
+                        insert into post_like (post_id, user_id, created_at)
+                        values (:postId, :userId, :createdAt)
+                        on conflict (post_id, user_id) do nothing
+                        """)
+                .param("postId", postId)
+                .param("userId", userId)
+                .param("createdAt", java.sql.Timestamp.from(clock.instant()))
+                .update();
+    }
+
+    public void deleteLike(UUID userId, UUID postId) {
+        jdbc.sql("delete from post_like where post_id = :postId and user_id = :userId")
+                .param("postId", postId)
+                .param("userId", userId)
+                .update();
+    }
+
+    public LikeState likeState(UUID postId, Optional<UUID> viewerUserId) {
+        // Single statement so the count and the viewer flag share one snapshot.
+        return jdbc.sql("""
+                        select
+                            (select count(*) from post_like where post_id = :post) as likes,
+                            exists (
+                                select 1 from post_like where post_id = :post and user_id = :viewer
+                            ) as viewer_liked
+                        """)
+                .param("post", postId)
+                .param("viewer", viewerUserId.orElse(null))
+                .query((rs, rowNum) -> new LikeState(rs.getLong("likes"), rs.getBoolean("viewer_liked")))
+                .single();
+    }
+
+    public CommentView insertComment(NewComment comment) {
+        Instant now = clock.instant();
+        jdbc.sql("""
+                        insert into comment (id, post_id, author_user_id, body_markdown, rendered_html, created_at)
+                        values (:id, :postId, :authorUserId, :bodyMarkdown, :renderedHtml, :createdAt)
+                        """)
+                .param("id", comment.id())
+                .param("postId", comment.postId())
+                .param("authorUserId", comment.authorUserId())
+                .param("bodyMarkdown", comment.bodyMarkdown())
+                .param("renderedHtml", comment.renderedHtml())
+                .param("createdAt", java.sql.Timestamp.from(now))
+                .update();
+        return new CommentView(
+                comment.id(),
+                comment.postId(),
+                comment.authorUserId(),
+                authorHandle(comment.authorUserId()),
+                comment.bodyMarkdown(),
+                comment.renderedHtml(),
+                now);
+    }
+
+    public CommentPage postComments(UUID postId, Optional<CommentCursor> cursor, int limit) {
+        // Oldest-first reading order; keyset ascends (created_at, id) to match comment_post_created_idx.
+        String cursorClause = cursor.isPresent()
+                ? "and (comment.created_at, comment.id) > (:cursorCreatedAt, :cursorId)"
+                : "";
+        var query = jdbc.sql("""
+                        select comment.id, comment.post_id, comment.author_user_id, profile.handle,
+                               comment.body_markdown, comment.rendered_html, comment.created_at
+                        from comment
+                        left join profile_projection profile on profile.user_id = comment.author_user_id
+                        where comment.post_id = :postId
+                        %s
+                        order by comment.created_at asc, comment.id asc
+                        limit :limit
+                        """.formatted(cursorClause))
+                .param("postId", postId)
+                .param("limit", limit + 1);
+        cursor.ifPresent(value -> query
+                .param("cursorCreatedAt", java.sql.Timestamp.from(value.createdAt()))
+                .param("cursorId", value.id()));
+
+        List<CommentView> rows = query.query((rs, rowNum) -> new CommentView(
+                rs.getObject("id", UUID.class),
+                rs.getObject("post_id", UUID.class),
+                rs.getObject("author_user_id", UUID.class),
+                rs.getString("handle"),
+                rs.getString("body_markdown"),
+                rs.getString("rendered_html"),
+                rs.getTimestamp("created_at").toInstant()))
+                .list();
+        String nextCursor = null;
+        if (rows.size() > limit) {
+            rows.removeLast();
+            CommentView last = rows.getLast();
+            nextCursor = new CommentCursor(last.createdAt(), last.id()).encode();
+        }
+        return new CommentPage(rows, nextCursor);
+    }
+
+    public boolean deleteComment(UUID commentId, UUID postId, UUID authorUserId) {
+        return jdbc.sql("""
+                        delete from comment
+                        where id = :id and post_id = :postId and author_user_id = :authorUserId
+                        """)
+                .param("id", commentId)
+                .param("postId", postId)
+                .param("authorUserId", authorUserId)
+                .update() == 1;
     }
 
     public ProfilePage searchProfilesByHandle(String handlePrefix, Optional<ProfileCursor> cursor, int limit) {
