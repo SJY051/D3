@@ -1,7 +1,7 @@
 // D³ logical ERD — D3-DOC-001
 // Owner: service owners
-// Status: logical baseline; 31 tables and 21 intra-service refs across active forward-only Flyway chains
-// Last verified: 2026-08-19 against `2915d0f`, Identity V3, Community V6, Judge V3 and Battle V11
+// Status: logical baseline; 33 tables and 21 intra-service refs across active forward-only Flyway chains
+// Last verified: 2026-08-19 against `2915d0f`, Identity V3, Community V6, Judge V3 and Battle V12
 //
 // Each schema below represents a separately owned PostgreSQL database, not a
 // shared physical schema. Refs exist only inside one service database.

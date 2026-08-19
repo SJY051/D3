@@ -38,7 +38,7 @@ Last verified: 2026-08-19 against `2915d0f`
 | 2 | [`architecture/workflow.md`](architecture/workflow.md) | 랭크 매칭부터 판정·결과 반영까지의 스윔레인 흐름을 설명한다. | 평가자, 개발자 | **로컬 P0 실증** — `25359ad` 두 세션 리허설 완료; final RC trace가 남아 있다. |
 | 3 | [`architecture/system-context.md`](architecture/system-context.md) | D³와 사용자·외부 시스템 사이의 전체 경계를 보여 준다. | 평가자, 아키텍트 | **로컬 토폴로지 활성** — 애플리케이션 클라우드 배포 증거가 남아 있다. |
 | 4 | [`architecture/services.md`](architecture/services.md) | 서비스별 책임, 데이터 소유권과 이벤트·API 연동을 정리한다. | 개발자, 아키텍트 | **P0 주요 경로 구현** — Community 결과/rating/profile/handle projection 완료; final RC·live Judge0 통합 증거가 남아 있다. |
-| 5 | [`architecture/erd.dbml`](architecture/erd.dbml) | 서비스별 데이터 모델과 서비스 내부 참조를 DBML로 정의한다. | 개발자, DBA | **Logical baseline** — 31개 테이블·21개 내부 참조, Identity V3/Community V6/Judge V3/Battle V11이다. |
+| 5 | [`architecture/erd.dbml`](architecture/erd.dbml) | 서비스별 데이터 모델과 서비스 내부 참조를 DBML로 정의한다. | 개발자, DBA | **Logical baseline** — 33개 테이블·21개 내부 참조, Identity V3/Community V6/Judge V3/Battle V12이다. |
 | 6 | [`architecture/cloud.md`](architecture/cloud.md) | AWS 배치 경계와 Judge0 격리 실행 구성을 설명한다. | 운영자, 아키텍트 | **부분 검증** — host·adapter·source-SG route smoke는 PASS, 애플리케이션 배포는 PENDING이다. |
 | 7 | [`wireframes/README.md`](wireframes/README.md) | WF-01~WF-08 화면의 기능, 상태와 이동을 정의한다. | 평가자, 디자이너, 프런트엔드 개발자 | **WF-01~06 승인·구현** — global rejoin banner와 self-verdict/accepted lock 반영; WF-07/08 검토와 final capture가 남아 있다. |
 | 8 | [`quality/test-plan.md`](quality/test-plan.md) | 단위·통합·부하·장애 시험의 범위와 증거 방식을 정의한다. | QA, 개발자, 운영자 | **계획 + 로컬 P0 증거** — final RC, deployed live-Judge0, 부하·장애 보고가 남아 있다. |
