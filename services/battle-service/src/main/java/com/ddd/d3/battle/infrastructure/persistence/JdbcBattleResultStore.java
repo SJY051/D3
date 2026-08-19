@@ -467,7 +467,7 @@ public class JdbcBattleResultStore implements BattleResultStore {
         record.put("peakTier", peakTier);
         record.put("leaderboardPosition", leaderboardPosition(player.playerId()));
         record.put("score", scoreRecord(completion, player));
-        record.put("execution", player.performance().map(this::executionRecord).orElse(null));
+        record.put("execution", player.performance().map(JdbcBattleResultStore::executionRecord).orElse(null));
         record.put("attacks", attackRecord(completion.pending().matchId(), player.playerId()));
         return record;
     }
