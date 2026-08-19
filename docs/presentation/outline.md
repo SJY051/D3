@@ -45,7 +45,7 @@ Evidence record: the two 2026-08-18 rehearsal report comments on Issue #19.
 | 1:45–3:45 | Ready both players, enter `RUNNING`, show Run energy, keep an incorrect Submit at `WRONG_ANSWER`, accept and lock a correct Submit, and recover one WebSocket reconnect. |
 | 3:45–5:00 | Switch to a match finished before the session (the live match's ten-minute deadline exceeds the slot), then show the viewer-relative result, rating/profile projection, automatic result post and player record. |
 
-The rehearsal completed this path on fresh isolated volumes after one manual demonstration-problem `INSERT`. Therefore the no-manual-database-edits Scenario A acceptance remains pending under Issue #73. Surrender is not shown in the current Battle UI, and attack exchange was not demonstrated.
+The fresh RC `c738cd8` acceptance on 2026-08-19 completed this path on isolated volumes with zero manual database edits (V12 seed) and included a live attack exchange with the warning overlay. Surrender is not shown in the current Battle UI.
 
 ### 5-minute questions
 
