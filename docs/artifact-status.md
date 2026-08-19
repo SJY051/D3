@@ -2,9 +2,9 @@
 
 Owner: 윤서진
 
-Status: Required-source baseline; implementation and final presentation evidence pending
+Status: Submission sources aligned; final RC acceptance, recording and application cloud deployment evidence pending
 
-Last verified: 2026-08-18 against origin/main at 25359ad plus PR #28 golden-path UI and PR #70 rating projection merges
+Last verified: 2026-08-19 against `2915d0f`, the merged P0 implementation and recorded evidence boundaries
 
 Requirement: D3-DOC-001
 
@@ -14,16 +14,16 @@ The planning PDF names the ten artifact classes below. This table is the authori
 
 | # | Required artifact | Repository source | Owner | Status | Last verification point | Evidence still required |
 |---:|---|---|---|---|---|---|
-| 1 | Requirements specification: core/optional, priority and MUST/SHOULD | [MVP specification](specs/d3-mvp.md#internal-scoring-priority-plan) | 윤서진 | Baseline | 2026-08-14 · PDF/source and AWS activation-gate cross-check | Implemented evidence per matrix item; final rubric confirmation |
-| 2 | Workflow Swimlane | [Ranked workflow](architecture/workflow.md) | 최정민 | Target baseline | 2026-08-13 · scenarios and contracts cross-check | Render review and Scenario A/B/C runtime traces |
-| 3 | System architecture | [System context](architecture/system-context.md) | 윤서진 | Baseline | 2026-08-13 · boundary source review | Running topology and final deployment substitutions |
-| 4 | Service architecture | [Service boundaries](architecture/services.md) | 윤서진 | Local platform active; identity/battle/judge P0 paths plus Community match projection, ranked result post, public record HTTP, rating projection, user-profile projection and handle search implemented | 2026-08-18 · Community `user-profile.changed.v1` consumer and `profile_projection` handle search with duplicate/replay/out-of-order/concurrency Kafka/PostgreSQL evidence (Identity producer PR #75) | Remaining integrated browser authorization evidence (#18/#19) |
-| 5 | Service database ERD | [Logical ERD](architecture/erd.dbml) | Service owners | Logical baseline: 32 tables, 20 intra-service refs; four forward-only Flyway chains | 2026-08-17 · Community V5 rating-first nullable identity fields with V1–V4 checksum preservation | Rendered diagram, remaining legacy cleanup validation and production query-plan evidence |
-| 6 | Cloud architecture | [Cloud architecture](architecture/cloud.md) | 윤서진 | Account/region and Judge0 host bound; application-to-Judge0 source-SG route proven; application services pending | 2026-08-15 · issue #59 production-adapter private-route smoke and full temporary-resource cleanup | Application IAM, quota and deployed-resource evidence |
-| 7 | Wireframes and functions | [WF-01 through WF-08](wireframes/README.md) | 최정민 | WF-01–06 P0 revision approved 2026-08-16; styled WF-01/02/03/05/06 screens merged (PR #28); WF-07/08 review required | 2026-08-18 · PR #28 merge `25359ad` · styled routes name their WF IDs with browser/test evidence | Integrated two-session screenshots/recording (#19); WF-07/08 review |
-| 8 | Test plan: unit, integration, load and chaos | [Test plan](quality/test-plan.md) | 최정민 and service owners | Plan baseline plus designated-host, private-route, Community projection, result-post and public-record evidence | 2026-08-16 · issue #64 concurrent/replay/order/rebuild/rollback, migration-upgrade, Kafka and public HTTP checks | Full deployed-service activation, integrated UI, load and chaos reports |
-| 9 | Deployment plan: CI/CD, procedure and rollback | [Deployment plan](operations/deployment-plan.md) | 윤서진 | Local runtime active; developer account and Judge0 host bound; application deployment pending | 2026-08-14 · full local preflight, CI and Judge0 AWS boundary review | Application images, AWS/OIDC bindings, deploy and rollback rehearsal |
-| 10 | Source and README | [README](../README.md), repository and [public contracts](../contracts/README.md) | Team | Executable local contributor baseline | 2026-08-18 · two-session golden-path rehearsal on frozen 25359ad and README refresh | Integrated product behavior, final revision, license decision and release evidence |
+| 1 | Requirements specification: core/optional, priority and MUST/SHOULD | [MVP specification](specs/d3-mvp.md#internal-scoring-priority-plan) | 윤서진 | P0 implementation and deterministic-fake rehearsal evidence aligned; P1 remains explicitly optional | 2026-08-19 · `2915d0f` · PRs #70/#75/#76/#79/#89/#91/#92/#96 cross-check | Final fresh-RC acceptance and submission recording |
+| 2 | Workflow Swimlane | [Ranked workflow](architecture/workflow.md) | 최정민 | P0 service hand-offs implemented and rehearsed locally with the deterministic fake judge | 2026-08-19 · `2915d0f` · `25359ad` two-browser rehearsal plus #89/#96 delta | Final fresh-RC trace; deployed live-Judge0 application E2E |
+| 3 | System architecture | [System context](architecture/system-context.md) | 윤서진 | Local Gateway, four domain services, service-owned data and event topology active | 2026-08-19 · `2915d0f` · active local topology cross-check | Application cloud deployment evidence |
+| 4 | Service architecture | [Service boundaries](architecture/services.md) | 윤서진 | Identity/Battle/Judge P0 paths and Community result post, public record, rating/profile projections and handle search implemented; issue #17 closed | 2026-08-19 · `2915d0f` · PRs #60/#64/#70/#75/#76/#89/#96 | Final fresh-RC browser acceptance; live Judge0 application E2E |
+| 5 | Service database ERD | [Logical ERD](architecture/erd.dbml) | Service owners | Logical baseline: 31 tables, 21 intra-service refs; Identity V3, Community V6, Judge V3, Battle V11 | 2026-08-19 · `2915d0f` · DBML declarations and Flyway-chain cross-check | Rendered diagram and production query-plan evidence |
+| 6 | Cloud architecture | [Cloud architecture](architecture/cloud.md) | 윤서진 | Account/region and zero-ingress Judge0 host bound; issue #59 production-adapter source-SG route smoke PASS; application services not deployed | 2026-08-19 · `2915d0f` · issue #59 six-runtime route evidence and cleanup | Application IAM/quota/resources and deployed judge-service integration (**PENDING/NOT RUN**) |
+| 7 | Wireframes and functions | [WF-01 through WF-08](wireframes/README.md) | 최정민 | WF-01–WF-06 approved and implemented; global active-match rejoin banner and self-verdict/accepted-lock state merged; WF-07/WF-08 review required | 2026-08-19 · `2915d0f` · PRs #28/#76/#91/#92/#96 | Final integrated screenshots/recording; WF-07/WF-08 review |
+| 8 | Test plan: unit, integration, load and chaos | [Test plan](quality/test-plan.md) | 최정민 and service owners | Unit/integration/contract suites plus `25359ad` deterministic-fake two-browser rehearsal and issue #59 route smoke recorded | 2026-08-19 · `2915d0f` · service, browser and AWS evidence boundary cross-check | Fresh-RC acceptance; deployed live-Judge0 application, load and chaos reports |
+| 9 | Deployment plan: CI/CD, procedure and rollback | [Deployment plan](operations/deployment-plan.md) | 윤서진 | Local runtime and CI active; Judge0 host/route smoke proven; image pipeline and application cloud deployment pending | 2026-08-19 · `2915d0f` · Compose/CI and issue #59 review | Container images, AWS/OIDC bindings, application deploy and rollback rehearsal |
+| 10 | Source and README | [README](../README.md), repository and [public contracts](../contracts/README.md) | Team | Executable local P0 baseline including #89 heartbeat/reconnect and #96 self-verdict/accepted lock | 2026-08-19 · `2915d0f` · merged source/docs/contracts cross-check | Frozen RC substitution, final acceptance, recording, license decision and release evidence |
 
 ## Supporting presentation sources
 

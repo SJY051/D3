@@ -1,6 +1,6 @@
 # D³ MVP Specification
 
-Status: Initial baseline
+Status: P0 implementation and local deterministic-fake rehearsal active; final RC and live Judge0 application evidence pending
 
 Product: D³ (Dopamin-Driven Development)
 
@@ -10,7 +10,7 @@ Owner: 윤서진
 
 Delivery window: 2026-08-13 through 2026-08-20
 
-Last verified: 2026-08-14 against the planning PDF, agreed product decisions and issue #15 evidence
+Last verified: 2026-08-19 against `2915d0f`, issues #17/#59 and merged PRs #70/#75/#76/#79/#89/#91/#92/#96
 
 ## Context
 
@@ -50,8 +50,8 @@ The bootcamp planning PDF describes a generic planning shape of ten core items a
 | M-06 | 7 | Players exchange at least one warned, reversible, server-authoritative attack without mutating stored source | D3-BTL-004 | Browser/editor test, event trace and source-integrity assertion | PARTIAL PASS: PR #50 adds warned launch, one-hop block/reflect, deterministic expiry, replayable PostgreSQL attack events, authoritative energy grants and versioned WebSocket v3 attack commands/snapshots. The approved WF-04 route now converts the short-lived session token into the v3 WebSocket credential protocol, renders warning/block/reflect states and deterministic display-only garbage, and has Playwright evidence that the controlled source remains byte-for-byte unchanged through warning, reflection, activation and expiry. Result/rating/outbox linkage is active; a live two-browser event trace remains PENDING |
 | M-07 | 7 | A ranked result updates public rating and separate seasonal RP/tier exactly once | D3-BTL-005 | Rating/RP tests and idempotent persistence evidence | PASS at the service boundary: placement/established factors, separate RP, five-match `Unranked` boundary, tier/division mapping and void/unranked no-op have fixed tests; concurrent PostgreSQL claims prove one atomic result/rating commit, immutable per-match audit fields, and replay-safe `rating.changed.v1` outbox publication |
 | M-08 | 7 | A developer feed publishes Markdown with fenced code while preserving visibility and source privacy | D3-COM-001 | Rendering, character-count, audience and privacy tests | PASS at the service boundary: PR #31 implements public-only post creation, fenced-code-aware character counting, sanitized rendered HTML, PostgreSQL keyset feed pagination and source/privacy regression tests. PR #28 merges the approved WF-02 feed screen over the versioned API with sanitized rendering, keyset Load more and publish insert; the integrated two-session browser trace remains part of #19 |
-| M-09 | 7 | The committed ranked result creates a public result post and traceable searchable match record | D3-STAT-001 | Outbox/inbox replay plus UI trace to match ID | PARTIAL PASS: Battle atomically emits replay-safe `match.finished.v1` and `rating.changed.v1` records with stable match correlation. Issue #60 consumes `match.finished.v1` through Kafka into a Community-owned PostgreSQL inbox and ACTIVE seat-ordered match projection. Issue #64 transactionally creates one immutable public post for each ranked non-void result and exposes privacy-safe ACTIVE match records by match or player through public HTTP with keyset pagination. PR #70 projects `rating.changed.v1` into `profile_projection` as a rating-first upsert. The Community `user-profile.changed.v1` consumer projects handle/`identity_source_version` onto the same row (filling a rating-first row, ignoring reordered lower versions) and a keyset handle search exposes it; the Identity producer remains pending in PR #75. PR #28 merges the approved WF-05/WF-06 result and record screens over the public match-record contract with viewer-relative outcomes. Concurrent duplicate, replay, out-of-order version, rebuild, migration-upgrade and rollback evidence passes. Only the integrated two-session UI trace remains PENDING |
-| M-10 | 7 | The team rehearses one deterministic end-to-end build with preflight, observability and a labeled backup | D3-UX-002, D3-QLT-001, D3-SEC-001 | Frozen revision, live Scenario A, security review and recording | Preflight/runbook baseline; live evidence not run |
+| M-09 | 7 | The committed ranked result creates a public result post and traceable searchable match record | D3-STAT-001 | Outbox/inbox replay plus UI trace to match ID | PASS at the service and local UI boundaries: Battle atomically emits replay-safe `match.finished.v1` and `rating.changed.v1`; Community projects ACTIVE seat-ordered matches, creates one immutable ranked non-void public result post, and exposes public match/player records. PR #70 projects rating/RP/tier, PRs #75/#76 publish and consume handles with authenticated keyset search, and issue #17 is closed. PR #28 supplies result and player-record screens. Replay, duplicate, reordering, rebuild, migration, rollback, and the `25359ad` two-browser UI trace pass; fresh `2915d0f` acceptance remains **PENDING** |
+| M-10 | 7 | The team rehearses one deterministic end-to-end build with preflight, observability and a labeled backup | D3-UX-002, D3-QLT-001, D3-SEC-001 | Frozen revision, live Scenario A, security review and recording | PARTIAL PASS: isolated preflight and the two-browser deterministic-fake golden path passed on frozen `25359ad`; final `2915d0f` acceptance and 1–3 minute submission recording remain **PENDING** |
 
 ### Optional 10 — P1 SHOULD
 

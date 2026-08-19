@@ -4,7 +4,7 @@ Owner: Team
 
 Status: Current documentation index; artifact completion follows the authoritative status inventory
 
-Last verified: 2026-08-18
+Last verified: 2026-08-19 against `2915d0f`
 
 ## 무엇을 찾고 있나요?
 
@@ -34,15 +34,15 @@ Last verified: 2026-08-18
 
 | # | 경로 | 한 줄 역할 | 대상 독자 | 현재 상태 요약 |
 |---:|---|---|---|---|
-| 1 | [`specs/d3-mvp.md`](specs/d3-mvp.md) | 핵심·선택 요구사항, 우선순위와 내부 평가 계획을 정의한다. | 평가자, 기획자, 개발자 | **Baseline** — 항목별 구현 증거와 최종 기준 확인이 남아 있다. |
-| 2 | [`architecture/workflow.md`](architecture/workflow.md) | 랭크 매칭부터 판정·결과 반영까지의 스윔레인 흐름을 설명한다. | 평가자, 개발자 | **Target baseline** — 렌더 검토와 시나리오별 런타임 추적이 남아 있다. |
-| 3 | [`architecture/system-context.md`](architecture/system-context.md) | D³와 사용자·외부 시스템 사이의 전체 경계를 보여 준다. | 평가자, 아키텍트 | **Baseline** — 실행 토폴로지와 최종 배포 구성이 남아 있다. |
-| 4 | [`architecture/services.md`](architecture/services.md) | 서비스별 책임, 데이터 소유권과 이벤트·API 연동을 정리한다. | 개발자, 아키텍트 | **P0 주요 경로 구현** — 통합 브라우저 인가 증거가 남아 있다. |
-| 5 | [`architecture/erd.dbml`](architecture/erd.dbml) | 서비스별 데이터 모델과 서비스 내부 참조를 DBML로 정의한다. | 개발자, DBA | **Logical baseline** — 32개 테이블·20개 내부 참조가 있으며 렌더와 운영 쿼리 검증이 남아 있다. |
-| 6 | [`architecture/cloud.md`](architecture/cloud.md) | AWS 배치 경계와 Judge0 격리 실행 구성을 설명한다. | 운영자, 아키텍트 | **부분 검증** — Judge0 경로는 확인됐고 애플리케이션 서비스 배포는 남아 있다. |
-| 7 | [`wireframes/README.md`](wireframes/README.md) | WF-01~WF-08 화면의 기능, 상태와 이동을 정의한다. | 평가자, 디자이너, 프런트엔드 개발자 | **부분 승인·구현** — WF-01~06 승인, 주요 P0 화면 병합; WF-07/08 검토와 통합 캡처가 남아 있다. |
-| 8 | [`quality/test-plan.md`](quality/test-plan.md) | 단위·통합·부하·장애 시험의 범위와 증거 방식을 정의한다. | QA, 개발자, 운영자 | **Plan baseline + 일부 증거** — 전체 배포, 통합 UI, 부하·장애 보고가 남아 있다. |
-| 9 | [`operations/deployment-plan.md`](operations/deployment-plan.md) | CI/CD, 배포 절차와 롤백 계획을 정리한다. | 운영자, 개발자 | **로컬 실행 가능** — 애플리케이션 이미지·AWS/OIDC 연동과 배포·롤백 리허설이 남아 있다. |
-| 10 | [`../README.md`](../README.md), [`../contracts/README.md`](../contracts/README.md), 저장소 소스 | 프로젝트 소개·실행 안내와 공개 계약을 실제 구현 소스에 연결한다. | 모든 독자 | **실행 가능한 로컬 기여 기준선** — 최종 개정, 라이선스 결정과 릴리스 증거가 남아 있다. |
+| 1 | [`specs/d3-mvp.md`](specs/d3-mvp.md) | 핵심·선택 요구사항, 우선순위와 내부 평가 계획을 정의한다. | 평가자, 기획자, 개발자 | **현재 P0 기준** — 로컬 fake-judge 리허설 완료; final RC·live Judge0 애플리케이션 증거가 남아 있다. |
+| 2 | [`architecture/workflow.md`](architecture/workflow.md) | 랭크 매칭부터 판정·결과 반영까지의 스윔레인 흐름을 설명한다. | 평가자, 개발자 | **로컬 P0 실증** — `25359ad` 두 세션 리허설 완료; final RC trace가 남아 있다. |
+| 3 | [`architecture/system-context.md`](architecture/system-context.md) | D³와 사용자·외부 시스템 사이의 전체 경계를 보여 준다. | 평가자, 아키텍트 | **로컬 토폴로지 활성** — 애플리케이션 클라우드 배포 증거가 남아 있다. |
+| 4 | [`architecture/services.md`](architecture/services.md) | 서비스별 책임, 데이터 소유권과 이벤트·API 연동을 정리한다. | 개발자, 아키텍트 | **P0 주요 경로 구현** — Community 결과/rating/profile/handle projection 완료; final RC·live Judge0 통합 증거가 남아 있다. |
+| 5 | [`architecture/erd.dbml`](architecture/erd.dbml) | 서비스별 데이터 모델과 서비스 내부 참조를 DBML로 정의한다. | 개발자, DBA | **Logical baseline** — 31개 테이블·21개 내부 참조, Identity V3/Community V6/Judge V3/Battle V11이다. |
+| 6 | [`architecture/cloud.md`](architecture/cloud.md) | AWS 배치 경계와 Judge0 격리 실행 구성을 설명한다. | 운영자, 아키텍트 | **부분 검증** — host·adapter·source-SG route smoke는 PASS, 애플리케이션 배포는 PENDING이다. |
+| 7 | [`wireframes/README.md`](wireframes/README.md) | WF-01~WF-08 화면의 기능, 상태와 이동을 정의한다. | 평가자, 디자이너, 프런트엔드 개발자 | **WF-01~06 승인·구현** — global rejoin banner와 self-verdict/accepted lock 반영; WF-07/08 검토와 final capture가 남아 있다. |
+| 8 | [`quality/test-plan.md`](quality/test-plan.md) | 단위·통합·부하·장애 시험의 범위와 증거 방식을 정의한다. | QA, 개발자, 운영자 | **계획 + 로컬 P0 증거** — final RC, deployed live-Judge0, 부하·장애 보고가 남아 있다. |
+| 9 | [`operations/deployment-plan.md`](operations/deployment-plan.md) | CI/CD, 배포 절차와 롤백 계획을 정리한다. | 운영자, 개발자 | **로컬 실행 가능** — 이미지·AWS/OIDC 애플리케이션 배포와 롤백 리허설이 남아 있다. |
+| 10 | [`../README.md`](../README.md), [`../contracts/README.md`](../contracts/README.md), 저장소 소스 | 프로젝트 소개·실행 안내와 공개 계약을 실제 구현 소스에 연결한다. | 모든 독자 | **실행 가능한 로컬 P0 기준선** — `2915d0f` 치환, final acceptance·recording·release evidence가 남아 있다. |
 
 > 산출물의 소유자, 상태, 검증 시점과 남은 증거에 대한 권위 있는 기준은 [`artifact-status.md`](artifact-status.md)입니다.

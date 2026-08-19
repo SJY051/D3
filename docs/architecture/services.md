@@ -2,9 +2,9 @@
 
 Owner: 윤서진
 
-Status: Local platform active; Judge boundary partially implemented
+Status: Local P0 service boundaries active; deployed Judge0 application integration and enriched P1 records pending
 
-Last verified: 2026-08-16 against issue #64 Community result-post and public-record evidence
+Last verified: 2026-08-19 against `2915d0f`, merged PRs #70/#75/#76/#89/#96 and issue #59 evidence
 
 | Boundary | Owns | Does not own | Initial caller or consumer |
 |---|---|---|---|
@@ -44,22 +44,13 @@ Issue #27 binds the browser-facing Identity route at Gateway: the external `/api
 
 Judge HTTP v1 has service-authenticated `RUN`/`SUBMIT` handlers, idempotent acceptance with a stable submission ID, and a bounded evidence read containing the minimum correctness and repeated size-tier runtime summary required by Battle. Judge persists the private command and safe evidence in its PostgreSQL database, fences asynchronous evaluation claims, and commits the terminal evidence with a `submission.judged.v1` outbox record before Kafka publication. Public responses and events omit source, hidden cases, provider credentials, compiler commands, and raw diagnostics.
 
-The deterministic fake is the local default and provides repeatable normalized-result evidence without representing host execution as live. An explicitly selected real adapter maps the six supported language keys to pinned Judge0 runtime IDs, applies fixed resource and network options, and normalizes provider results behind the same application seam. The real adapter path has narrow HTTP and normalization tests; judge-service-to-AWS execution over the intended private route is **NOT RUN**.
+The deterministic fake is the local default and provides repeatable normalized-result evidence without representing host execution as live. An explicitly selected real adapter maps the six supported language keys to pinned Judge0 runtime IDs, applies fixed resource and network options, and normalizes provider results behind the same application seam. Issue #59 ran the production `HttpJudge0Client` and `Judge0ExecutionAdapter` for all six runtimes over an exact source-security-group-only route to the designated Judge0 host, then removed the temporary runner and route. This adapter/route smoke is **PASS**; execution by a deployed judge-service application remains **NOT RUN**.
 
-Issue #13 therefore provides partial vertical-slice evidence, not an end-to-end Judge claim. Battle now supplies the local `RUN`/`SUBMIT`, accepted-correlation, judged-inbox and safe-evidence consumer seam under issue #15, plus committed score/rating and Battle outbox under issue #48. The source-security-group-only AWS path, designated-host application smoke and live two-browser trace remain **PENDING**, so Scenario A is still incomplete.
+The local P0 vertical slice includes Battle `RUN`/`SUBMIT` correlation, judged-event consumption, accepted locking, committed score/rating, Battle outbox, and viewer-scoped submission verdicts in `battle-event.v3`. PR #89 adds heartbeat and reconnect stability, and PR #96 adds self-only submission verdict/attempt state with accepted locking. The 2026-08-18 two-browser rehearsal passed with the deterministic fake; a fresh `2915d0f` acceptance and live Judge0 application E2E remain **PENDING**.
 
-The current v1 event inventory is sufficient for a basic match projection, but not the complete P0 public rating projection. `match.finished.v1` defines seat-ordered player IDs, but omits score composition, attempts, attack history, and execution evidence. `rating.changed.v1` has an unconstrained tier string and omits an independently defined division as well as leaderboard position, language statistics, and peak tier. `user-profile.changed.v1` omits display name. Consequently, division display requires a compatible structured representation or new versioned boundary, and the target enriched Community projection fields in `erd.dbml` cannot all be populated from the current schemas.
+The current v1 events support the implemented P0 Community projections: `match.finished.v1` creates the seat-ordered public match record and ranked non-void result post, `rating.changed.v1` updates rating/RP/tier, and `user-profile.changed.v1` updates the public handle. PRs #60/#64/#70/#75/#76 provide replay-safe projection, Identity production, Community consumption, and authenticated keyset handle search; issue #17 is closed. Score composition, attempts, attack history, execution summary, display name, leaderboard, language statistics, and peak tier remain P1 enrichment rather than missing P0 projection work.
 
-Issue #64 builds on the basic `match.finished.v1` projection without reaching into Battle persistence. Applying a newer ACTIVE ranked non-void projection creates at most one immutable PUBLIC result post in the same Community PostgreSQL transaction; replay, stale events and rebuilds do not duplicate or rewrite it. Public exact-match and player-history HTTP reads expose only seat-ordered user IDs, result, ranked state, source version and projection time. The Gateway strips the external `/api` prefix and permits only those exact GET shapes anonymously. Unranked auto-posts, handle search and rating/profile enrichment remain outside this slice.
-
-Issue #17 closes the profile slice. Community consumes `user-profile.changed.v1` (Identity producer delivered by #75) through the same strict-mapper inbox-claim pattern as `rating.changed.v1`, upserting only the identity-owned `handle` and `identity_source_version` of `profile_projection`. Identity and rating remain independent producers of the row: an identity delivery fills the handle on a rating-first row without touching rating columns, and a reordered delivery carrying a lower `identity_source_version` is claimed but drops. An authenticated keyset handle-prefix search reads `profile_projection` (LIKE wildcards escaped, rating-first rows without a handle excluded) and exposes only public projection fields — user ID, handle, and authoritative rating/tier — never identity secrets or internal source versions. No migration is required; `profile_projection` already carries these columns from V1/V5.
-
-Before an enriched Community projection is implemented, approve one of these versioned boundaries:
-
-- a new event version carrying the minimum privacy-reviewed summary; or
-- a bounded versioned read API/read model owned by the authoritative service and keyed by the event's aggregate ID and version.
-
-Community stores the returned data in its own database. Cross-service tables, foreign keys, entities, and database queries remain prohibited. Existing v1 stubs are not completion evidence for the enriched record.
+Community stores every projection in its own database. Any future enriched P1 record requires either a new privacy-reviewed event version or a bounded versioned read model owned by the authoritative service; cross-service tables, foreign keys, entities, and database queries remain prohibited.
 
 ## Persistence rules
 
