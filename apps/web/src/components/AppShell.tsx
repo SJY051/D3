@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { ApiRequestError, waitForRankedMatch } from "../api/goldenPathApi";
@@ -16,9 +16,10 @@ export function AppShell() {
   const activeMatchId = useActiveMatch();
   const rankedQueue = useRankedQueue();
   const { pathname } = useLocation();
+  const [now, setNow] = useState(() => Date.now());
   const matchedQueueId = rankedQueue?.status === "MATCHED" ? rankedQueue.matchId : null;
   const queueElapsed = rankedQueue?.status === "QUEUED" && rankedQueue.enqueuedAt !== null
-    ? formatElapsed(rankedQueue.enqueuedAt)
+    ? formatElapsed(rankedQueue.enqueuedAt, now)
     : null;
   const showMatchedQueue = matchedQueueId !== null && pathname !== `/battles/${matchedQueueId}`;
   const showRejoin = !showMatchedQueue && activeMatchId !== null && pathname !== `/battles/${activeMatchId}`;
@@ -50,7 +51,7 @@ export function AppShell() {
           return;
         } catch (error) {
           if (controller.signal.aborted) return;
-          if (error instanceof ApiRequestError && error.status === 401) {
+          if (error instanceof ApiRequestError && error.status >= 400 && error.status < 500) {
             pauseRankedQueue();
             return;
           }
@@ -68,6 +69,12 @@ export function AppShell() {
       controller.abort();
     };
   }, [rankedQueue?.idempotencyKey, rankedQueue?.language, rankedQueue?.status]);
+
+  useEffect(() => {
+    if (!showSearchingQueue) return undefined;
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [showSearchingQueue]);
 
   return (
     <div className="scaffold-shell">
@@ -127,7 +134,7 @@ function sleep(milliseconds: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-function formatElapsed(enqueuedAt: string): string {
-  const totalSeconds = Math.max(0, Math.floor((Date.now() - Date.parse(enqueuedAt)) / 1_000));
+function formatElapsed(enqueuedAt: string, now: number): string {
+  const totalSeconds = Math.max(0, Math.floor((now - Date.parse(enqueuedAt)) / 1_000));
   return `${Math.floor(totalSeconds / 60).toString().padStart(2, "0")}:${(totalSeconds % 60).toString().padStart(2, "0")}`;
 }

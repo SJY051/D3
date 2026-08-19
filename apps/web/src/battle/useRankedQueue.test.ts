@@ -74,4 +74,17 @@ describe("ranked-queue store", () => {
     window.removeEventListener("storage", handler);
     expect(handler).toHaveBeenCalledTimes(2);
   });
+
+  it("skips duplicate queued ticket writes", () => {
+    const handler = vi.fn();
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-4" });
+    window.addEventListener("storage", handler);
+
+    startRankedQueue("C");
+    updateRankedQueue({ enqueuedAt: "2026-08-18T00:00:00Z", matchId: null, status: "QUEUED" });
+    updateRankedQueue({ enqueuedAt: "2026-08-18T00:00:00Z", matchId: null, status: "QUEUED" });
+
+    window.removeEventListener("storage", handler);
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
 });

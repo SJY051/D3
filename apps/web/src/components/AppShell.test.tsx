@@ -7,7 +7,7 @@ import { AppShell } from "./AppShell";
 import { LiveBattlePage } from "../pages/LiveBattlePage";
 import { clearSession, setSession } from "../api/session";
 import { getActiveMatch, setActiveMatch } from "../battle/useActiveMatch";
-import { startRankedQueue } from "../battle/useRankedQueue";
+import { getRankedQueue, startRankedQueue } from "../battle/useRankedQueue";
 
 const MATCH = "00000000-0000-4000-8000-000000000001";
 
@@ -180,6 +180,22 @@ describe("rejoin banner", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(13);
     expect(container.textContent).toContain("Ranked match found");
+    root.unmount();
+  });
+
+  it("pauses shell polling on non-retryable queue errors", async () => {
+    setSession({ accessToken: "t", userId: "user-a" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({
+      code: "QUEUE_CONFLICT",
+      message: "language changed",
+    }, 400)));
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-1" });
+    startRankedQueue("PYTHON3", "user-a");
+
+    const { root } = await renderShell("/feed");
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(getRankedQueue()?.status).toBe("PAUSED");
     root.unmount();
   });
 });

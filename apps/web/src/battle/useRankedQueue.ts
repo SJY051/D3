@@ -103,6 +103,11 @@ export function startRankedQueue(language: RankedLanguage, owner: string | null 
 export function updateRankedQueue(ticket: RankedQueueTicket) {
   const current = read();
   if (current === null) return;
+  if (current.enqueuedAt === ticket.enqueuedAt
+      && current.matchId === ticket.matchId
+      && current.status === ticket.status) {
+    return;
+  }
   write({
     ...current,
     enqueuedAt: ticket.enqueuedAt,
