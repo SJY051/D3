@@ -107,7 +107,8 @@ function FeedComposer({ onPublished }: { onPublished: (post: FeedPost) => void }
 }
 
 function FeedPostCard({ post }: { post: FeedPost }) {
-  return <article className="golden-record"><p>Author {post.authorUserId}</p><div className="golden-markdown" dangerouslySetInnerHTML={{ __html: post.renderedHtml }} />{post.matchId !== null && <Link to={`/results/${post.matchId}`}>View match result</Link>}</article>;
+  const author = post.authorHandle ? `@${post.authorHandle}` : post.authorUserId.slice(0, 8);
+  return <article className="golden-record"><p>Author {author}</p><div className="golden-markdown" dangerouslySetInnerHTML={{ __html: post.renderedHtml }} />{post.matchId !== null && <Link to={`/results/${post.matchId}`}>View match result</Link>}</article>;
 }
 
 function Ranked() {

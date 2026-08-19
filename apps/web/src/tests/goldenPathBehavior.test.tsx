@@ -118,4 +118,22 @@ describe("P0 route behavior", () => {
     expect(textarea.value).toBe("");
     root.unmount();
   });
+
+  it("prefers the public author handle and falls back to a short user ID", async () => {
+    setSession({ userId: "user-1", accessToken: "token" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({
+      posts: [
+        { authorHandle: "alice", authorUserId: "11111111-1111-4111-8111-111111111111", createdAt: "2026-08-17T00:00:00Z", id: "post-1", markdown: "hello", matchId: null, renderedHtml: "<p>hello</p>" },
+        { authorHandle: null, authorUserId: "22222222-2222-4222-8222-222222222222", createdAt: "2026-08-16T00:00:00Z", id: "post-2", markdown: "fallback", matchId: null, renderedHtml: "<p>fallback</p>" },
+      ],
+      nextCursor: null,
+    })));
+
+    const { container, root } = await render("feed", "/feed");
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(container.textContent).toContain("Author @alice");
+    expect(container.textContent).toContain("Author 22222222");
+    root.unmount();
+  });
 });

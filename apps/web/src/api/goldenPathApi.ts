@@ -3,6 +3,7 @@ import { authenticatedFetch, clearSession, endSession, setSession, type SessionT
 export type RankedLanguage = "C" | "CPP" | "JAVA" | "PYTHON3" | "JAVASCRIPT" | "TYPESCRIPT";
 
 export interface FeedPost {
+  authorHandle?: string | null;
   authorUserId: string;
   createdAt: string;
   id: string;

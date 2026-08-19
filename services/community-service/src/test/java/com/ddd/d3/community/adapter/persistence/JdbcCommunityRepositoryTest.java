@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.ddd.d3.community.application.CommunityService.NewPost;
+import com.ddd.d3.community.application.CommunityService.NewResultPost;
 import com.ddd.d3.community.domain.PostVisibility;
 import java.time.Clock;
 import java.time.Instant;
@@ -73,6 +74,22 @@ class JdbcCommunityRepositoryTest {
                 firstPage.posts().getFirst().createdAt(), firstPage.posts().getFirst().id())), 2);
         assertEquals(List.of(POST_ONE), secondPage.posts().stream().map(post -> post.id()).toList());
         assertNull(secondPage.nextCursor());
+    }
+
+    @Test
+    void d3Com001ProjectsAuthorHandlesForRegularAndResultPostsWithoutAnIdentityDatabaseJoin() {
+        seedProfile(USER_ONE, "alice", 1450, "GOLD", 1L);
+        insertMatch(MATCH_ONE, USER_ONE, USER_TWO, "PLAYER_ONE_WIN", "ACTIVE", 7, "2026-08-14T00:00:00Z");
+        repository.insertPost(new NewPost(POST_ONE, USER_ONE, PostVisibility.PUBLIC, "regular", "<p>regular</p>", 7));
+        repository.insertResultPost(new NewResultPost(
+                POST_TWO, MATCH_ONE, 7, USER_ONE, "result", "<p>result</p>", 6));
+
+        var posts = repository.publicFeed(Optional.empty(), 10).posts();
+        assertEquals(2, posts.size());
+        assertEquals("alice", posts.get(0).authorHandle());
+        assertEquals("alice", posts.get(1).authorHandle());
+        assertEquals(MATCH_ONE, posts.get(0).matchId());
+        assertNull(posts.get(1).matchId());
     }
 
     @Test
