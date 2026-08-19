@@ -2,9 +2,9 @@
 
 Owner: 윤서진
 
-Status: Initial baseline
+Status: Local P0 topology active; application cloud deployment pending
 
-Last verified: 2026-08-13 against the MVP system constraints and service boundaries
+Last verified: 2026-08-19 against `2915d0f` and the active service boundaries
 
 ```mermaid
 flowchart TB
