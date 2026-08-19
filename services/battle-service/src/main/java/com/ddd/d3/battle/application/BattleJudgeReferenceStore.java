@@ -52,7 +52,7 @@ public interface BattleJudgeReferenceStore {
 
     record PendingJudgedEvent(UUID eventId, UUID submissionId) {}
 
-    record SubmissionVerdict(UUID submissionId, String status, Instant completedAt) {}
+    record SubmissionVerdict(UUID submissionId, String status, int attemptNumber, Instant completedAt) {}
 
     record Evidence(
             UUID submissionId,

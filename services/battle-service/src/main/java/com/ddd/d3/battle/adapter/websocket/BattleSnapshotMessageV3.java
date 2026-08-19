@@ -31,13 +31,15 @@ public record BattleSnapshotMessageV3(
                 view.attackCost(), view.blockCost(), view.reflectCost(), current);
     }
 
+    // Null when the viewer has no settled submission; the field stays viewer-scoped so
+    // an opponent frame never carries this verdict.
     private static Submission submission(BattleJudgeReferenceStore.SubmissionVerdict verdict) {
-        return verdict == null ? new Submission(null, false)
-                : new Submission(verdict.status(), "ACCEPTED".equals(verdict.status()));
+        return verdict == null ? null
+                : new Submission(verdict.status(), verdict.attemptNumber(), "ACCEPTED".equals(verdict.status()));
     }
 
     public record Payload(BattleSnapshotMessageV2.Payload match, Attack attack, Submission submission) {}
-    public record Submission(String lastVerdict, boolean accepted) {}
+    public record Submission(String verdict, int attemptNumber, boolean acceptedLocked) {}
     public record Attack(
             int selfEnergy, int opponentEnergy, int maximumEnergy,
             int attackCost, int blockCost, int reflectCost,

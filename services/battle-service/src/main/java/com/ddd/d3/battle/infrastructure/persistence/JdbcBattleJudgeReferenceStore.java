@@ -123,7 +123,7 @@ public class JdbcBattleJudgeReferenceStore implements BattleJudgeReferenceStore 
         Objects.requireNonNull(matchId, "matchId");
         Objects.requireNonNull(playerId, "playerId");
         return jdbc.sql("""
-                        select submission_id, last_judge_status, last_result_at
+                        select submission_id, last_judge_status, attempt_number, last_result_at
                         from judge_job_reference
                         where match_id = :matchId
                           and player_user_id = :playerId
@@ -137,6 +137,7 @@ public class JdbcBattleJudgeReferenceStore implements BattleJudgeReferenceStore 
                 .query((resultSet, rowNumber) -> new SubmissionVerdict(
                         resultSet.getObject("submission_id", UUID.class),
                         resultSet.getString("last_judge_status"),
+                        resultSet.getInt("attempt_number"),
                         resultSet.getTimestamp("last_result_at").toInstant()))
                 .optional();
     }
