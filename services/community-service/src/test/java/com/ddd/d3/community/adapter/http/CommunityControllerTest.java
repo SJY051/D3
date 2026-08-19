@@ -241,6 +241,82 @@ class CommunityControllerTest {
     }
 
     @Test
+    void d3Com001AddsACommentForTheAuthenticatedSubjectAndReturnsSanitizedHtml() throws Exception {
+        var comment = new CommunityService.CommentView(
+                UUID.fromString("66666666-6666-4666-8666-666666666661"),
+                POST_ID,
+                USER_ID,
+                "alice",
+                "hi",
+                "<p>hi</p>",
+                Instant.parse("2026-08-19T00:00:00Z"));
+        when(service.addComment(USER_ID, POST_ID, "hi")).thenReturn(comment);
+
+        mockMvc.perform(post("/v1/community/posts/{postId}/comments", POST_ID)
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"markdown\":\"hi\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authorUserId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.authorHandle").value("alice"))
+                .andExpect(jsonPath("$.renderedHtml").value("<p>hi</p>"));
+    }
+
+    @Test
+    void d3Com001ReturnsNotFoundWhenCommentingOnANonPublicPost() throws Exception {
+        when(service.addComment(USER_ID, POST_ID, "hi"))
+                .thenThrow(new com.ddd.d3.community.application.PostNotFoundException());
+
+        mockMvc.perform(post("/v1/community/posts/{postId}/comments", POST_ID)
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"markdown\":\"hi\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("POST_NOT_FOUND"));
+    }
+
+    @Test
+    void d3Com001ListsCommentsWithKeysetPagination() throws Exception {
+        var comment = new CommunityService.CommentView(
+                UUID.fromString("66666666-6666-4666-8666-666666666661"),
+                POST_ID, USER_ID, "alice", "hi", "<p>hi</p>", Instant.parse("2026-08-19T00:00:00Z"));
+        when(service.postComments(POST_ID, Optional.empty(), 1))
+                .thenReturn(new CommunityService.CommentPage(List.of(comment), "next-comment"));
+
+        mockMvc.perform(get("/v1/community/posts/{postId}/comments", POST_ID)
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+                        .param("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.comments[0].renderedHtml").value("<p>hi</p>"))
+                .andExpect(jsonPath("$.nextCursor").value("next-comment"));
+    }
+
+    @Test
+    void d3Com001DeletesOwnCommentButReturnsNotFoundForOthers() throws Exception {
+        UUID commentId = UUID.fromString("66666666-6666-4666-8666-666666666661");
+        mockMvc.perform(delete("/v1/community/posts/{postId}/comments/{commentId}", POST_ID, commentId)
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
+                .andExpect(status().isNoContent());
+        verify(service).deleteComment(USER_ID, commentId);
+
+        org.mockito.Mockito.doThrow(new com.ddd.d3.community.application.CommentNotFoundException())
+                .when(service).deleteComment(USER_ID, commentId);
+        mockMvc.perform(delete("/v1/community/posts/{postId}/comments/{commentId}", POST_ID, commentId)
+                        .with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("COMMENT_NOT_FOUND"));
+    }
+
+    @Test
+    void d3Sec001KeepsCommentingBehindAuthentication() throws Exception {
+        mockMvc.perform(post("/v1/community/posts/{postId}/comments", POST_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"markdown\":\"hi\"}"))
+                .andExpect(status().isUnauthorized());
+        verify(service, never()).addComment(any(), any(), any());
+    }
+
+    @Test
     void d3Sec001KeepsHandleSearchBehindAuthentication() throws Exception {
         mockMvc.perform(get("/v1/community/profiles").param("handle", "ali"))
                 .andExpect(status().isUnauthorized())

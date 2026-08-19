@@ -1,8 +1,12 @@
 package com.ddd.d3.community.adapter.persistence;
 
+import com.ddd.d3.community.application.CommunityService.CommentCursor;
+import com.ddd.d3.community.application.CommunityService.CommentPage;
+import com.ddd.d3.community.application.CommunityService.CommentView;
 import com.ddd.d3.community.application.CommunityService.FeedCursor;
 import com.ddd.d3.community.application.CommunityService.FollowState;
 import com.ddd.d3.community.application.CommunityService.LikeState;
+import com.ddd.d3.community.application.CommunityService.NewComment;
 import com.ddd.d3.community.application.CommunityService.FeedPage;
 import com.ddd.d3.community.application.CommunityService.MatchRecordCursor;
 import com.ddd.d3.community.application.CommunityService.MatchRecordPage;
@@ -221,6 +225,75 @@ public final class JdbcCommunityRepository {
                 .single())
                 .orElse(false);
         return new LikeState(likes, viewerLiked);
+    }
+
+    public CommentView insertComment(NewComment comment) {
+        Instant now = clock.instant();
+        jdbc.sql("""
+                        insert into comment (id, post_id, author_user_id, body_markdown, rendered_html, created_at)
+                        values (:id, :postId, :authorUserId, :bodyMarkdown, :renderedHtml, :createdAt)
+                        """)
+                .param("id", comment.id())
+                .param("postId", comment.postId())
+                .param("authorUserId", comment.authorUserId())
+                .param("bodyMarkdown", comment.bodyMarkdown())
+                .param("renderedHtml", comment.renderedHtml())
+                .param("createdAt", java.sql.Timestamp.from(now))
+                .update();
+        return new CommentView(
+                comment.id(),
+                comment.postId(),
+                comment.authorUserId(),
+                authorHandle(comment.authorUserId()),
+                comment.bodyMarkdown(),
+                comment.renderedHtml(),
+                now);
+    }
+
+    public CommentPage postComments(UUID postId, Optional<CommentCursor> cursor, int limit) {
+        // Oldest-first reading order; keyset ascends (created_at, id) to match comment_post_created_idx.
+        String cursorClause = cursor.isPresent()
+                ? "and (comment.created_at, comment.id) > (:cursorCreatedAt, :cursorId)"
+                : "";
+        var query = jdbc.sql("""
+                        select comment.id, comment.post_id, comment.author_user_id, profile.handle,
+                               comment.body_markdown, comment.rendered_html, comment.created_at
+                        from comment
+                        left join profile_projection profile on profile.user_id = comment.author_user_id
+                        where comment.post_id = :postId
+                        %s
+                        order by comment.created_at asc, comment.id asc
+                        limit :limit
+                        """.formatted(cursorClause))
+                .param("postId", postId)
+                .param("limit", limit + 1);
+        cursor.ifPresent(value -> query
+                .param("cursorCreatedAt", java.sql.Timestamp.from(value.createdAt()))
+                .param("cursorId", value.id()));
+
+        List<CommentView> rows = query.query((rs, rowNum) -> new CommentView(
+                rs.getObject("id", UUID.class),
+                rs.getObject("post_id", UUID.class),
+                rs.getObject("author_user_id", UUID.class),
+                rs.getString("handle"),
+                rs.getString("body_markdown"),
+                rs.getString("rendered_html"),
+                rs.getTimestamp("created_at").toInstant()))
+                .list();
+        String nextCursor = null;
+        if (rows.size() > limit) {
+            rows.removeLast();
+            CommentView last = rows.getLast();
+            nextCursor = new CommentCursor(last.createdAt(), last.id()).encode();
+        }
+        return new CommentPage(rows, nextCursor);
+    }
+
+    public boolean deleteComment(UUID commentId, UUID authorUserId) {
+        return jdbc.sql("delete from comment where id = :id and author_user_id = :authorUserId")
+                .param("id", commentId)
+                .param("authorUserId", authorUserId)
+                .update() == 1;
     }
 
     public ProfilePage searchProfilesByHandle(String handlePrefix, Optional<ProfileCursor> cursor, int limit) {

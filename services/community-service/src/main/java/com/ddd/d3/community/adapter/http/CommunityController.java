@@ -86,6 +86,31 @@ public final class CommunityController {
         return service.likeState(postId, Optional.of(UUID.fromString(jwt.getSubject())));
     }
 
+    @PostMapping("/posts/{postId}/comments")
+    CommunityService.CommentView addComment(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID postId,
+            @Valid @RequestBody CreateCommentRequest request) {
+        return service.addComment(UUID.fromString(jwt.getSubject()), postId, request.markdown());
+    }
+
+    @GetMapping("/posts/{postId}/comments")
+    CommunityService.CommentPage comments(
+            @PathVariable UUID postId,
+            @RequestParam Optional<String> cursor,
+            @RequestParam(defaultValue = "20") int limit) {
+        return service.postComments(postId, cursor, limit);
+    }
+
+    @DeleteMapping("/posts/{postId}/comments/{commentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void deleteComment(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID postId,
+            @PathVariable UUID commentId) {
+        service.deleteComment(UUID.fromString(jwt.getSubject()), commentId);
+    }
+
     @GetMapping("/matches/{matchId}")
     CommunityService.MatchRecordView matchRecord(@PathVariable UUID matchId) {
         return service.matchRecord(matchId).orElseThrow(CommunityMatchRecordNotFoundException::new);
@@ -102,4 +127,6 @@ public final class CommunityController {
     record CreatePostRequest(@NotBlank String markdown, PostVisibility visibility) {}
 
     record FollowRequest(@NotNull UUID followedUserId) {}
+
+    record CreateCommentRequest(@NotBlank String markdown) {}
 }

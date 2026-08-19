@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.ddd.d3.community.application.CommunityService.NewComment;
 import com.ddd.d3.community.application.CommunityService.NewPost;
 import com.ddd.d3.community.application.CommunityService.NewResultPost;
 import com.ddd.d3.community.domain.PostVisibility;
@@ -235,6 +236,40 @@ class JdbcCommunityRepositoryTest {
                 .update();
         assertFalse(repository.publicPostExists(POST_ONE));
         assertFalse(repository.publicPostExists(POST_TWO)); // absent post
+    }
+
+    @Test
+    void d3Com001CommentsReadOldestFirstWithKeysetAndProjectedHandle() {
+        repository.insertPost(new NewPost(POST_ONE, USER_ONE, PostVisibility.PUBLIC, "post", "<p>post</p>", 4));
+        seedProfile(USER_TWO, "bob", 1200, "SILVER", 1L);
+        UUID commentOne = UUID.fromString("66666666-6666-4666-8666-666666666661");
+        UUID commentTwo = UUID.fromString("66666666-6666-4666-8666-666666666662");
+        repository.insertComment(new NewComment(commentOne, POST_ONE, USER_TWO, "first", "<p>first</p>"));
+        repository.insertComment(new NewComment(commentTwo, POST_ONE, USER_ONE, "second", "<p>second</p>"));
+
+        var firstPage = repository.postComments(POST_ONE, Optional.empty(), 1);
+        assertEquals(1, firstPage.comments().size());
+        assertEquals(commentOne, firstPage.comments().getFirst().id());
+        assertEquals("bob", firstPage.comments().getFirst().authorHandle());
+        assertEquals("<p>first</p>", firstPage.comments().getFirst().renderedHtml());
+        assertFalse(firstPage.nextCursor().isBlank());
+
+        var cursor = new com.ddd.d3.community.application.CommunityService.CommentCursor(
+                firstPage.comments().getFirst().createdAt(), firstPage.comments().getFirst().id());
+        var secondPage = repository.postComments(POST_ONE, Optional.of(cursor), 10);
+        assertEquals(List.of(commentTwo), secondPage.comments().stream().map(c -> c.id()).toList());
+        assertNull(secondPage.nextCursor());
+    }
+
+    @Test
+    void d3Com001DeletesOnlyTheAuthorsOwnComment() {
+        repository.insertPost(new NewPost(POST_ONE, USER_ONE, PostVisibility.PUBLIC, "post", "<p>post</p>", 4));
+        UUID commentId = UUID.fromString("66666666-6666-4666-8666-666666666663");
+        repository.insertComment(new NewComment(commentId, POST_ONE, USER_ONE, "mine", "<p>mine</p>"));
+
+        assertFalse(repository.deleteComment(commentId, USER_TWO)); // not the author
+        assertTrue(repository.deleteComment(commentId, USER_ONE)); // author
+        assertFalse(repository.deleteComment(commentId, USER_ONE)); // already gone
     }
 
     private void seedProfile(UUID userId, String handle, int rating, String tier, long identityVersion) {

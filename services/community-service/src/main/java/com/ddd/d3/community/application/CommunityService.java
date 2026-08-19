@@ -127,6 +127,31 @@ public final class CommunityService {
         }
     }
 
+    public CommentView addComment(UUID authorUserId, UUID postId, String markdown) {
+        requirePublicPost(postId);
+        if (markdown.isBlank()) {
+            throw new IllegalArgumentException("comment must not be blank");
+        }
+        if (markdown.length() > markdownLimit) {
+            throw new IllegalArgumentException("comment markdown exceeds the configured limit");
+        }
+        return repository.insertComment(new NewComment(
+                ids.get(), postId, authorUserId, markdown, markdownPolicy.renderSanitizedHtml(markdown)));
+    }
+
+    public CommentPage postComments(UUID postId, Optional<String> cursor, int limit) {
+        requirePublicPost(postId);
+        Optional<CommentCursor> decodedCursor = cursor.map(CommentCursor::decode);
+        return repository.postComments(postId, decodedCursor, clamp(limit, 1, 50));
+    }
+
+    /** Deletes a comment only when the requester is its author; otherwise it is not found for them. */
+    public void deleteComment(UUID requesterUserId, UUID commentId) {
+        if (!repository.deleteComment(commentId, requesterUserId)) {
+            throw new CommentNotFoundException();
+        }
+    }
+
     public ProfilePage searchProfilesByHandle(String handlePrefix, Optional<String> cursor, int limit) {
         if (handlePrefix == null || handlePrefix.isBlank()) {
             throw new IllegalArgumentException("handle query must not be blank");
@@ -184,6 +209,40 @@ public final class CommunityService {
     public record FollowState(long followerCount, long followingCount, boolean viewerFollowing) {}
 
     public record LikeState(long likeCount, boolean viewerLiked) {}
+
+    public record NewComment(UUID id, UUID postId, UUID authorUserId, String bodyMarkdown, String renderedHtml) {}
+
+    public record CommentView(
+            UUID id,
+            UUID postId,
+            UUID authorUserId,
+            String authorHandle,
+            String bodyMarkdown,
+            String renderedHtml,
+            Instant createdAt) {}
+
+    public record CommentPage(List<CommentView> comments, String nextCursor) {}
+
+    public record CommentCursor(Instant createdAt, UUID id) {
+        public String encode() {
+            String raw = createdAt + "|" + id;
+            return java.util.Base64.getUrlEncoder()
+                    .withoutPadding()
+                    .encodeToString(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+
+        static CommentCursor decode(String cursor) {
+            try {
+                String raw = new String(
+                        java.util.Base64.getUrlDecoder().decode(cursor),
+                        java.nio.charset.StandardCharsets.UTF_8);
+                String[] parts = raw.split("\\|", 2);
+                return new CommentCursor(Instant.parse(parts[0]), UUID.fromString(parts[1]));
+            } catch (RuntimeException exception) {
+                throw new IllegalArgumentException("comment cursor is invalid", exception);
+            }
+        }
+    }
 
     public record ProfileCursor(String handle, UUID userId) {
         public String encode() {
