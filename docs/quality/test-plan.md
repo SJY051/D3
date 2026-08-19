@@ -4,7 +4,10 @@ Owner: 최정민 and service owners
 
 Status: Local deterministic-fake golden path rehearsed; live Judge0 application, final RC, load and chaos evidence pending
 
-Last verified: 2026-08-19 against `c738cd8`, the `25359ad` two-browser rehearsal and issue #59 route smoke
+3: Last verified: 2026-08-19 against `c738cd8`, the `25359ad` two-browser rehearsal, issue #59 route smoke, and PR #98 early-judging tests
+4: | Contract | HTTP, events, WebSocket | Versioned HTTP, event and WebSocket documents have positive and adversarial samples. Negative samples reject client-owned identity/source, undeclared command types, wrong versions and privacy-unsafe fields; `battle-event.v3` carries self-only submission verdict/attempt/accepted-lock state | Producer/consumer compatibility and negative samples | PARTIAL PASS: Gateway/Battle auth, heartbeat/reconnect, viewer privacy, Judge commands, result events, Community projection consumers and server-owned connection lifecycle tests are active; the fresh RC `c738cd8` two-session acceptance passed on 2026-08-19 |
+| Browser | Ranked golden path and privacy | Playwright covers the approved P0 routes and Battle attack source integrity. The isolated `25359ad` rehearsal drove two browser sessions through sign-in, feed, ranked queue, Run/Submit, reconnect, result, rating/RP, result post and public record with the deterministic fake judge | Two independent sessions with fake judge; capture the both-accepted early-JUDGING transition | PASS: the `25359ad` rehearsal plus the fresh RC `c738cd8` acceptance on 2026-08-19 covering the submission-verdict banner, the both-accepted early finish (0.6s to FINISHED) and a live attack exchange; the Surrender trace remains NOT RUN |
+5: | Demo preflight | Full-stack dependency readiness | `pnpm local:start` plus HTTP/TCP checker | All required live dependencies pass on frozen build | PASS for the isolated `25359ad` rehearsal and the fresh RC `c738cd8` acceptance (2026-08-19) |
 
 Requirement: D3-QLT-001
 
@@ -12,15 +15,20 @@ Requirement: D3-QLT-001
 
 | Layer | Primary risk | Current evidence | Completion evidence | Status |
 |---|---|---|---|---|
-| Domain unit | Match state, outcome, rating, energy | Active Battle lifecycle, versioned score/rating calculators, fixed one-solver, both-solver, neither-solver, exact-tie, placement, established, unranked and void boundaries, plus deterministic fake and real-Judge normalization slices | Deterministic examples, boundaries and clock control | PARTIAL PASS: Battle outcome, rating and attack domain requirements are active; live calibration evidence remains pending |
+| Domain unit | Match state, outcome, rating, energy | Active Battle lifecycle, both-accepted early `RUNNING → JUDGING`, versioned score/rating calculators, fixed one-solver, both-solver, neither-solver, exact-tie, placement, established, unranked and void boundaries, plus deterministic fake and real-Judge normalization slices | Deterministic examples, boundaries and clock control | PARTIAL PASS: Battle outcome, rating and attack domain requirements are active; live calibration evidence remains pending |
 | Adapter integration | PostgreSQL, Redis, Kafka, outbox/inbox | Forward-only service migrations run on PostgreSQL Testcontainers; Battle proves Redis TTL/lease coordination, two-user matching, per-player concurrent active-match fencing, idempotent match creation, legacy clock/result restoration, single-snapshot aggregate reads, optimistic lifecycle persistence, transactional READY/SURRENDER replay, PostgreSQL transport-generation allocation, autonomous deadline advancement, generation-fenced Redis retry, cross-instance notification repair, durable Judge evidence, concurrent exactly-once result/rating commit, per-match audit persistence, failed-publication retention and replay-safe Battle outbox dispatch; Judge adds transactional outbox and producer behavior | Real-container transaction, uniqueness and retry evidence | PARTIAL PASS: ranked entry, lifecycle, Judge correlation, result/rating commit and both outbox producers are active; live multi-service and broker-restart evidence remains pending |
-| Contract | HTTP, events, WebSocket | Versioned HTTP, event and WebSocket documents have positive and adversarial samples. Negative samples reject client-owned identity/source, undeclared command types, wrong versions and privacy-unsafe fields; `battle-event.v3` carries self-only submission verdict/attempt/accepted-lock state | Producer/consumer compatibility and negative samples | PARTIAL PASS: Gateway/Battle auth, heartbeat/reconnect, viewer privacy, Judge commands, result events, Community projection consumers and server-owned connection lifecycle tests are active; the fresh RC `c738cd8` two-session acceptance passed on 2026-08-19 |
-| Browser | Ranked golden path and privacy | Playwright covers the approved P0 routes and Battle attack source integrity. The isolated `25359ad` rehearsal drove two browser sessions through sign-in, feed, ranked queue, Run/Submit, reconnect, result, rating/RP, result post and public record with the deterministic fake judge | Two independent sessions with fake judge | PASS for the recorded `25359ad` rehearsal; fresh `c738cd8` acceptance, submission-verdict capture and live attack/Surrender traces remain PENDING/NOT RUN |
+3: Last verified: 2026-08-19 against `c738cd8`, the `25359ad` two-browser rehearsal, issue #59 route smoke, and PR #98 early-judging tests
+4: | Contract | HTTP, events, WebSocket | Versioned HTTP, event and WebSocket documents have positive and adversarial samples. Negative samples reject client-owned identity/source, undeclared command types, wrong versions and privacy-unsafe fields; `battle-event.v3` carries self-only submission verdict/attempt/accepted-lock state | Producer/consumer compatibility and negative samples | PARTIAL PASS: Gateway/Battle auth, heartbeat/reconnect, viewer privacy, Judge commands, result events, Community projection consumers and server-owned connection lifecycle tests are active; the fresh RC `c738cd8` two-session acceptance passed on 2026-08-19 |
+| Browser | Ranked golden path and privacy | Playwright covers the approved P0 routes and Battle attack source integrity. The isolated `25359ad` rehearsal drove two browser sessions through sign-in, feed, ranked queue, Run/Submit, reconnect, result, rating/RP, result post and public record with the deterministic fake judge | Two independent sessions with fake judge; capture the both-accepted early-JUDGING transition | PASS: the `25359ad` rehearsal plus the fresh RC `c738cd8` acceptance on 2026-08-19 covering the submission-verdict banner, the both-accepted early finish (0.6s to FINISHED) and a live attack exchange; the Surrender trace remains NOT RUN |
+5: | Demo preflight | Full-stack dependency readiness | `pnpm local:start` plus HTTP/TCP checker | All required live dependencies pass on frozen build | PASS for the isolated `25359ad` rehearsal and the fresh RC `c738cd8` acceptance (2026-08-19) |
 | Judge host smoke | Runtime mapping and host isolation | Bound zero-ingress host, pinned images, hardened startup and executable sanitized smoke | Real Judge0 cases for six pinned runtimes | PASS: six hello-world plus six deterministic cases; live outage injection NOT RUN |
 | Judge application smoke | Real adapter routing, credential and private connectivity | Local HTTP-fixture tests plus issue #59 production-adapter execution from a temporary application-side runner over an exact source-SG route | deployed judge-service calls the designated host for all six runtimes | PARTIAL PASS: adapter and source-SG route smoke PASS; deployed judge-service application integration remains NOT RUN |
 | Load | Match fan-out, judge queue, feed reads | Scenario definitions below | Versioned report on designated host | NOT RUN |
 | Chaos | Reconnect, broker lag, cache loss, Judge failure | Scenario definitions below | Recovery and no-duplicate assertions | NOT RUN |
-| Demo preflight | Full-stack dependency readiness | `pnpm local:start` plus HTTP/TCP checker | All required live dependencies pass on frozen build | PASS for the isolated `25359ad` rehearsal; rerun on `c738cd8` remains PENDING |
+3: Last verified: 2026-08-19 against `c738cd8`, the `25359ad` two-browser rehearsal, issue #59 route smoke, and PR #98 early-judging tests
+4: | Contract | HTTP, events, WebSocket | Versioned HTTP, event and WebSocket documents have positive and adversarial samples. Negative samples reject client-owned identity/source, undeclared command types, wrong versions and privacy-unsafe fields; `battle-event.v3` carries self-only submission verdict/attempt/accepted-lock state | Producer/consumer compatibility and negative samples | PARTIAL PASS: Gateway/Battle auth, heartbeat/reconnect, viewer privacy, Judge commands, result events, Community projection consumers and server-owned connection lifecycle tests are active; the fresh RC `c738cd8` two-session acceptance passed on 2026-08-19 |
+| Browser | Ranked golden path and privacy | Playwright covers the approved P0 routes and Battle attack source integrity. The isolated `25359ad` rehearsal drove two browser sessions through sign-in, feed, ranked queue, Run/Submit, reconnect, result, rating/RP, result post and public record with the deterministic fake judge | Two independent sessions with fake judge; capture the both-accepted early-JUDGING transition | PASS: the `25359ad` rehearsal plus the fresh RC `c738cd8` acceptance on 2026-08-19 covering the submission-verdict banner, the both-accepted early finish (0.6s to FINISHED) and a live attack exchange; the Surrender trace remains NOT RUN |
+5: | Demo preflight | Full-stack dependency readiness | `pnpm local:start` plus HTTP/TCP checker | All required live dependencies pass on frozen build | PASS for the isolated `25359ad` rehearsal and the fresh RC `c738cd8` acceptance (2026-08-19) |
 
 ## Reporting contract
 
@@ -75,13 +83,22 @@ These rows summarize narrow test evidence. The issue #13 PR report remains autho
 
 ## Critical functional suites
 
-- D3-BTL-002: state transition, authoritative deadline, reconnect boundary, surrender, incident void and duplicate commands.
+- D3-BTL-002: state transition, both-accepted early judging, authoritative deadline, reconnect boundary, surrender, incident void and duplicate commands.
 - D3-BTL-003: one solve, both solve, neither solve, exact tie, repeatable runtime tiers and unknown static evidence.
 - D3-BTL-004: energy anti-farming, warning, block, reflect, display-only effects, caret validity and editor undo.
 - D3-BTL-005: placement visibility, adjustment-factor boundary, RP/tier separation and exactly-once update.
 - D3-ID-001 and D3-SEC-001: explicit OAuth linking, refresh rotation, revocation, object and room authorization.
 - D3-JDG-001: accepted, wrong answer, compilation, runtime, timeout, memory and platform failure for each supported runtime.
 - D3-COM-001 and D3-STAT-001: code privacy, audience policy, idempotent projection and traceable match record.
+
+## Issue #98 early-judging evidence
+
+| Case | Deterministic evidence | Current result |
+|---|---|---|
+| Both participants hold accepted `SUBMIT` evidence | `BattleJudgedSubmissionServiceTest.d3Btl002BeginsJudgingEarlyWhenBothParticipantsHoldAnAcceptedSubmit` | PASS: state moves from `RUNNING` to `JUDGING` and publishes a snapshot |
+| Only one participant holds accepted evidence | `BattleJudgedSubmissionServiceTest.d3Btl002WaitsForTheDeadlineWhenOnlyOneParticipantHasAccepted` | PASS: match remains `RUNNING` |
+| Accepted-evidence predicate | `JdbcBattleJudgeReferenceStoreIntegrationTest.d3Btl002ReportsBothParticipantsAcceptedOnlyWhenEachHoldsAnAcceptedSubmit` | PASS: false for 0/1 accepted or mixed verdicts; true only for both accepted |
+| Browser demonstration | Fresh two-session fake-Judge run on `c738cd8` | PASS (2026-08-19, match `30e8b599`): self-only verdict/lock, both-accepted early finish, live attack exchange, result, and record; the 1–3 minute submission recording remains PENDING |
 
 ## Load plan
 
