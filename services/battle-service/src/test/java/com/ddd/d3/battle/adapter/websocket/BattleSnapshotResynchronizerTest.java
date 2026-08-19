@@ -69,6 +69,56 @@ class BattleSnapshotResynchronizerTest {
     }
 
     @Test
+    void d3Jdg001PublishesAVerdictOnlyFrameWithTheBumpedSerializedSequence() throws Exception {
+        BattleMatchViewService views = mock(BattleMatchViewService.class);
+        when(views.read(MATCH_ID, PLAYER_ONE)).thenReturn(view(4));
+        com.ddd.d3.battle.application.BattleAttackService attacks =
+                mock(com.ddd.d3.battle.application.BattleAttackService.class);
+        when(attacks.read(MATCH_ID, PLAYER_ONE)).thenReturn(new com.ddd.d3.battle.application.BattleAttackView(
+                MATCH_ID, 3, NOW, 50, 50, 100, 40, 20, 30, null));
+        com.ddd.d3.battle.application.BattleSubmissionViewService submissions =
+                mock(com.ddd.d3.battle.application.BattleSubmissionViewService.class);
+        UUID submissionId = UUID.fromString("55555555-5555-4555-8555-555555555555");
+        when(submissions.read(MATCH_ID, PLAYER_ONE))
+                .thenReturn(java.util.Optional.empty())
+                .thenReturn(java.util.Optional.of(
+                        new com.ddd.d3.battle.application.BattleJudgeReferenceStore.SubmissionVerdict(
+                                submissionId, "WRONG_ANSWER", 1, NOW.plusSeconds(1))))
+                .thenReturn(java.util.Optional.of(
+                        new com.ddd.d3.battle.application.BattleJudgeReferenceStore.SubmissionVerdict(
+                                submissionId, "WRONG_ANSWER", 1, NOW.plusSeconds(1))));
+        BattleWebSocketSessionRegistry sessions = new BattleWebSocketSessionRegistry(
+                views,
+                attacks,
+                submissions,
+                new BattleDisconnectRetryQueue(
+                        mock(BattleConnectionService.class),
+                        mock(ScheduledExecutorService.class),
+                        Duration.ofMillis(1)),
+                new ObjectMapper());
+        WebSocketSession session = session();
+        when(session.getAcceptedProtocol()).thenReturn(BattleWebSocketHandler.V3_PROTOCOL);
+        sessions.register(session, 1);
+
+        sessions.publish(MATCH_ID);
+        sessions.publish(MATCH_ID);
+        sessions.publish(MATCH_ID);
+
+        ArgumentCaptor<TextMessage> messages = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session, times(2)).sendMessage(messages.capture());
+        ObjectMapper objectMapper = new ObjectMapper();
+        var first = objectMapper.readTree(messages.getAllValues().get(0).getPayload());
+        var second = objectMapper.readTree(messages.getAllValues().get(1).getPayload());
+        assertEquals(7, first.path("sequence").asLong());
+        assertEquals(true, first.path("payload").path("submission").isNull());
+        assertEquals(8, second.path("sequence").asLong(),
+                "a verdict-only change must serialize the bumped sequence into the frame");
+        assertEquals("WRONG_ANSWER", second.path("payload").path("submission").path("verdict").asString());
+        assertEquals(1, second.path("payload").path("submission").path("attemptNumber").asInt());
+        assertEquals(false, second.path("payload").path("submission").path("acceptedLocked").asBoolean());
+    }
+
+    @Test
     void d3Btl002RetainsRejectedMatchesUntilTheBoundedExecutorRecovers() {
         BattleWebSocketSessionRegistry sessions = mock(BattleWebSocketSessionRegistry.class);
         UUID secondMatchId = UUID.fromString("33333333-3333-4333-8333-333333333333");

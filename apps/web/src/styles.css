@@ -836,3 +836,30 @@ a:focus-visible {
     animation-iteration-count: 1 !important;
   }
 }
+
+.submission-verdict {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--arena-line);
+  border-left-width: 4px;
+  border-radius: 2px;
+  background: var(--arena-panel);
+  color: var(--arena-ink);
+  font-size: 0.92rem;
+}
+
+.submission-verdict-accepted {
+  border-left-color: var(--arena-blue);
+}
+
+.submission-verdict-accepted strong {
+  color: var(--arena-blue);
+}
+
+.submission-verdict-rejected {
+  border-left-color: var(--arena-coral);
+}
+
+.submission-verdict-rejected strong {
+  color: var(--arena-coral);
+}

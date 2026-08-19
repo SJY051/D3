@@ -109,6 +109,11 @@ class BattleJudgeCommandServiceTest {
     }
 
     private static final class FakeReferences implements BattleJudgeReferenceStore {
+        @Override
+        public Optional<SubmissionVerdict> findLatestSubmissionVerdict(UUID matchId, UUID playerId) {
+            return Optional.empty();
+        }
+
         private final List<Reference> recorded = new ArrayList<>();
 
         @Override

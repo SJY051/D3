@@ -152,6 +152,54 @@ class JdbcBattleJudgeReferenceStoreIntegrationTest {
     }
 
     @Test
+    void d3Jdg001ReadsTheLatestViewerScopedSubmissionVerdict() {
+        MatchFixture match = createRunningMatch();
+        assertTrue(store.findLatestSubmissionVerdict(match.matchId(), match.playerOneId()).isEmpty());
+
+        transactions.executeWithoutResult(status -> store.record(new BattleJudgeReferenceStore.Reference(
+                UUID.randomUUID(), match.matchId(), match.playerOneId(), BattleJudgeGateway.Mode.RUN,
+                UUID.randomUUID(), null, "ACCEPTED", "judge-evidence-v1", NOW, NOW.plusSeconds(1))));
+        assertTrue(store.findLatestSubmissionVerdict(match.matchId(), match.playerOneId()).isEmpty(),
+                "RUN attempts must never surface as submission verdicts");
+
+        UUID pendingId = UUID.randomUUID();
+        transactions.executeWithoutResult(status -> store.record(new BattleJudgeReferenceStore.Reference(
+                pendingId, match.matchId(), match.playerOneId(), BattleJudgeGateway.Mode.SUBMIT,
+                UUID.randomUUID(), 1, "QUEUED", null, NOW, null)));
+        assertTrue(store.findLatestSubmissionVerdict(match.matchId(), match.playerOneId()).isEmpty(),
+                "unsettled submissions must not surface a verdict yet");
+
+        transactions.executeWithoutResult(status -> jdbc.sql("""
+                        update judge_job_reference
+                        set last_judge_status = 'WRONG_ANSWER',
+                            evidence_version = 'judge-evidence-v1',
+                            last_result_at = :resultAt
+                        where submission_id = :submissionId
+                        """)
+                .param("resultAt", Timestamp.from(NOW.plusSeconds(2)))
+                .param("submissionId", pendingId)
+                .update());
+        BattleJudgeReferenceStore.SubmissionVerdict wrong =
+                store.findLatestSubmissionVerdict(match.matchId(), match.playerOneId()).orElseThrow();
+        assertEquals("WRONG_ANSWER", wrong.status());
+        assertEquals(1, wrong.attemptNumber());
+        assertEquals(pendingId, wrong.submissionId());
+
+        UUID acceptedId = UUID.randomUUID();
+        transactions.executeWithoutResult(status -> store.record(new BattleJudgeReferenceStore.Reference(
+                acceptedId, match.matchId(), match.playerOneId(), BattleJudgeGateway.Mode.SUBMIT,
+                UUID.randomUUID(), 2, "ACCEPTED", "judge-evidence-v1", NOW.plusSeconds(3), NOW.plusSeconds(4))));
+        BattleJudgeReferenceStore.SubmissionVerdict accepted =
+                store.findLatestSubmissionVerdict(match.matchId(), match.playerOneId()).orElseThrow();
+        assertEquals("ACCEPTED", accepted.status());
+        assertEquals(2, accepted.attemptNumber());
+        assertEquals(acceptedId, accepted.submissionId());
+
+        assertTrue(store.findLatestSubmissionVerdict(match.matchId(), match.playerTwoId()).isEmpty(),
+                "the opponent must never observe the submitter's verdict");
+    }
+
+    @Test
     void v9UpgradePreservesExistingJudgeReferencesAndAddsNullableEvidence() {
         Flyway.configure().dataSource(dataSource).cleanDisabled(false).load().clean();
         Flyway.configure().dataSource(dataSource).target("8").load().migrate();

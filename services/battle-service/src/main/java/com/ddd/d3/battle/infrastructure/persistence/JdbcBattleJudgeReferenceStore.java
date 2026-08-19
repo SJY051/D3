@@ -119,6 +119,30 @@ public class JdbcBattleJudgeReferenceStore implements BattleJudgeReferenceStore 
     }
 
     @Override
+    public Optional<SubmissionVerdict> findLatestSubmissionVerdict(UUID matchId, UUID playerId) {
+        Objects.requireNonNull(matchId, "matchId");
+        Objects.requireNonNull(playerId, "playerId");
+        return jdbc.sql("""
+                        select submission_id, last_judge_status, attempt_number, last_result_at
+                        from judge_job_reference
+                        where match_id = :matchId
+                          and player_user_id = :playerId
+                          and mode = 'SUBMIT'
+                          and last_result_at is not null
+                        order by last_result_at desc, attempt_number desc, submission_id desc
+                        limit 1
+                        """)
+                .param("matchId", matchId)
+                .param("playerId", playerId)
+                .query((resultSet, rowNumber) -> new SubmissionVerdict(
+                        resultSet.getObject("submission_id", UUID.class),
+                        resultSet.getString("last_judge_status"),
+                        resultSet.getInt("attempt_number"),
+                        resultSet.getTimestamp("last_result_at").toInstant()))
+                .optional();
+    }
+
+    @Override
     public void record(Reference reference) {
         Objects.requireNonNull(reference, "reference");
         int inserted = jdbc.sql("""

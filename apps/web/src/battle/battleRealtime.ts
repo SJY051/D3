@@ -45,6 +45,11 @@ export interface BattleSnapshot {
       resolution: "BLOCKED" | "EXPIRED" | null;
     } | null;
   };
+  submission: {
+    verdict: string;
+    attemptNumber: number;
+    acceptedLocked: boolean;
+  } | null;
 }
 
 export type BattleCommandType =
@@ -157,7 +162,7 @@ export function parseBattleSnapshot(raw: string): BattleSnapshot | null {
     return null;
   }
 
-  const payload = message.payload as { match?: unknown; attack?: unknown };
+  const payload = message.payload as { match?: unknown; attack?: unknown; submission?: unknown };
   if (!isMatch(payload.match) || !isAttack(payload.attack)) {
     return null;
   }
@@ -168,6 +173,25 @@ export function parseBattleSnapshot(raw: string): BattleSnapshot | null {
     serverTime: message.serverTime,
     match: payload.match,
     attack: payload.attack,
+    submission: parseSubmission(payload.submission),
+  };
+}
+
+// Absent or malformed verdicts degrade to null so pre-verdict frames keep rendering.
+function parseSubmission(value: unknown): BattleSnapshot["submission"] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const submission = value as { verdict?: unknown; attemptNumber?: unknown; acceptedLocked?: unknown };
+  if (typeof submission.verdict !== "string"
+      || !isNonNegativeInteger(submission.attemptNumber)
+      || typeof submission.acceptedLocked !== "boolean") {
+    return null;
+  }
+  return {
+    verdict: submission.verdict,
+    attemptNumber: submission.attemptNumber,
+    acceptedLocked: submission.acceptedLocked,
   };
 }
 
