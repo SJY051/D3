@@ -2,6 +2,7 @@ package com.ddd.d3.battle.adapter.websocket;
 
 import com.ddd.d3.battle.application.BattleAttackService;
 import com.ddd.d3.battle.application.BattleMatchViewService;
+import com.ddd.d3.battle.application.BattleSubmissionViewService;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
@@ -28,6 +29,7 @@ final class BattleWebSocketSessionRegistry {
     private static final Logger LOGGER = LoggerFactory.getLogger(BattleWebSocketSessionRegistry.class);
     private final BattleMatchViewService views;
     private final BattleAttackService attacks;
+    private final BattleSubmissionViewService submissions;
     private final BattleDisconnectRetryQueue disconnects;
     private final ObjectMapper objectMapper;
     private final Map<String, Registration> sessionsById = new ConcurrentHashMap<>();
@@ -37,7 +39,7 @@ final class BattleWebSocketSessionRegistry {
             BattleMatchViewService views,
             BattleDisconnectRetryQueue disconnects,
             ObjectMapper objectMapper) {
-        this(views, null, disconnects, objectMapper);
+        this(views, null, null, disconnects, objectMapper);
     }
 
     BattleWebSocketSessionRegistry(
@@ -45,8 +47,14 @@ final class BattleWebSocketSessionRegistry {
             BattleAttackService attacks,
             BattleDisconnectRetryQueue disconnects,
             ObjectMapper objectMapper) {
+        this(views, attacks, null, disconnects, objectMapper);
+    }
+
+    BattleWebSocketSessionRegistry(BattleMatchViewService views, BattleAttackService attacks,
+            BattleSubmissionViewService submissions, BattleDisconnectRetryQueue disconnects, ObjectMapper objectMapper) {
         this.views = Objects.requireNonNull(views, "views must not be null");
         this.attacks = attacks;
+        this.submissions = submissions;
         this.disconnects = Objects.requireNonNull(disconnects, "disconnects must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
     }
@@ -55,10 +63,11 @@ final class BattleWebSocketSessionRegistry {
     BattleWebSocketSessionRegistry(
             BattleMatchViewService views,
             BattleAttackService attacks,
+            BattleSubmissionViewService submissions,
             BattleDisconnectRetryQueue disconnects,
             ObjectMapper objectMapper,
             MeterRegistry meters) {
-        this(views, attacks, disconnects, objectMapper);
+        this(views, attacks, submissions, disconnects, objectMapper);
         Gauge.builder("d3.battle.websocket.sessions.active", sessionsByParticipant, Map::size)
                 .description("Current participant-owned Battle WebSocket sessions on this instance")
                 .register(Objects.requireNonNull(meters, "meters must not be null"));
@@ -174,6 +183,7 @@ final class BattleWebSocketSessionRegistry {
             }
             registration.session.sendMessage(prepared.message());
             registration.lastSequence = prepared.sequence();
+            registration.lastSubmissionId = prepared.submissionId();
         }
     }
 
@@ -185,18 +195,21 @@ final class BattleWebSocketSessionRegistry {
                     throw new IllegalStateException("attack service is unavailable");
                 }
                 var attack = attacks.read(registration.matchId, registration.viewerId);
+                var submission = submissions == null ? null : submissions.read(registration.matchId, registration.viewerId).orElse(null);
                 long sequence = Math.addExact(view.aggregateVersion(), attack.sequence());
-                if (sequence <= registration.lastSequence) {
+                UUID submissionId = submission == null ? null : submission.submissionId();
+                if (sequence <= registration.lastSequence && Objects.equals(submissionId, registration.lastSubmissionId)) {
                     return null;
                 }
-                String payload = objectMapper.writeValueAsString(BattleSnapshotMessageV3.from(view, attack));
-                return new PreparedSnapshot(sequence, new TextMessage(payload));
+                sequence = Math.max(sequence, registration.lastSequence + 1);
+                String payload = objectMapper.writeValueAsString(BattleSnapshotMessageV3.from(view, attack, submission));
+                return new PreparedSnapshot(sequence, submissionId, new TextMessage(payload));
             }
             if (view.aggregateVersion() <= registration.lastSequence) {
                 return null;
             }
             String payload = objectMapper.writeValueAsString(BattleSnapshotMessageV2.from(view));
-            return new PreparedSnapshot(view.aggregateVersion(), new TextMessage(payload));
+            return new PreparedSnapshot(view.aggregateVersion(), null, new TextMessage(payload));
         } catch (RuntimeException exception) {
             throw new SnapshotPreparationException(exception);
         }
@@ -257,6 +270,7 @@ final class BattleWebSocketSessionRegistry {
         private final long generation;
         private final ParticipantKey participant;
         private long lastSequence = -1;
+        private UUID lastSubmissionId;
 
         private Registration(WebSocketSession session, UUID matchId, UUID viewerId, long generation) {
             if (generation <= 0) {
@@ -272,7 +286,7 @@ final class BattleWebSocketSessionRegistry {
 
     private record ParticipantKey(UUID matchId, UUID viewerId) {}
 
-    private record PreparedSnapshot(long sequence, TextMessage message) {}
+    private record PreparedSnapshot(long sequence, UUID submissionId, TextMessage message) {}
 
     private static final class SnapshotPreparationException extends RuntimeException {
 

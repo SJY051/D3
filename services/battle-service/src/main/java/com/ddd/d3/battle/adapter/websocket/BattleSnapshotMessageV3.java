@@ -2,6 +2,7 @@ package com.ddd.d3.battle.adapter.websocket;
 
 import com.ddd.d3.battle.application.BattleAttackView;
 import com.ddd.d3.battle.application.BattleMatchView;
+import com.ddd.d3.battle.application.BattleJudgeReferenceStore;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -11,13 +12,14 @@ public record BattleSnapshotMessageV3(
     private static final String MESSAGE_TYPE = "BATTLE_SNAPSHOT";
     private static final int MESSAGE_VERSION = 3;
 
-    public static BattleSnapshotMessageV3 from(BattleMatchView match, BattleAttackView attack) {
+    public static BattleSnapshotMessageV3 from(
+            BattleMatchView match, BattleAttackView attack, BattleJudgeReferenceStore.SubmissionVerdict submission) {
         Objects.requireNonNull(match);
         Objects.requireNonNull(attack);
         if (!match.matchId().equals(attack.matchId())) throw new IllegalArgumentException("snapshot matchIds differ");
         return new BattleSnapshotMessageV3(MESSAGE_TYPE, MESSAGE_VERSION, match.matchId(),
                 Math.addExact(match.aggregateVersion(), attack.sequence()), attack.serverTime(),
-                new Payload(BattleSnapshotMessageV2.from(match).payload(), attack(attack)));
+                new Payload(BattleSnapshotMessageV2.from(match).payload(), attack(attack), submission(submission)));
     }
 
     private static Attack attack(BattleAttackView view) {
@@ -29,7 +31,13 @@ public record BattleSnapshotMessageV3(
                 view.attackCost(), view.blockCost(), view.reflectCost(), current);
     }
 
-    public record Payload(BattleSnapshotMessageV2.Payload match, Attack attack) {}
+    private static Submission submission(BattleJudgeReferenceStore.SubmissionVerdict verdict) {
+        return verdict == null ? new Submission(null, false)
+                : new Submission(verdict.status(), "ACCEPTED".equals(verdict.status()));
+    }
+
+    public record Payload(BattleSnapshotMessageV2.Payload match, Attack attack, Submission submission) {}
+    public record Submission(String lastVerdict, boolean accepted) {}
     public record Attack(
             int selfEnergy, int opponentEnergy, int maximumEnergy,
             int attackCost, int blockCost, int reflectCost,
