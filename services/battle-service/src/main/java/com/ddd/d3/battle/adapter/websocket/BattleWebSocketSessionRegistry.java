@@ -196,12 +196,22 @@ final class BattleWebSocketSessionRegistry {
                 }
                 var attack = attacks.read(registration.matchId, registration.viewerId);
                 var submission = submissions == null ? null : submissions.read(registration.matchId, registration.viewerId).orElse(null);
-                long sequence = Math.addExact(view.aggregateVersion(), attack.sequence());
+                // A verdict-only change bumps the sequence past the aggregate-plus-attack
+                // baseline. That bump must persist as an offset for every later frame:
+                // a one-shot max() leaves lastSequence ahead of the next authoritative
+                // snapshot, which would silently swallow state transitions (e.g. FINISHED).
+                long sequence = Math.addExact(
+                        Math.addExact(view.aggregateVersion(), attack.sequence()),
+                        registration.sequenceOffset);
                 UUID submissionId = submission == null ? null : submission.submissionId();
                 if (sequence <= registration.lastSequence && Objects.equals(submissionId, registration.lastSubmissionId)) {
                     return null;
                 }
-                sequence = Math.max(sequence, registration.lastSequence + 1);
+                if (sequence <= registration.lastSequence) {
+                    registration.sequenceOffset = Math.addExact(
+                            registration.sequenceOffset, registration.lastSequence + 1 - sequence);
+                    sequence = registration.lastSequence + 1;
+                }
                 String payload = objectMapper.writeValueAsString(
                         BattleSnapshotMessageV3.from(view, attack, submission, sequence));
                 return new PreparedSnapshot(sequence, submissionId, new TextMessage(payload));
@@ -272,6 +282,7 @@ final class BattleWebSocketSessionRegistry {
         private final ParticipantKey participant;
         private long lastSequence = -1;
         private UUID lastSubmissionId;
+        private long sequenceOffset;
 
         private Registration(WebSocketSession session, UUID matchId, UUID viewerId, long generation) {
             if (generation <= 0) {
