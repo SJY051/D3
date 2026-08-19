@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { clearSession, setSession } from "../api/session";
+import { getRankedQueue } from "../battle/useRankedQueue";
 import { formatElapsed, GoldenPathPage, type GoldenPathKind } from "../pages/GoldenPathPage";
 
 function json(body: unknown, status = 200): Response {
@@ -25,6 +26,7 @@ async function render(kind: GoldenPathKind, path: string) {
 }
 
 afterEach(() => {
+  localStorage.clear();
   clearSession();
   vi.unstubAllGlobals();
 });
@@ -72,9 +74,8 @@ describe("P0 route behavior", () => {
   });
 
   it("replays the same queued ticket key after a local cancel", async () => {
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-1" });
     setSession({ userId: "user-1", accessToken: "token" });
-    const fetchMock = vi.fn().mockResolvedValue(json({ status: "QUEUED", matchId: null, enqueuedAt: "2026-08-18T00:00:00Z" }));
-    vi.stubGlobal("fetch", fetchMock);
     const { container, root } = await render("ranked", "/ranked");
 
     await act(async () => { container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); await Promise.resolve(); });
@@ -83,11 +84,10 @@ describe("P0 route behavior", () => {
 
     expect(container.querySelector("select")!.disabled).toBe(true);
     expect(container.querySelector("button[type=submit]")!.textContent).toBe("Retry existing queue");
+    expect(getRankedQueue()?.idempotencyKey).toBe("ticket-1");
 
     await act(async () => { container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); await Promise.resolve(); });
-    const queueCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("/battle/ranked/queue"));
-    expect(queueCalls.length).toBeGreaterThanOrEqual(2);
-    expect(queueCalls[1][1].headers["Idempotency-Key"]).toBe(queueCalls[0][1].headers["Idempotency-Key"]);
+    expect(getRankedQueue()).toMatchObject({ idempotencyKey: "ticket-1", status: "QUEUED" });
     root.unmount();
   });
 

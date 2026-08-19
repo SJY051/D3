@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -8,7 +8,6 @@ import {
   type MatchRecord,
   type MatchRecordPage,
   type RankedLanguage,
-  type RankedQueueTicket,
   createPublicPost,
   logout,
   isUuid,
@@ -17,10 +16,9 @@ import {
   loadPlayerRecords,
   register,
   signIn,
-  waitForRankedMatch,
 } from "../api/goldenPathApi";
 import { currentSessionUserId } from "../api/session";
-import { setActiveMatch } from "../battle/useActiveMatch";
+import { pauseRankedQueue, startRankedQueue, useRankedQueue } from "../battle/useRankedQueue";
 
 export type GoldenPathKind = "sign-in" | "feed" | "ranked" | "result" | "record";
 
@@ -112,36 +110,25 @@ function FeedPostCard({ post }: { post: FeedPost }) {
 
 function Ranked() {
   const navigate = useNavigate();
-  const abortRef = useRef<AbortController | null>(null);
+  const queue = useRankedQueue();
   const [language, setLanguage] = useState<RankedLanguage>("PYTHON3");
-  const [resource, setResource] = useState<Resource<RankedQueueTicket>>({ status: "empty" });
-  const [isPolling, setIsPolling] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const attemptKeyRef = useRef<string | null>(null);
-  useEffect(() => () => abortRef.current?.abort(), []);
   useEffect(() => {
-    if (!isPolling) return undefined;
+    if (queue?.status !== "QUEUED") return undefined;
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
-  }, [isPolling]);
-  useSessionRedirect(resource, navigate);
+  }, [queue?.status]);
+  useEffect(() => {
+    if (queue?.status === "MATCHED" && queue.matchId !== null) navigate(`/battles/${queue.matchId}`);
+  }, [navigate, queue]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (isPolling) return;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    attemptKeyRef.current ??= crypto.randomUUID();
-    setIsPolling(true);
-    setResource({ status: "loading" });
-    try {
-      const ticket = await waitForRankedMatch(language, { idempotencyKey: attemptKeyRef.current ?? undefined, signal: controller.signal, onTicket: (next) => setResource({ status: "success", value: next }) });
-      if (ticket.matchId !== null) setActiveMatch(ticket.matchId, currentSessionUserId());
-      navigate(`/battles/${ticket.matchId}`);
-    } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setResource(toFailure(error)); } finally { setIsPolling(false); }
+    if (queue?.status === "QUEUED" || queue?.status === "MATCHED") return;
+    startRankedQueue(language, currentSessionUserId());
   }
-  function cancel() { abortRef.current?.abort(); abortRef.current = null; setIsPolling(false); setResource({ status: "empty" }); }
-  const queuedAt = resource.status === "success" && resource.value.status === "QUEUED" ? resource.value.enqueuedAt : null;
-  return <form className="golden-panel golden-form" onSubmit={submit}><label>Language<select disabled={isPolling || attemptKeyRef.current !== null} onChange={(event) => setLanguage(event.target.value as RankedLanguage)} value={language}><option value="C">C</option><option value="CPP">CPP</option><option value="JAVA">JAVA</option><option value="PYTHON3">PYTHON3</option><option value="JAVASCRIPT">JAVASCRIPT</option><option value="TYPESCRIPT">TYPESCRIPT</option></select></label><p>Queue replays one idempotency key until MATCHED, then opens the authenticated Battle v3 route.</p><p className="golden-queue-state" role="status">{isPolling ? "Searching — queued attempt remains active." : attemptKeyRef.current !== null ? "Polling paused — the queued ticket stays active on the server until it matches or expires." : "Idle — choose a language to join."}{queuedAt !== null && ` Elapsed ${formatElapsed(queuedAt, now)}.`}</p><button disabled={isPolling} type="submit">{isPolling ? "Finding a match…" : attemptKeyRef.current !== null ? "Retry existing queue" : "Join ranked queue"}</button>{isPolling && <button type="button" onClick={cancel}>Cancel queue</button>}<ResourceMessage resource={resource} success={(ticket) => ticket.status === "MATCHED" ? "Match found. Opening Battle v3." : "Queued. Waiting for a matched replay."} /></form>;
+  const queuedAt = queue?.status === "QUEUED" ? queue.enqueuedAt : null;
+  const selectedLanguage = queue?.language ?? language;
+  return <form className="golden-panel golden-form" onSubmit={submit}><label>Language<select disabled={queue !== null} onChange={(event) => setLanguage(event.target.value as RankedLanguage)} value={selectedLanguage}><option value="C">C</option><option value="CPP">CPP</option><option value="JAVA">JAVA</option><option value="PYTHON3">PYTHON3</option><option value="JAVASCRIPT">JAVASCRIPT</option><option value="TYPESCRIPT">TYPESCRIPT</option></select></label><p>Queue replays one idempotency key until MATCHED, then opens the authenticated Battle v3 route.</p><p className="golden-queue-state" role="status">{queue?.status === "QUEUED" ? "Searching — queued attempt remains active across routes." : queue?.status === "PAUSED" ? "Polling paused — the queued ticket stays active on the server until it matches or expires." : queue?.status === "MATCHED" ? "Match found. Opening Battle v3." : "Idle — choose a language to join."}{queuedAt !== null && ` Elapsed ${formatElapsed(queuedAt, now)}.`}</p><button disabled={queue?.status === "QUEUED" || queue?.status === "MATCHED"} type="submit">{queue?.status === "QUEUED" ? "Finding a match..." : queue?.status === "PAUSED" ? "Retry existing queue" : queue?.status === "MATCHED" ? "Match found" : "Join ranked queue"}</button>{queue?.status === "QUEUED" && <button type="button" onClick={pauseRankedQueue}>Cancel queue</button>}{queue?.status === "MATCHED" && queue.matchId !== null && <Link className="golden-link" to={`/battles/${queue.matchId}`}>Enter battle</Link>}</form>;
 }
 
 function Result() {

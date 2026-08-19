@@ -15,6 +15,7 @@ import {
 } from "../battle/battleRealtime";
 import { currentSessionUserId, requestSessionAccessToken } from "../api/session";
 import { clearActiveMatchIfMatch, setActiveMatch } from "../battle/useActiveMatch";
+import { clearRankedQueueIfMatch } from "../battle/useRankedQueue";
 
 interface BattleArenaProps {
   connection: ConnectionState;
@@ -105,6 +106,7 @@ export function LiveBattlePage() {
       clearActiveMatchIfMatch(matchId);
     } else {
       setActiveMatch(matchId, currentSessionUserId());
+      clearRankedQueueIfMatch(matchId);
     }
   }, [matchId, snapshot]);
 

@@ -7,8 +7,13 @@ import { AppShell } from "./AppShell";
 import { LiveBattlePage } from "../pages/LiveBattlePage";
 import { clearSession, setSession } from "../api/session";
 import { getActiveMatch, setActiveMatch } from "../battle/useActiveMatch";
+import { startRankedQueue } from "../battle/useRankedQueue";
 
 const MATCH = "00000000-0000-4000-8000-000000000001";
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" }, status });
+}
 
 function snapshotMessage(state = "RUNNING") {
   return JSON.stringify({
@@ -122,6 +127,25 @@ describe("rejoin banner", () => {
 
     expect(container.textContent).toContain("Solution buffer");
     expect(getActiveMatch()).toBe(MATCH); // still recorded during a live match
+    root.unmount();
+  });
+
+  it("keeps polling a ranked queue from the shell and exposes the matched battle", async () => {
+    setSession({ accessToken: "t", userId: "user-a" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({
+      enqueuedAt: "2026-08-18T00:00:00Z",
+      matchId: MATCH,
+      status: "MATCHED",
+    })));
+    vi.stubGlobal("crypto", { randomUUID: () => "ticket-1" });
+    startRankedQueue("PYTHON3", "user-a");
+
+    const { container, root } = await renderShell("/feed");
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(container.textContent).toContain("Ranked match found");
+    expect(banner(container)?.getAttribute("href")).toBe(`/battles/${MATCH}`);
+    expect(getActiveMatch()).toBe(MATCH);
     root.unmount();
   });
 });
