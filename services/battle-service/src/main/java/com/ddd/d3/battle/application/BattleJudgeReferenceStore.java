@@ -21,6 +21,9 @@ public interface BattleJudgeReferenceStore {
 
     void recordEvidence(UUID eventId, Evidence evidence);
 
+    /** True when both match participants hold an accepted (locked) SUBMIT, so judging can begin early. */
+    boolean bothParticipantsAccepted(UUID matchId);
+
     record SubmissionContext(
             UUID problemId,
             int problemVersion,

@@ -53,6 +53,48 @@ class BattleJudgedSubmissionServiceTest {
         assertEquals(List.of(MATCH_ID), published);
     }
 
+    @Test
+    void d3Btl002BeginsJudgingEarlyWhenBothParticipantsHoldAnAcceptedSubmit() {
+        FakeReferences references = new FakeReferences();
+        references.bothAccepted = true;
+        FakeMatches matches = new FakeMatches(runningSnapshot());
+        List<UUID> published = new ArrayList<>();
+        BattleJudgedSubmissionService service = new BattleJudgedSubmissionService(
+                references,
+                new AcceptedJudge(),
+                scope -> new JudgeServiceTokenProvider.Token("read-token", 300),
+                matches,
+                published::add,
+                Clock.fixed(NOW.plusSeconds(30), ZoneOffset.UTC),
+                DirectTransactions.INSTANCE);
+
+        assertEquals(1, service.processPending(10));
+
+        assertEquals(BattleMatch.State.JUDGING, matches.snapshot.state());
+        assertEquals(List.of(MATCH_ID), published);
+    }
+
+    @Test
+    void d3Btl002WaitsForTheDeadlineWhenOnlyOneParticipantHasAccepted() {
+        FakeReferences references = new FakeReferences();
+        references.bothAccepted = false;
+        FakeMatches matches = new FakeMatches(runningSnapshot());
+        List<UUID> published = new ArrayList<>();
+        BattleJudgedSubmissionService service = new BattleJudgedSubmissionService(
+                references,
+                new AcceptedJudge(),
+                scope -> new JudgeServiceTokenProvider.Token("read-token", 300),
+                matches,
+                published::add,
+                Clock.fixed(NOW.plusSeconds(30), ZoneOffset.UTC),
+                DirectTransactions.INSTANCE);
+
+        assertEquals(1, service.processPending(10));
+
+        assertEquals(BattleMatch.State.RUNNING, matches.snapshot.state());
+        assertEquals(List.of(), published);
+    }
+
     private static BattleMatch.Snapshot runningSnapshot() {
         BattleMatch match = new BattleMatch(
                 MATCH_ID.toString(), PLAYER_ONE.toString(), PLAYER_TWO.toString(), Clock.fixed(NOW, ZoneOffset.UTC));
@@ -77,12 +119,14 @@ class BattleJudgedSubmissionServiceTest {
                 NOW,
                 null);
         private Evidence evidence;
+        private boolean bothAccepted;
 
         @Override public List<PendingJudgedEvent> findProcessablePending(int limit) {
             return List.of(new PendingJudgedEvent(EVENT_ID, SUBMISSION_ID));
         }
         @Override public Optional<Reference> lockPendingReference(UUID eventId) { return Optional.of(reference); }
         @Override public void recordEvidence(UUID eventId, Evidence evidence) { this.evidence = evidence; }
+        @Override public boolean bothParticipantsAccepted(UUID matchId) { return bothAccepted; }
         @Override public SubmissionContext lockSubmissionContext(UUID matchId, UUID playerId, long generation, BattleJudgeGateway.Mode mode) { throw new UnsupportedOperationException(); }
         @Override public Optional<Reference> findByCommandId(UUID commandId) { throw new UnsupportedOperationException(); }
         @Override public void record(Reference reference) { throw new UnsupportedOperationException(); }
@@ -104,6 +148,26 @@ class BattleJudgedSubmissionServiceTest {
                     0,
                     8,
                     List.of(new RuntimeMeasurement("LARGE", 10_000, 3, 0)),
+                    "judge0-v1",
+                    "java-21",
+                    "judge-evidence-v1",
+                    NOW.plusSeconds(20));
+        }
+    }
+
+    private static final class AcceptedJudge implements BattleJudgeGateway {
+        @Override public Acceptance accept(Command command, String authorizationHeader) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Evidence readEvidence(UUID submissionId, String authorizationHeader) {
+            return new Evidence(
+                    SUBMISSION_ID,
+                    "ACCEPTED",
+                    8,
+                    8,
+                    List.of(new RuntimeMeasurement("LARGE", 10_000, 3, 1_200)),
                     "judge0-v1",
                     "java-21",
                     "judge-evidence-v1",
