@@ -3,7 +3,9 @@ package com.ddd.d3.community.adapter.persistence;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.ddd.d3.community.application.CommunityService.NewComment;
 import com.ddd.d3.community.application.CommunityService.NewPost;
 import com.ddd.d3.community.application.CommunityService.NewResultPost;
 import com.ddd.d3.community.domain.PostVisibility;
@@ -175,6 +177,100 @@ class JdbcCommunityRepositoryTest {
         // '_' is a LIKE wildcard; escaped, "a_" must match only the literal "a_b", not "axb".
         var page = repository.searchProfilesByHandle("a_", Optional.empty(), 10);
         assertEquals(List.of("a_b"), page.profiles().stream().map(p -> p.handle()).toList());
+    }
+
+    @Test
+    void d3Com001FollowIsIdempotentAndReportsDirectionalCountsAndViewerState() {
+        UUID userThree = UUID.fromString("55555555-5555-4555-8555-555555555553");
+        repository.insertFollow(USER_ONE, USER_TWO);
+        repository.insertFollow(USER_ONE, USER_TWO); // idempotent: no duplicate, no error
+        repository.insertFollow(userThree, USER_TWO);
+
+        var followed = repository.followState(USER_TWO, Optional.of(USER_ONE));
+        assertEquals(2, followed.followerCount());
+        assertEquals(0, followed.followingCount());
+        assertTrue(followed.viewerFollowing());
+
+        var follower = repository.followState(USER_ONE, Optional.of(USER_TWO));
+        assertEquals(0, follower.followerCount());
+        assertEquals(1, follower.followingCount());
+        assertFalse(follower.viewerFollowing());
+
+        repository.deleteFollow(USER_ONE, USER_TWO);
+        repository.deleteFollow(USER_ONE, USER_TWO); // idempotent delete
+        var afterUnfollow = repository.followState(USER_TWO, Optional.of(USER_ONE));
+        assertEquals(1, afterUnfollow.followerCount());
+        assertFalse(afterUnfollow.viewerFollowing());
+    }
+
+    @Test
+    void d3Com001LikeIsIdempotentAndCountsPerViewer() {
+        repository.insertPost(new NewPost(POST_ONE, USER_ONE, PostVisibility.PUBLIC, "post", "<p>post</p>", 4));
+        assertTrue(repository.publicPostExists(POST_ONE));
+
+        repository.insertLike(USER_TWO, POST_ONE);
+        repository.insertLike(USER_TWO, POST_ONE); // idempotent
+        repository.insertLike(USER_ONE, POST_ONE);
+
+        var state = repository.likeState(POST_ONE, Optional.of(USER_TWO));
+        assertEquals(2, state.likeCount());
+        assertTrue(state.viewerLiked());
+        assertFalse(repository.likeState(POST_ONE, Optional.empty()).viewerLiked());
+
+        repository.deleteLike(USER_TWO, POST_ONE);
+        repository.deleteLike(USER_TWO, POST_ONE); // idempotent
+        assertEquals(1, repository.likeState(POST_ONE, Optional.of(USER_TWO)).likeCount());
+    }
+
+    @Test
+    void d3Com001TreatsOnlyPublicPostsAsLikeable() {
+        jdbc.sql("""
+                        insert into post (
+                            id, author_user_id, visibility, prose_markdown, rendered_html,
+                            prose_character_count, created_at, updated_at
+                        )
+                        values (:id, :author, 'PRIVATE', 'hidden', '<p>hidden</p>', 6, now(), now())
+                        """)
+                .param("id", POST_ONE)
+                .param("author", USER_ONE)
+                .update();
+        assertFalse(repository.publicPostExists(POST_ONE));
+        assertFalse(repository.publicPostExists(POST_TWO)); // absent post
+    }
+
+    @Test
+    void d3Com001CommentsReadOldestFirstWithKeysetAndProjectedHandle() {
+        repository.insertPost(new NewPost(POST_ONE, USER_ONE, PostVisibility.PUBLIC, "post", "<p>post</p>", 4));
+        seedProfile(USER_TWO, "bob", 1200, "SILVER", 1L);
+        UUID commentOne = UUID.fromString("66666666-6666-4666-8666-666666666661");
+        UUID commentTwo = UUID.fromString("66666666-6666-4666-8666-666666666662");
+        repository.insertComment(new NewComment(commentOne, POST_ONE, USER_TWO, "first", "<p>first</p>"));
+        repository.insertComment(new NewComment(commentTwo, POST_ONE, USER_ONE, "second", "<p>second</p>"));
+
+        var firstPage = repository.postComments(POST_ONE, Optional.empty(), 1);
+        assertEquals(1, firstPage.comments().size());
+        assertEquals(commentOne, firstPage.comments().getFirst().id());
+        assertEquals("bob", firstPage.comments().getFirst().authorHandle());
+        assertEquals("<p>first</p>", firstPage.comments().getFirst().renderedHtml());
+        assertFalse(firstPage.nextCursor().isBlank());
+
+        var cursor = new com.ddd.d3.community.application.CommunityService.CommentCursor(
+                firstPage.comments().getFirst().createdAt(), firstPage.comments().getFirst().id());
+        var secondPage = repository.postComments(POST_ONE, Optional.of(cursor), 10);
+        assertEquals(List.of(commentTwo), secondPage.comments().stream().map(c -> c.id()).toList());
+        assertNull(secondPage.nextCursor());
+    }
+
+    @Test
+    void d3Com001DeletesOnlyTheAuthorsOwnComment() {
+        repository.insertPost(new NewPost(POST_ONE, USER_ONE, PostVisibility.PUBLIC, "post", "<p>post</p>", 4));
+        UUID commentId = UUID.fromString("66666666-6666-4666-8666-666666666663");
+        repository.insertComment(new NewComment(commentId, POST_ONE, USER_ONE, "mine", "<p>mine</p>"));
+
+        assertFalse(repository.deleteComment(commentId, POST_ONE, USER_TWO)); // not the author
+        assertFalse(repository.deleteComment(commentId, POST_TWO, USER_ONE)); // wrong parent post
+        assertTrue(repository.deleteComment(commentId, POST_ONE, USER_ONE)); // author + correct post
+        assertFalse(repository.deleteComment(commentId, POST_ONE, USER_ONE)); // already gone
     }
 
     private void seedProfile(UUID userId, String handle, int rating, String tier, long identityVersion) {
