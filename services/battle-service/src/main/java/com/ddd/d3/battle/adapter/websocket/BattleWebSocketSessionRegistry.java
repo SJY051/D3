@@ -202,7 +202,8 @@ final class BattleWebSocketSessionRegistry {
                     return null;
                 }
                 sequence = Math.max(sequence, registration.lastSequence + 1);
-                String payload = objectMapper.writeValueAsString(BattleSnapshotMessageV3.from(view, attack, submission));
+                String payload = objectMapper.writeValueAsString(
+                        BattleSnapshotMessageV3.from(view, attack, submission, sequence));
                 return new PreparedSnapshot(sequence, submissionId, new TextMessage(payload));
             }
             if (view.aggregateVersion() <= registration.lastSequence) {

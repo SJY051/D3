@@ -12,13 +12,17 @@ public record BattleSnapshotMessageV3(
     private static final String MESSAGE_TYPE = "BATTLE_SNAPSHOT";
     private static final int MESSAGE_VERSION = 3;
 
+    // The registry owns the effective sequence: verdict-only changes bump it past the
+    // aggregate-plus-attack baseline, and the serialized frame must carry that same value
+    // or v3 clients discard the verdict frame as stale.
     public static BattleSnapshotMessageV3 from(
-            BattleMatchView match, BattleAttackView attack, BattleJudgeReferenceStore.SubmissionVerdict submission) {
+            BattleMatchView match, BattleAttackView attack,
+            BattleJudgeReferenceStore.SubmissionVerdict submission, long sequence) {
         Objects.requireNonNull(match);
         Objects.requireNonNull(attack);
         if (!match.matchId().equals(attack.matchId())) throw new IllegalArgumentException("snapshot matchIds differ");
         return new BattleSnapshotMessageV3(MESSAGE_TYPE, MESSAGE_VERSION, match.matchId(),
-                Math.addExact(match.aggregateVersion(), attack.sequence()), attack.serverTime(),
+                sequence, attack.serverTime(),
                 new Payload(BattleSnapshotMessageV2.from(match).payload(), attack(attack), submission(submission)));
     }
 
