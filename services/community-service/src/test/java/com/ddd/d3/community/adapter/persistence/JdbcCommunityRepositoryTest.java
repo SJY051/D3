@@ -81,6 +81,46 @@ class JdbcCommunityRepositoryTest {
     }
 
     @Test
+    void d3Com001FollowingFeedComposesMultipleAuthorsAcrossKeysetPages() {
+        UUID authorTwo = UUID.fromString("55555555-5555-4555-8555-555555555555");
+        UUID postA = UUID.fromString("33333333-3333-4333-8333-33333333B001"); // USER_TWO   PUBLIC
+        UUID postB = UUID.fromString("33333333-3333-4333-8333-33333333B002"); // authorTwo  PUBLIC
+        UUID postC = UUID.fromString("33333333-3333-4333-8333-33333333B003"); // USER_TWO   FOLLOWERS
+
+        repository.insertPost(new NewPost(postA, USER_TWO, PostVisibility.PUBLIC, "a", "<p>a</p>", 1));
+        repository.insertPost(new NewPost(postB, authorTwo, PostVisibility.PUBLIC, "b", "<p>b</p>", 1));
+        repository.insertPost(new NewPost(postC, USER_TWO, PostVisibility.FOLLOWERS, "c", "<p>c</p>", 1));
+        repository.insertFollow(USER_ONE, USER_TWO);
+        repository.insertFollow(USER_ONE, authorTwo); // viewer follows two distinct authors
+
+        // Fixed clock => equal created_at, so order falls to id desc: C, B, A across both authors.
+        var firstPage = repository.followingFeed(USER_ONE, Optional.empty(), 2);
+        assertEquals(List.of(postC, postB), firstPage.posts().stream().map(post -> post.id()).toList());
+        assertFalse(firstPage.nextCursor().isBlank()); // limit+1 row seen => nextCursor emitted
+
+        var last = firstPage.posts().getLast();
+        var secondPage = repository.followingFeed(USER_ONE,
+                Optional.of(new com.ddd.d3.community.application.CommunityService.FeedCursor(
+                        last.createdAt(), last.id())), 2);
+        assertEquals(List.of(postA), secondPage.posts().stream().map(post -> post.id()).toList()); // no dup, no miss
+        assertNull(secondPage.nextCursor()); // last page: no more rows
+    }
+
+    @Test
+    void d3Com001FollowingFeedExcludesPrivatePostsOfFollowedAuthors() {
+        UUID publicPost = UUID.fromString("33333333-3333-4333-8333-33333333C001");
+        UUID privatePost = UUID.fromString("33333333-3333-4333-8333-33333333C003");
+
+        repository.insertPost(new NewPost(publicPost, USER_TWO, PostVisibility.PUBLIC, "pub", "<p>pub</p>", 3));
+        repository.insertPost(new NewPost(privatePost, USER_TWO, PostVisibility.PRIVATE, "pri", "<p>pri</p>", 3));
+        repository.insertFollow(USER_ONE, USER_TWO);
+
+        List<UUID> feed = repository.followingFeed(USER_ONE, Optional.empty(), 20)
+                .posts().stream().map(post -> post.id()).toList();
+        assertEquals(List.of(publicPost), feed); // PRIVATE stays hidden even from a followed author
+    }
+
+    @Test
     void d3Com001RecognizesAllAudiencesButFeedsOnlyPublicPostsWithKeysetPagination() {
         repository.insertPost(new NewPost(POST_ONE, USER_ONE, PostVisibility.PUBLIC, "one", "<p>one</p>", 3));
         repository.insertPost(new NewPost(POST_TWO, USER_TWO, PostVisibility.PUBLIC, "two", "<p>two</p>", 3));
