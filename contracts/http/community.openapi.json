@@ -2,14 +2,14 @@
   "openapi": "3.1.0",
   "info": {
     "title": "D3 Community API",
-    "version": "0.3.0",
-    "description": "P0 public developer feed and privacy-safe match record contract, plus the P1 social interactions (follow, like, comment) activated over the already-recognized persistence. Markdown rendering is a safe minimal subset: paragraphs, line breaks, and fenced code blocks."
+    "version": "0.4.0",
+    "description": "P0 public developer feed and privacy-safe match record contract, plus the P1 social interactions (follow, like, comment), FOLLOWERS-visibility posts, and a following feed activated over the already-recognized persistence. Markdown rendering is a safe minimal subset: paragraphs, line breaks, and fenced code blocks."
   },
   "x-requirements": ["D3-COM-001", "D3-STAT-001", "D3-SEC-001"],
   "paths": {
     "/v1/community/posts": {
       "post": {
-        "summary": "Create a public Markdown post",
+        "summary": "Create a Markdown post (PUBLIC or FOLLOWERS visibility)",
         "security": [{ "bearerAuth": [] }],
         "requestBody": {
           "required": true,
@@ -45,6 +45,28 @@
         "responses": {
           "200": {
             "description": "Public feed page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FeedPage" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/v1/community/following-feed": {
+      "get": {
+        "summary": "List posts authored by users the viewer follows (PUBLIC and FOLLOWERS) with keyset pagination",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "cursor", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Following feed page; FOLLOWERS posts appear only for followers of the author",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/FeedPage" }
@@ -345,7 +367,7 @@
       "PostVisibility": {
         "type": "string",
         "enum": ["PUBLIC", "FOLLOWERS", "CIRCLE", "PRIVATE"],
-        "description": "P0 APIs accept only PUBLIC; persistence recognizes every documented value."
+        "description": "Post creation accepts PUBLIC and FOLLOWERS; CIRCLE and PRIVATE are recognized by persistence but not yet activated at the interface."
       },
       "Post": {
         "type": "object",

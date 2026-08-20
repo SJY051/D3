@@ -34,7 +34,7 @@ public final class CommunityController {
     CommunityService.PostView createPost(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreatePostRequest request) {
-        return service.createPublicPost(UUID.fromString(jwt.getSubject()), request.markdown(), request.visibility());
+        return service.createPost(UUID.fromString(jwt.getSubject()), request.markdown(), request.visibility());
     }
 
     @GetMapping("/feed")
@@ -42,6 +42,14 @@ public final class CommunityController {
             @RequestParam Optional<String> cursor,
             @RequestParam(defaultValue = "20") int limit) {
         return service.publicFeed(cursor, limit);
+    }
+
+    @GetMapping("/following-feed")
+    CommunityService.FeedPage followingFeed(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam Optional<String> cursor,
+            @RequestParam(defaultValue = "20") int limit) {
+        return service.followingFeed(UUID.fromString(jwt.getSubject()), cursor, limit);
     }
 
     @GetMapping("/profiles")

@@ -30,10 +30,10 @@ public final class CommunityService {
         this.markdownLimit = markdownLimit;
     }
 
-    public PostView createPublicPost(UUID authorUserId, String markdown, PostVisibility visibility) {
+    public PostView createPost(UUID authorUserId, String markdown, PostVisibility visibility) {
         PostVisibility requestedVisibility = visibility == null ? PostVisibility.PUBLIC : visibility;
-        if (requestedVisibility != PostVisibility.PUBLIC) {
-            throw new IllegalArgumentException("only public posts are enabled in P0");
+        if (requestedVisibility != PostVisibility.PUBLIC && requestedVisibility != PostVisibility.FOLLOWERS) {
+            throw new IllegalArgumentException("only public and followers posts are activated; circle and private are not");
         }
         if (markdown.length() > markdownLimit) {
             throw new IllegalArgumentException("post markdown exceeds the configured limit");
@@ -45,7 +45,7 @@ public final class CommunityService {
         return repository.insertPost(new NewPost(
                 ids.get(),
                 authorUserId,
-                PostVisibility.PUBLIC,
+                requestedVisibility,
                 markdown,
                 markdownPolicy.renderSanitizedHtml(markdown),
                 proseCharacters));
@@ -90,6 +90,12 @@ public final class CommunityService {
     public FeedPage publicFeed(Optional<String> cursor, int limit) {
         Optional<FeedCursor> decodedCursor = cursor.map(FeedCursor::decode);
         return repository.publicFeed(decodedCursor, clamp(limit, 1, 50));
+    }
+
+    /** Posts authored by users the viewer follows; FOLLOWERS posts reach only followers, PUBLIC still public. */
+    public FeedPage followingFeed(UUID viewerUserId, Optional<String> cursor, int limit) {
+        Optional<FeedCursor> decodedCursor = cursor.map(FeedCursor::decode);
+        return repository.followingFeed(viewerUserId, decodedCursor, clamp(limit, 1, 50));
     }
 
     public void follow(UUID followerUserId, UUID followedUserId) {

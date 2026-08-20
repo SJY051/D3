@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,7 +28,7 @@ class CommunityServiceTest {
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> service.createPublicPost(
+                () -> service.createPost(
                         UUID.fromString("11111111-1111-4111-8111-111111111111"),
                         markdown,
                         PostVisibility.PUBLIC));
@@ -42,6 +43,17 @@ class CommunityServiceTest {
 
         assertThrows(PostNotFoundException.class, () -> service.unlike(userId, postId));
         verify(repository, never()).deleteLike(any(), any());
+    }
+
+    @Test
+    void d3Com001CreatePostActivatesFollowersButStillRejectsCircleAndPrivate() {
+        UUID author = UUID.fromString("11111111-1111-4111-8111-111111111111");
+
+        service.createPost(author, "hi", PostVisibility.FOLLOWERS);
+        verify(repository).insertPost(argThat(post -> post.visibility() == PostVisibility.FOLLOWERS));
+
+        assertThrows(IllegalArgumentException.class, () -> service.createPost(author, "hi", PostVisibility.CIRCLE));
+        assertThrows(IllegalArgumentException.class, () -> service.createPost(author, "hi", PostVisibility.PRIVATE));
     }
 
     @Test
